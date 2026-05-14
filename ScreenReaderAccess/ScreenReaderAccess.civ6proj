@@ -1,0 +1,66 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Default" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Default</Configuration>
+    <Name>Screen Reader Access</Name>
+    <Guid>49224623-c629-4e7a-a5cb-ad822828072e</Guid>
+    <ProjectGuid>86d90124-1370-4574-ada6-d21e12e6f95f</ProjectGuid>
+    <ModVersion>1</ModVersion>
+    <Teaser>A mod that allows textual information from game to be output via a running screen reader, allowing blind and visually impaired</Teaser>
+    <Description>A mod that allows textual information from game to be output via a running screen reader, allowing blind and visually impaired players to play the game.</Description>
+    <Authors>BlindFuryC</Authors>
+    <SpecialThanks>
+    </SpecialThanks>
+    <AffectsSavedGames>true</AffectsSavedGames>
+    <SupportsSinglePlayer>true</SupportsSinglePlayer>
+    <SupportsMultiplayer>true</SupportsMultiplayer>
+    <SupportsHotSeat>true</SupportsHotSeat>
+    <CompatibleVersions>1.2,2.0</CompatibleVersions>
+    <AssemblyName>ScreenReaderAccess</AssemblyName>
+    <RootNamespace>ScreenReaderAccess</RootNamespace>
+    <FrontEndActionData><![CDATA[<FrontEndActions><ImportFiles id="SRAccess_FE_UpdateFiles"><File priority="10001">Assets/UI/ToolTips/PlotToolTip.lua</File><File priority="10001">Assets/UI/Accessibility/ScreenReader.lua</File><File priority="10001">Assets/UI/Panels/StatusMessagePanel.lua</File><File priority="10001">Assets/UI/Panels/NotificationPanel.lua</File><File priority="10001">Assets/UI/Frontend/MainMenu.lua</File></ImportFiles></FrontEndActions>]]></FrontEndActionData>
+    <InGameActionData><![CDATA[<InGameActions><ImportFiles id="SRAccess_IG_UpdateFiles"><File priority="10001">Assets/UI/ToolTips/PlotToolTip.lua</File><File priority="10001">Assets/UI/Accessibility/ScreenReader.lua</File><File priority="10001">Assets/UI/Panels/StatusMessagePanel.lua</File><File priority="10001">Assets/UI/Panels/NotificationPanel.lua</File><File priority="10001">Assets/UI/Panels/ProductionPanel.lua</File><File priority="10001">Assets/UI/Popups/TechCivicCompletedPopup.lua</File><File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File></ImportFiles><AddGameplayScripts id="SRAccess_IG_GameplayScripts"><File priority="10001">Assets/UI/Accessibility/ScreenReaderEventHandlers.lua</File><File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File></AddGameplayScripts></InGameActions>]]></InGameActionData>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Default' ">
+    <OutputPath>.</OutputPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="Assets\UI\Accessibility\ScreenReader.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Assets\UI\Accessibility\ScreenReaderEventHandlers.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Assets\UI\Accessibility\ScreenReaderPlotUtils.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Assets\UI\Frontend\MainMenu.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Assets\UI\Panels\NotificationPanel.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Assets\UI\Panels\ProductionPanel.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Assets\UI\Panels\StatusMessagePanel.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Assets\UI\Popups\TechCivicCompletedPopup.lua">
+      <SubType>Content</SubType>
+    </Content>
+    <Content Include="Assets\UI\ToolTips\PlotToolTip.lua">
+      <SubType>Content</SubType>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Assets" />
+    <Folder Include="Assets\UI" />
+    <Folder Include="Assets\UI\Accessibility" />
+    <Folder Include="Assets\UI\Frontend" />
+    <Folder Include="Assets\UI\Popups" />
+    <Folder Include="Assets\UI\Panels" />
+    <Folder Include="Assets\UI\ToolTips" />
+  </ItemGroup>
+  <Import Project="$(MSBuildLocalExtensionPath)Civ6.targets" />
+</Project>

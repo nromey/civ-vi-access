@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Mod id="49224623-c629-4e7a-a5cb-ad822828072e" version="1">
+  <Properties>
+    <Name>Screen Reader Access</Name>
+    <Teaser>A mod that allows textual information from game to be output via a running screen reader, allowing blind and visually impaired</Teaser>
+    <Description>A mod that allows textual information from game to be output via a running screen reader, allowing blind and visually impaired players to play the game.</Description>
+    <Authors>Noel Romey</Authors>
+    <SpecialThanks></SpecialThanks>
+    <AffectsSavedGames>1</AffectsSavedGames>
+    <SupportsSinglePlayer>1</SupportsSinglePlayer>
+    <SupportsMultiplayer>1</SupportsMultiplayer>
+    <SupportsHotSeat>1</SupportsHotSeat>
+    <CompatibleVersions>1.2,2.0</CompatibleVersions>
+  </Properties>
+  <FrontEndActions>
+    <ImportFiles id="SRAccess_FE_UpdateFiles">
+      <File priority="10001">Assets/UI/ToolTips/PlotToolTip.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScreenReader.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/MainMenuAccess.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/LoadGameMenuAccess.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/OptionsAccess.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ContextHelp.lua</File>
+      <File priority="10001">Assets/UI/Panels/StatusMessagePanel.lua</File>
+      <File priority="10001">Assets/UI/Panels/NotificationPanel.lua</File>
+      <File priority="10001">Assets/UI/Frontend/MainMenu.lua</File>
+      <File priority="10001">Assets/UI/Frontend/FrontEndPopup.lua</File>
+      <File priority="10001">Assets/UI/Frontend/IntroScreen.lua</File>
+      <File priority="10001">Assets/UI/Frontend/LoadGameMenu.lua</File>
+      <File priority="10001">Assets/UI/Options.lua</File>
+    </ImportFiles>
+    <UpdateText id="SRAccess_FE_Text">
+      <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
+    </UpdateText>
+  </FrontEndActions>
+  <InGameActions>
+    <ImportFiles id="SRAccess_IG_UpdateFiles">
+      <File priority="10001">Assets/UI/ToolTips/PlotToolTip.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScreenReader.lua</File>
+      <File priority="10001">Assets/UI/Panels/StatusMessagePanel.lua</File>
+      <File priority="10001">Assets/UI/Panels/NotificationPanel.lua</File>
+      <File priority="10001">Assets/UI/Panels/ProductionPanel.lua</File>
+      <File priority="10001">Assets/UI/Popups/TechCivicCompletedPopup.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/OptionsAccess.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ContextHelp.lua</File>
+      <File priority="10001">Assets/UI/Options.lua</File>
+    </ImportFiles>
+    <AddGameplayScripts id="SRAccess_IG_GameplayScripts">
+      <File priority="10001">Assets/UI/Accessibility/ScreenReaderEventHandlers.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
+    </AddGameplayScripts>
+    <UpdateText id="SRAccess_IG_Text">
+      <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
+    </UpdateText>
+  </InGameActions>
+  <Files>
+    <File>Assets/UI/Accessibility/ScreenReader.lua</File>
+    <File>Assets/UI/Accessibility/ScreenReaderEventHandlers.lua</File>
+    <File>Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
+    <File>Assets/UI/Accessibility/MainMenuAccess.lua</File>
+    <File>Assets/UI/Accessibility/LoadGameMenuAccess.lua</File>
+    <File>Assets/UI/Accessibility/OptionsAccess.lua</File>
+    <File>Assets/UI/Accessibility/ContextHelp.lua</File>
+    <File>Assets/UI/Options.lua</File>
+    <File>Assets/UI/Frontend/MainMenu.lua</File>
+    <File>Assets/UI/Frontend/FrontEndPopup.lua</File>
+    <File>Assets/UI/Frontend/IntroScreen.lua</File>
+    <File>Assets/UI/Frontend/LoadGameMenu.lua</File>
+    <File>Assets/UI/Panels/NotificationPanel.lua</File>
+    <File>Assets/UI/Panels/ProductionPanel.lua</File>
+    <File>Assets/UI/Panels/StatusMessagePanel.lua</File>
+    <File>Assets/UI/Popups/TechCivicCompletedPopup.lua</File>
+    <File>Assets/UI/ToolTips/PlotToolTip.lua</File>
+    <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
+  </Files>
+</Mod>

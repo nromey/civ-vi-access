@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Civ VI Access — user-facing strings.
+
+    File convention: one XML per language, in Assets/Text/<lang>/. Civ VI
+    loads the file matching the current game language; Locale.Lookup
+    returns the right text without our Lua needing to pick.
+
+    To translate:
+      1. Copy this file to Assets/Text/<lang>/CivVIAccessStrings.xml
+      2. Translate the <Text> contents (keep Tag values identical, and
+         keep placeholder tokens like {1_Label} exactly as written —
+         the Lua side passes positional arguments that fill them in)
+      3. Add the file to <UpdateDatabase> entries in ScreenReaderAccess.modinfo
+         (both FrontEndActions and InGameActions, since several screens
+         are reached from both contexts)
+
+    Naming convention:
+      LOC_CIVVIACCESS_<AREA>_<PURPOSE>
+        ITEM_*    — reusable composition templates ("{1_Label}, activated"
+                    etc.) that get filled with a current focus label
+        VALUE_*   — formatted value renderers ("{1_Num} percent")
+        ENTRY_*   — list-row descriptions ("{1_Name}, folder", etc.)
+        HELP_*    — long-form F1 help bodies keyed by screen identifier
+        Otherwise the second segment names the screen (MAIN_MENU,
+        LOADGAME, EULA, POPUP, OPTIONS) and the third segment is purpose.
+-->
+<GameData>
+    <BaseGameText>
+
+        <!-- Reusable item-state composition templates. -->
+        <Row Tag="LOC_CIVVIACCESS_ITEM_ACTIVATED">
+            <Text>{1_Label}, activated</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ITEM_CHECKED">
+            <Text>{1_Label}, checked</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ITEM_UNCHECKED">
+            <Text>{1_Label}, unchecked</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ITEM_UNAVAILABLE">
+            <Text>{1_Label}, unavailable</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ITEM_EMPTY">
+            <Text>{1_Label}, empty</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ITEM_VALUE">
+            <Text>{1_Label}, {2_Value}</Text>
+        </Row>
+
+        <!-- Value renderers and list-entry templates. -->
+        <Row Tag="LOC_CIVVIACCESS_VALUE_PERCENT">
+            <Text>{1_Num} percent</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ENTRY_FOLDER">
+            <Text>{1_Name}, folder</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ENTRY_ORDINAL">
+            <Text>{1_Name}, {2_Ord} of {3_Total}</Text>
+        </Row>
+
+        <!-- Main menu. -->
+        <Row Tag="LOC_CIVVIACCESS_MAIN_MENU_TITLE">
+            <Text>Civilization VI main menu</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_MAIN_MENU_BACK_CUE">
+            <Text>Main menu</Text>
+        </Row>
+
+        <!-- Load Game menu. The COUNT_* pair handles English singular vs
+             plural; translators can adjust per their language's pluralization
+             rules without us baking plural logic into Lua. -->
+        <Row Tag="LOC_CIVVIACCESS_LOADGAME_EMPTY">
+            <Text>No saved games available. Press Escape to go back.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOADGAME_COUNT_ONE">
+            <Text>1 save game available.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOADGAME_COUNT_MANY">
+            <Text>{1_Num} save games available.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOADGAME_NAV_HELP">
+            <Text>Use up and down arrows to navigate, Enter to load, Escape to go back.</Text>
+        </Row>
+
+        <!-- EULA / IntroScreen. The INTRO body wraps Civ VI's localized
+             LOC_COPYRIGHT_TEXT, which the Lua looks up before passing it
+             through as {1_Body}. -->
+        <Row Tag="LOC_CIVVIACCESS_EULA_ACCEPTED">
+            <Text>License agreement accepted. Loading main menu.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_EULA_INTRO">
+            <Text>End user license agreement. {1_Body} Please wait for the accept option to become available.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_EULA_PROMPT">
+            <Text>Press Enter or Space to accept the license agreement and continue.</Text>
+        </Row>
+
+        <!-- FrontEndPopup (Alt+F4 confirm + generic FE error popups). -->
+        <Row Tag="LOC_CIVVIACCESS_POPUP_BUTTONS_HELP">
+            <Text>Buttons: {1_List}. Use up and down arrows to navigate, Enter to activate, Escape to cancel.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_POPUP_FOCUSED">
+            <Text>Focused: {1_Label}</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_QUITTING">
+            <Text>Quitting Civilization VI.</Text>
+        </Row>
+
+        <!-- Options screen. EDITBOX_MOUSE_HINT is a standalone sentence the
+             Lua appends after the current editbox announcement. -->
+        <Row Tag="LOC_CIVVIACCESS_TAB_HEADER">
+            <Text>{1_Title} tab</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_TAB_STUB">
+            <Text>{1_Title} tab, not yet accessible. Reset, Confirm, or Close available.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_OPTIONS_NAV_HINT">
+            <Text>Use Page Up and Page Down to change tabs. Press F1 for full keyboard help.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_EDITBOX_MOUSE_HINT">
+            <Text>Mouse click to edit.</Text>
+        </Row>
+
+        <!-- F1 / context-sensitive keyboard help, keyed by screen identifier
+             (ContextHelp.Speak(KEY)). Pre-existing entry; kept here so all
+             user-facing strings live in one file. -->
+        <Row Tag="LOC_CIVVIACCESS_HELP_OPTIONS">
+            <Text>Options keyboard help. Use this dialog to adjust various options related to Civilization VI's gameplay. Press Page Down or Tab to move to the next tab. Press Page Up to move to the previous tab. Use the Up and Down arrow keys to move between items in the current tab. Press Home or End to jump to the first or last item. Press the Left or Right arrow key to adjust sliders by 5 percent or to cycle through pulldown options. Hold the Control key and press Left or Right to adjust sliders by 20 percent. Press Enter or Space to activate buttons and toggle checkboxes. Press Escape to close Options without saving.</Text>
+        </Row>
+
+    </BaseGameText>
+</GameData>
