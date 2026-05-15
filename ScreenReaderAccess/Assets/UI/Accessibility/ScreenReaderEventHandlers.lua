@@ -32,6 +32,29 @@ local function unitDisplayName(unit)
     return Locale.Lookup(unitInfo.Name);
 end
 
+-- True if the unit has any damage at all. Inline rather than imported
+-- from ScreenReaderPlotUtils because it's three lines and we don't need
+-- a global API surface for it. pcall-guards GetDamage in case it returns
+-- nil mid-destruction.
+local function unitIsDamaged(unit)
+    if unit == nil or unit.GetDamage == nil then
+        return false;
+    end
+    local ok, damage = pcall(function() return unit:GetDamage(); end);
+    return ok and damage ~= nil and damage > 0;
+end
+
+-- Compose the player's-own-unit announcement: unit name plus a damaged
+-- suffix when applicable. No civilization adjective — the player knows
+-- it's theirs because they just selected it.
+local function ownUnitAnnouncement(unit)
+    local name = unitDisplayName(unit);
+    if name == "" or not unitIsDamaged(unit) then
+        return name;
+    end
+    return Locale.Lookup("LOC_CIVVIACCESS_UNIT_DAMAGED", name);
+end
+
 -- Collect every unit and city sitting on a hex adjacent to (hexX, hexY).
 -- Civ VI's DirectionTypes.NUM_DIRECTION_TYPES on a pointy-top hex map is 6,
 -- so this iterates the six real neighbors. Map.GetAdjacentPlot returns nil
@@ -93,7 +116,7 @@ function OnUnitSelectionChanged(playerID :number, unitID :number,
         return;
     end
 
-    OutputMessageToScreenReader(unitDisplayName(pUnit));
+    OutputMessageToScreenReader(ownUnitAnnouncement(pUnit));
 
     local pois = GetAdjacentPointsOfInterestFrom(hexI, hexJ);
     local line = TurnPointsOfInterestIntoString(pois);

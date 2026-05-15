@@ -43,6 +43,7 @@
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
       <File priority="10001">Assets/UI/Accessibility/OptionsAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ContextHelp.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/TutorialAccess.lua</File>
       <File priority="10001">Assets/UI/Options.lua</File>
     </ImportFiles>
     <AddGameplayScripts id="SRAccess_IG_GameplayScripts">
@@ -61,6 +62,7 @@
     <File>Assets/UI/Accessibility/LoadGameMenuAccess.lua</File>
     <File>Assets/UI/Accessibility/OptionsAccess.lua</File>
     <File>Assets/UI/Accessibility/ContextHelp.lua</File>
+    <File>Assets/UI/Accessibility/TutorialAccess.lua</File>
     <File>Assets/UI/Options.lua</File>
     <File>Assets/UI/Frontend/MainMenu.lua</File>
     <File>Assets/UI/Frontend/FrontEndPopup.lua</File>

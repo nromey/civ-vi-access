@@ -48,6 +48,28 @@
             <Text>{1_Label}, {2_Value}</Text>
         </Row>
 
+        <!-- Relationship decorators for adjacent units / cities. Peace
+             (the default state with another civ) is deliberately unmarked
+             — the dominant case shouldn't carry a noise word every time.
+             Self / Enemy / Allied wrap the inner description; translators
+             can adjust word order per language (e.g. "敵 American Warrior"
+             vs. English "Enemy American Warrior"). -->
+        <Row Tag="LOC_CIVVIACCESS_REL_SELF">
+            <Text>Your {1_Description}</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_REL_ENEMY">
+            <Text>Enemy {1_Description}</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_REL_ALLIED">
+            <Text>Allied {1_Description}</Text>
+        </Row>
+
+        <!-- Damaged-state suffix for units. Used both on adjacency
+             announcements and on primary unit-selection announcements. -->
+        <Row Tag="LOC_CIVVIACCESS_UNIT_DAMAGED">
+            <Text>{1_Description}, damaged</Text>
+        </Row>
+
         <!-- Value renderers and list-entry templates. -->
         <Row Tag="LOC_CIVVIACCESS_VALUE_PERCENT">
             <Text>{1_Num} percent</Text>
@@ -120,6 +142,27 @@
         </Row>
         <Row Tag="LOC_CIVVIACCESS_EDITBOX_MOUSE_HINT">
             <Text>Mouse click to edit.</Text>
+        </Row>
+
+        <!-- Tutorial accessibility — wraps the engine's tutorial popup,
+             goal, and world-pointer events for spoken announcement. The
+             body of each advisor message and goal text comes from Civ VI
+             itself (already localized); these strings are the wrapping
+             scaffolding we add. -->
+        <Row Tag="LOC_CIVVIACCESS_TUTORIAL_POPUP_PREFIX">
+            <Text>Tutorial.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_TUTORIAL_BUTTONS">
+            <Text>Buttons: {1_List}.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_TUTORIAL_GOAL_ADDED">
+            <Text>New goal: {1_Goal}</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_TUTORIAL_GOAL_COMPLETE">
+            <Text>Goal completed: {1_Goal}</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_TUTORIAL_POINTING_AT">
+            <Text>Pointing at plot {1_X}, {2_Y}.</Text>
         </Row>
 
         <!-- F1 / context-sensitive keyboard help, keyed by screen identifier
