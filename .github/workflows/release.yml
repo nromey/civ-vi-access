@@ -121,13 +121,20 @@ jobs:
       # transparent — the service issues a fresh cert per signing
       # request; timestamping (via the trusted timestamp authority below)
       # keeps the resulting signature valid indefinitely.
+      # Note on the bin\x64\... path segment: when running inside the
+      # vcvars-loaded dev environment that ilammy/msvc-dev-cmd@v1
+      # provides (required for the AOT linker), MSBuild picks up the
+      # Platform=x64 environment variable and inserts it into the
+      # output path. Locally outside dev cmd, output lands at
+      # bin\Release\... without the extra x64 segment. CI-specific
+      # path here because the workflow only runs on CI.
       - name: Sign with Azure Trusted Signing
         uses: azure/trusted-signing-action@v0
         with:
           endpoint: https://eus.codesigning.azure.net/
           trusted-signing-account-name: nromey
           certificate-profile-name: romeycert
-          files-folder: ${{ github.workspace }}\CivViAccess\bin\Release\net10.0-windows\win-x64\publish
+          files-folder: ${{ github.workspace }}\CivViAccess\bin\x64\Release\net10.0-windows\win-x64\publish
           files-folder-filter: exe
           file-digest: SHA256
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
@@ -138,7 +145,7 @@ jobs:
       - name: Rename signed binary
         shell: pwsh
         run: |
-          $src = "${{ github.workspace }}\CivViAccess\bin\Release\net10.0-windows\win-x64\publish\CivViAccess.exe"
+          $src = "${{ github.workspace }}\CivViAccess\bin\x64\Release\net10.0-windows\win-x64\publish\CivViAccess.exe"
           $dst = "${{ github.workspace }}\CivViAccess-${{ steps.version.outputs.version }}.exe"
           Copy-Item $src $dst
           Get-Item $dst | Format-List Name, Length, LastWriteTime

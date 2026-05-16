@@ -20,6 +20,23 @@ The same number lives in three places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.1.13 — 2026-05-16 — Release pipeline fix (publish output path)
+
+Third pipeline-debugging bump. 0.1.12 fixed Azure auth and the
+build + sign step actually started executing — but the signing
+step couldn't find the published binary because of a path
+mismatch. When dotnet publish runs inside the vcvars-loaded
+dev environment that ilammy/msvc-dev-cmd@v1 provides (which we
+need for the AOT linker), MSBuild picks up the Platform=x64
+env var and inserts an extra `x64\` segment into the output
+path: `bin\x64\Release\...` instead of `bin\Release\...`.
+Local builds outside dev cmd don't have this segment, so the
+hardcoded path was wrong only on CI.
+
+Updated all `files-folder` / `copy` paths in the workflow to
+include the extra `bin\x64\` segment. Workflow only runs on CI
+so the divergence from local-build paths is contained.
+
 ## 0.1.12 — 2026-05-16 — Release pipeline fix (drop subscription-id from azure/login)
 
 Second pipeline-debugging bump. 0.1.11 added `allow-no-subscriptions:
