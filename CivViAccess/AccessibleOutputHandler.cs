@@ -57,7 +57,9 @@ public sealed class AccessibleOutputHandler
                 }
 
                 var sanitized = SanitizeLine(line);
-                Tolk.Output(sanitized, interrupt);
+                Logger.Info($"OutputMessage forwarding to Tolk (interrupt={interrupt}): '{sanitized}'");
+                var ok = Tolk.Output(sanitized, interrupt);
+                Logger.Info($"  Tolk.Output returned {ok}");
             }
         }
     }

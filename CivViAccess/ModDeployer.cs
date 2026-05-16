@@ -11,19 +11,19 @@ namespace CivVIAccess.Launcher;
 // DLC dir."
 //
 // Path discovery: walks parent directories from the launcher exe looking
-// for a ScreenReaderAccess folder with a ScreenReaderAccess.modinfo file
-// inside. That double-check (folder name + sentinel file) avoids confusing
-// a random "ScreenReaderAccess" name match somewhere on disk.
+// for a CivViAccessMod folder with a CivViAccessMod.modinfo file inside.
+// That double-check (folder name + sentinel file) avoids confusing a
+// random "CivViAccessMod" name match somewhere on disk.
 public static class ModDeployer
 {
-    private const string ModDirName = "ScreenReaderAccess";
-    private const string ModInfoFileName = "ScreenReaderAccess.modinfo";
+    private const string ModDirName = "CivViAccessMod";
+    private const string ModInfoFileName = "CivViAccessMod.modinfo";
 
     // Default Steam-install Civ VI DLC location. Matches the hardcoded
     // civVIPath in Program.cs; if/when that becomes configurable, this
     // does too.
     public const string DefaultDestination =
-        @"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Civilization VI\DLC\ScreenReaderAccess";
+        @"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Civilization VI\DLC\CivViAccessMod";
 
     public static string? FindModSourceDir()
     {

@@ -1,6 +1,6 @@
 -- In-game gameplay-script event handlers for screen-reader announcements.
 --
--- Listed under <AddGameplayScripts> in ScreenReaderAccess.modinfo so it runs
+-- Listed under <AddGameplayScripts> in CivViAccessMod.modinfo so it runs
 -- once per game session inside the in-game Lua context (where the Game,
 -- Players, Map, Units, and Cities APIs are reachable). The frontend context
 -- never loads this file — there are no units to announce in the main menu.

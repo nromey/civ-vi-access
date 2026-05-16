@@ -33,11 +33,11 @@ external DLLs, make HTTP requests, write files, or otherwise talk to
 processes outside the game. To bridge that gap, this project pairs two
 pieces:
 
-1. **The mod itself** (`ScreenReaderAccess/`) runs inside Civ VI. When it
+1. **The mod itself** (`CivViAccessMod/`) runs inside Civ VI. When it
    has something to announce, it `print()`s the line into Civ VI's
    `Lua.log` with a special prefix marker (`#SCREENREADER -` or
    `#SCREENREADER[NOINTERRUPT] -`).
-2. **The launcher** (`CivVIAccess.Launcher/`) is a small .NET 10 console
+2. **The launcher** (`CivViAccess/`) is a small .NET 10 console
    app that runs alongside the game. It tails `Lua.log`, parses prefix-
    marked lines, and routes them to the user's screen reader via
    [Tolk](https://github.com/dkager/tolk) — which speaks to NVDA, JAWS,

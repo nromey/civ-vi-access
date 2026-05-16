@@ -1,0 +1,159 @@
+# Release workflow for Civ VI Access.
+#
+# Triggered by pushing a git tag matching the pattern v* (e.g., v0.1.10).
+# Builds the launcher as a Native AOT single-file Windows binary, signs
+# it via Azure Trusted Signing using OIDC federation (no client secrets),
+# and publishes the signed binary as an asset on the GitHub Release for
+# the tag.
+#
+# The tag name (minus the leading v) becomes the version embedded in the
+# binary's FileVersion / ProductVersion metadata. The csproj <Version>
+# is overridden at publish time so the binary metadata always matches
+# the tag rather than whatever the csproj happened to read at the moment
+# of tagging.
+#
+# Required GitHub Secrets on the repo (Settings -> Secrets and variables
+# -> Actions):
+#   AZURE_CLIENT_ID       Application (client) ID of the civviaccess-signing
+#                         App Registration in Microsoft Entra ID.
+#   AZURE_TENANT_ID       Directory (tenant) ID.
+#   AZURE_SUBSCRIPTION_ID Subscription ID containing the Trusted Signing
+#                         account.
+#
+# Required Azure-side setup (one-time per repo, see the Trusted Signing
+# setup guide for the full walkthrough):
+#   - App Registration with a federated credential trusting
+#     repo:nromey/civ-vi-access:ref:refs/heads/main (and/or tag refs).
+#   - The App Reg granted the "Trusted Signing Certificate Profile Signer"
+#     RBAC role on the romeycert profile in the nromey Trusted Signing
+#     account (eastus region).
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# OIDC federation needs id-token: write; release-asset upload needs
+# contents: write.
+permissions:
+  id-token: write
+  contents: write
+
+jobs:
+  build-sign-release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Extract the version number from the tag (strip the leading 'v').
+      # Used both for the binary metadata and for the release asset name.
+      - name: Compute version from tag
+        id: version
+        shell: bash
+        run: |
+          tag="${GITHUB_REF#refs/tags/}"
+          version="${tag#v}"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Tag: $tag, version: $version"
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      # Native AOT compilation invokes the MSVC linker (link.exe), which
+      # needs the Visual Studio developer environment on PATH. ilammy's
+      # action loads vcvarsall.bat into the current shell so subsequent
+      # dotnet publish steps can find link.exe.
+      - name: Setup MSVC dev environment
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      # Override the csproj <Version> at publish time so the binary
+      # metadata matches the tag exactly. Without this, you could tag
+      # v0.1.10 but the binary would still report whatever <Version>
+      # was committed in the csproj at that moment.
+      - name: Publish AOT
+        shell: pwsh
+        run: |
+          dotnet publish CivViAccess `
+            -c Release `
+            -r win-x64 `
+            -p:Version=${{ steps.version.outputs.version }} `
+            --nologo
+
+      # OIDC federation: GitHub mints a short-lived identity token,
+      # azure/login exchanges it for an Azure access token using the
+      # federated credential rule on the civviaccess-signing App Reg.
+      # No client secret is stored anywhere.
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # Sign the published binary in place. The Trusted Signing service
+      # holds the private key in Microsoft-managed HSMs; this action
+      # sends the file hash to the service and gets back a signature
+      # which it embeds into the .exe. The 72-hour cert lifetime is
+      # transparent — the service issues a fresh cert per signing
+      # request; timestamping (via the trusted timestamp authority below)
+      # keeps the resulting signature valid indefinitely.
+      - name: Sign with Azure Trusted Signing
+        uses: azure/trusted-signing-action@v0
+        with:
+          endpoint: https://eus.codesigning.azure.net/
+          trusted-signing-account-name: nromey
+          certificate-profile-name: romeycert
+          files-folder: ${{ github.workspace }}\CivViAccess\bin\Release\net10.0-windows\win-x64\publish
+          files-folder-filter: exe
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      # Rename the signed binary to include the version, matching the
+      # CHANGELOG.md convention (CivViAccess-0.1.10.exe).
+      - name: Rename signed binary
+        shell: pwsh
+        run: |
+          $src = "${{ github.workspace }}\CivViAccess\bin\Release\net10.0-windows\win-x64\publish\CivViAccess.exe"
+          $dst = "${{ github.workspace }}\CivViAccess-${{ steps.version.outputs.version }}.exe"
+          Copy-Item $src $dst
+          Get-Item $dst | Format-List Name, Length, LastWriteTime
+
+      # Verify the signature lands correctly. This is belt-and-suspenders
+      # — if signing silently failed, this step makes the workflow fail
+      # loudly so we never publish an unsigned binary to the release.
+      - name: Verify signature
+        shell: pwsh
+        run: |
+          $sig = Get-AuthenticodeSignature "${{ github.workspace }}\CivViAccess-${{ steps.version.outputs.version }}.exe"
+          $sig | Format-List
+          if ($sig.Status -ne 'Valid') {
+            Write-Error "Signature status is $($sig.Status), expected Valid. Aborting release."
+            exit 1
+          }
+          Write-Host "Signature verified: $($sig.SignerCertificate.Subject)"
+
+      # Create (or update if it already exists) the GitHub Release for
+      # this tag and attach the signed binary. softprops/action-gh-release
+      # handles both cases; if the release was pre-created in the GitHub
+      # UI it gets updated, otherwise a new release is created from the
+      # tag.
+      - name: Publish GitHub Release with signed binary
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: ${{ steps.version.outputs.tag }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            CivViAccess-${{ steps.version.outputs.version }}.exe

@@ -11,7 +11,7 @@
       2. Translate the <Text> contents (keep Tag values identical, and
          keep placeholder tokens like {1_Label} exactly as written —
          the Lua side passes positional arguments that fill them in)
-      3. Add the file to <UpdateDatabase> entries in ScreenReaderAccess.modinfo
+      3. Add the file to <UpdateDatabase> entries in CivViAccessMod.modinfo
          (both FrontEndActions and InGameActions, since several screens
          are reached from both contexts)
 

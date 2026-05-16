@@ -1,0 +1,97 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <!-- net10.0-windows (not plain net10.0) so Microsoft.Win32.Registry,
+         WindowsIdentity, and the other Windows-only APIs we now depend on
+         are available in-framework without separate packages. The launcher
+         is Windows-only by definition: Tolk, AttachThreadInput, IFEO
+         redirect, registry — none have a Linux/macOS equivalent. The Mac
+         stretch goal will need its own native helper (see
+         [[project-cross-platform]]). -->
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <PlatformTarget>x64</PlatformTarget>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+
+    <!-- Pre-release scheme: 0.1.N, bumped per shipped batch (see CHANGELOG.md).
+         Stays on 0.1.x until the installer + auto-update path lands.
+         The release workflow overrides this via -p:Version=<tag> at
+         publish time, so for signed releases the binary metadata
+         always matches the git tag. This default value is what local
+         dotnet build / dotnet publish produce in dev. -->
+    <Version>0.1.10</Version>
+
+    <!-- Distributed exe name has no dots, all camelCase. The project
+         folder + namespace can keep their existing "CivVIAccess.Launcher"
+         shape; only the produced binary is what users see. -->
+    <AssemblyName>CivViAccess</AssemblyName>
+    <Product>Civ VI Access</Product>
+    <AssemblyTitle>Civ VI Access Launcher</AssemblyTitle>
+    <Company>Noel Romey</Company>
+    <!-- LibraryImport's source generator emits unsafe pointer code for
+         marshalling. Required for the AOT-clean P/Invokes in
+         WindowFocusManager.cs. Does not weaken user code — only permits
+         the generated stubs to compile. -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+
+    <!-- Native AOT deployment. `dotnet publish -c Release -r win-x64`
+         produces a single self-contained native .exe with no .NET runtime
+         install requirement. Decided over self-contained framework-
+         dependent in 2026-05 (see project_launcher_publish_mode memory):
+         smaller footprint (~10-20 MB vs ~70-100 MB), faster cold start,
+         one-file deploy. The launcher is a pure P/Invoke catapult — no
+         reflection, no dynamic loading, no serializer attribute scanning
+         — which makes it textbook AOT territory.
+         InvariantGlobalization drops ICU + culture data we never use
+         (the launcher only handles ASCII paths and log markers). -->
+    <PublishAot>true</PublishAot>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!-- App manifest declares Common Controls v6 dependency, required
+         for TaskDialogIndirect (used by Dialogs.ShowChoice for command-
+         link choice dialogs). Without this, TaskDialogIndirect throws
+         EntryPointNotFoundException at runtime because comctl32 v5
+         (the default) doesn't export it. Also sets DPI awareness so
+         dialogs render crisply on high-DPI displays. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\third_party\tolk\dotnet\Tolk.cs" Link="Tolk\Tolk.cs" />
+  </ItemGroup>
+
+  <!--
+    Tolk DLLs are embedded as resources (logical name `tolk/<filename>`)
+    so the launcher exe is genuinely standalone — drop the .exe anywhere
+    and TolkBootstrap.EnsureNativeDllsPresent extracts the sidecars next
+    to it on first run. This unlocks the "download a single file, double-
+    click to install" UX. Native AOT compiles them in as binary blobs.
+
+    All DLLs in this directory are x64 — name of the folder enforces it
+    and the launcher's <PlatformTarget>x64</PlatformTarget> would refuse
+    to load a 32-bit DLL anyway.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\third_party\tolk\dist\x64\*.dll">
+      <LogicalName>tolk/%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+  <!--
+    The mod source tree is embedded as resources (logical name
+    `mod/<relative path>`) so the installer can extract it into Civ VI's
+    DLC dir on install without needing an external mod download. Mod
+    folder is ~640 KB, AOT-compiled into the .exe as binary blobs.
+
+    Skip ModBuddy-managed bin/obj if they ever appear in CivViAccessMod;
+    only Lua and XML source files need to ship.
+  -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\CivViAccessMod\**\*.*"
+                      Exclude="..\CivViAccessMod\bin\**\*;..\CivViAccessMod\obj\**\*">
+      <LogicalName>mod/%(RecursiveDir)%(Filename)%(Extension)</LogicalName>
+    </EmbeddedResource>
+  </ItemGroup>
+
+</Project>

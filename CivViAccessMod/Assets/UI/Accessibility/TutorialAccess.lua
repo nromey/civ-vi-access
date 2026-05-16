@@ -21,7 +21,7 @@
 -- which goal finished without forcing the user to remember it by id.
 --
 -- Loads via the InGameActions ImportFiles registration in
--- ScreenReaderAccess.modinfo. Frontend context never reaches this file —
+-- CivViAccessMod.modinfo. Frontend context never reaches this file —
 -- the tutorial is only active during an in-game session.
 
 include("ScreenReader");
