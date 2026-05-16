@@ -97,16 +97,21 @@ jobs:
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-          # The signing App Registration has no subscription-level RBAC
-          # role (it only has the "Trusted Signing Certificate Profile
-          # Signer" role scoped to the cert profile itself). azure/login
-          # by default enumerates subscriptions associated with the
-          # principal and fails when it finds none. Our downstream
-          # signing step talks directly to the Trusted Signing endpoint
-          # and doesn't need subscription enumeration; this flag tells
-          # azure/login to skip that check and just produce the access
-          # token.
+          # NOT passing subscription-id: the signing App Registration
+          # has no subscription-level RBAC role — it only has the
+          # "Trusted Signing Certificate Profile Signer" role scoped
+          # to the cert profile itself (principle of least privilege).
+          # Passing subscription-id triggers azure/login to attempt
+          # `az account set --subscription <id>` which fails because
+          # the App Reg can't see the subscription. allow-no-subscriptions
+          # tells the action to skip subscription enumeration / selection
+          # entirely. The downstream Trusted Signing call uses the
+          # OIDC-derived access token directly against the signing
+          # endpoint — no subscription context required.
+          #
+          # AZURE_SUBSCRIPTION_ID GitHub Secret is left in place
+          # (unused here) so if we ever add steps that legitimately
+          # need subscription context we have it ready.
           allow-no-subscriptions: true
 
       # Sign the published binary in place. The Trusted Signing service

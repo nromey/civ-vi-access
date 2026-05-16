@@ -20,6 +20,23 @@ The same number lives in three places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.1.12 — 2026-05-16 — Release pipeline fix (drop subscription-id from azure/login)
+
+Second pipeline-debugging bump. 0.1.11 added `allow-no-subscriptions:
+true` to the azure/login step, which handles the "no subscriptions
+enumerated" case — but we were ALSO explicitly passing
+`subscription-id`, which triggers a separate code path that tries
+to `az account set` to the specified subscription and fails because
+the App Registration has no subscription-level access. Removed the
+`subscription-id` parameter entirely; the OIDC-derived access
+token is used directly by the Trusted Signing call which doesn't
+need subscription context.
+
+Build pipeline reached the AOT publish step successfully under
+0.1.11 (first time the build phase ran end-to-end on GitHub
+runners). This bump fixes the Azure-auth step that immediately
+follows.
+
 ## 0.1.11 — 2026-05-16 — Release pipeline fix (subscription-enumeration bypass)
 
 Pipeline-debugging bump on top of 0.1.10. The 0.1.10 tag pushed
