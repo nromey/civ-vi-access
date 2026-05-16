@@ -20,7 +20,7 @@
          publish time, so for signed releases the binary metadata
          always matches the git tag. This default value is what local
          dotnet build / dotnet publish produce in dev. -->
-    <Version>0.1.10</Version>
+    <Version>0.1.11</Version>
 
     <!-- Distributed exe name has no dots, all camelCase. The project
          folder + namespace can keep their existing "CivVIAccess.Launcher"

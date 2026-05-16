@@ -20,6 +20,22 @@ The same number lives in three places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.1.11 — 2026-05-16 — Release pipeline fix (subscription-enumeration bypass)
+
+Pipeline-debugging bump on top of 0.1.10. The 0.1.10 tag pushed
+a new `release.yml` workflow that authenticated to Azure
+successfully but failed at `azure/login`'s default subscription-
+enumeration step, because the signing App Registration has no
+subscription-level RBAC role (it only has signing scope on the
+cert profile itself, which is the principle-of-least-privilege
+shape). Added `allow-no-subscriptions: true` to the azure/login
+step so it skips that check and just produces the access token
+the signing call needs.
+
+No source / binary changes from 0.1.10; this is the first version
+that actually produces a signed binary attached to a GitHub
+Release.
+
 ## 0.1.10 — 2026-05-16 — TaskDialog dialog migration, full uninstall cleanup, signed releases
 
 ### Installer / uninstaller UX
