@@ -1,6 +1,6 @@
 using Camm;
+using Camm.Wizard;
 using CivVIAccess.Launcher;
-using CivVIAccess.Launcher.Wizard;
 using DavyKager;
 using System.Diagnostics;
 
@@ -38,7 +38,7 @@ using System.Diagnostics;
 CammHost.Initialize(new CammModManifest
 {
     LocalAppDataFolderName = "CivVIAccess",
-    LauncherExeName = Installer.LauncherExeName,
+    LauncherExeName = "CivViAccess.exe",
     LauncherAssetNamePattern = "CivViAccess-{0}.exe",
     GitHubReleasesOwner = "nromey",
     GitHubReleasesRepo = "civ-vi-access",
@@ -53,6 +53,8 @@ CammHost.Initialize(new CammModManifest
     DisplayName = "Civ VI Access",
     Publisher = "Noel Romey",
     ProjectUrl = "https://github.com/nromey/civ-vi-access",
+    TargetGameDisplayName = "Civilization VI",
+    TargetGameLauncherName = "Steam",
 });
 
 Logger.StartSession("startup");
