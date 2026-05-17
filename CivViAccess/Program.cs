@@ -27,6 +27,28 @@ using System.Diagnostics;
 // .pending launcher swaps in cleanly, regardless of which mode we'd
 // otherwise enter.
 
+// Configure CAMM with the per-mod values it needs at runtime. Sets
+// folder names, GitHub release coordinates, IFEO target binaries,
+// game process names, mod payload metadata, and Apps & Features
+// display strings. Step 5 of the extraction plan replaces this with
+// a manifest object passed to CammHost.RunAsync.
+CammConfig.LocalAppDataFolderName = "CivVIAccess";
+CammConfig.LauncherExeName = Installer.LauncherExeName;
+CammConfig.LauncherAssetNamePattern = "CivViAccess-{0}.exe";
+CammConfig.GitHubReleasesOwner = "nromey";
+CammConfig.GitHubReleasesRepo = "civ-vi-access";
+CammConfig.UserAgent = "CivVIAccess.Launcher";
+CammConfig.IfeoTargetExeNames = new[] { "CivilizationVI.exe", "CivilizationVI_DX12.exe" };
+CammConfig.GameProcessNames = new[] { "CivilizationVI", "CivilizationVI_DX12" };
+CammConfig.ModPayloadFolderName = "CivViAccessMod";
+CammConfig.ModPayloadSentinelFileName = "CivViAccessMod.modinfo";
+CammConfig.ModPayloadDefaultDestination = () =>
+    @"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Civilization VI\DLC\CivViAccessMod";
+CammConfig.AppsAndFeaturesKeyName = "CivVIAccess";
+CammConfig.DisplayName = "Civ VI Access";
+CammConfig.Publisher = "Noel Romey";
+CammConfig.ProjectUrl = "https://github.com/nromey/civ-vi-access";
+
 Logger.StartSession("startup", "CivVIAccess");
 
 try { Console.Title = "Civ VI Access Launcher"; } catch { /* console may be redirected */ }
@@ -368,8 +390,7 @@ if (settings.UpdateChannel != UpdateChannel.Off && !isDevCheckout)
         if (release is not null && release.Version.CompareTo(SemVer.Current()) > 0)
         {
             var updater = new Updater(http, Log, Speak);
-            var result = await updater.ApplyAsync(
-                release, ModDeployer.DefaultDestination);
+            var result = await updater.ApplyAsync(release);
             switch (result)
             {
                 case UpdateResult.AppliedModOnly:

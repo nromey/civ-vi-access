@@ -1,3 +1,5 @@
+using Camm;
+
 namespace CivVIAccess.Launcher.Wizard;
 
 // Shared mutable state passed between wizard pages. Pages write their
