@@ -414,4 +414,7 @@ FodyWeavers.xsd
 
 # End of https://www.toptal.com/developers/gitignore/api/visualstudio
 
+# Claude Code per-project session metadata
+.claude/
+
 *.civ6suo

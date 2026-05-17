@@ -48,6 +48,28 @@
     <PublishAot>true</PublishAot>
     <InvariantGlobalization>true</InvariantGlobalization>
 
+    <!-- WinForms is enabled for the install wizard (see WIZARD_PLAN.md
+         and CivViAccess\Wizard\). The plain TaskDialog/MessageBox UI in
+         Dialogs.cs is kept for non-wizard one-shot prompts. AOT-clean
+         in .NET 10 with this property set; expect exe size to grow
+         from ~7.5 MB to ~13-15 MB once wizard ships. We keep
+         <OutputType>Exe</OutputType> (above) rather than the WinExe
+         default that UseWindowsForms otherwise implies — the launcher
+         needs its console window for log output and as the dialog
+         owner HWND (see Dialogs.cs). -->
+    <UseWindowsForms>true</UseWindowsForms>
+
+    <!-- WinForms triggers NETSDK1175 ("not supported or recommended
+         with trimming enabled") under PublishAot, because trimming
+         can prune reflection-discovered types in the broader WinForms
+         surface (Designer-serialized controls, data binding, the
+         property grid). Our wizard surface is intentionally code-only
+         (no Designer files, no data binding, no property grid, no
+         reflection-driven serialization), so we acknowledge the
+         warning and proceed. Any trimming-induced breakage will show
+         up during wizard testing; revisit if it does. -->
+    <_SuppressWinFormsTrimError>true</_SuppressWinFormsTrimError>
+
     <!-- App manifest declares Common Controls v6 dependency, required
          for TaskDialogIndirect (used by Dialogs.ShowChoice for command-
          link choice dialogs). Without this, TaskDialogIndirect throws

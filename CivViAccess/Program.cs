@@ -1,4 +1,5 @@
 using CivVIAccess.Launcher;
+using CivVIAccess.Launcher.Wizard;
 using DavyKager;
 using System.Diagnostics;
 
@@ -162,6 +163,22 @@ if (HasFlag(userArgs, "--config"))
         {
             Log("User cancelled channel change; settings unchanged.");
         }
+    }
+    return 0;
+}
+
+// Dev-only entry point: opens the install wizard scaffold without
+// running the actual install. Yanked once the wizard replaces the
+// TaskDialog install chain in Installer.Install (step 7 of
+// WIZARD_PLAN.md). Lets us iterate on wizard UI without re-running
+// the full install flow each time.
+if (HasFlag(userArgs, "--wizard-test"))
+{
+    if (OperatingSystem.IsWindows())
+    {
+        Log("Opening install wizard (--wizard-test mode)...");
+        InstallWizardForm.Run();
+        Log("Wizard closed.");
     }
     return 0;
 }
