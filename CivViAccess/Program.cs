@@ -1,6 +1,8 @@
 using Camm;
+using Camm.Speech;
 using Camm.Wizard;
 using CivVIAccess.Launcher;
+using CivVIAccess.Launcher.Speech;
 using DavyKager;
 using System.Diagnostics;
 
@@ -55,6 +57,8 @@ CammHost.Initialize(new CammModManifest
     ProjectUrl = "https://github.com/nromey/civ-vi-access",
     TargetGameDisplayName = "Civilization VI",
     TargetGameLauncherName = "Steam",
+    Sanitizer = new CivViMessageSanitizer(),
+    MarkerProtocol = new CivViScreenReaderMarkerProtocol(),
 });
 
 Logger.StartSession("startup");
@@ -103,8 +107,7 @@ Logger.Info("Step 3: AccessibleOutputHandler init");
 AccessibleOutputHandler? accessibleOutput = null;
 try
 {
-    var accessibleOutputOptionReader = new AccessibleOutputOptionReader();
-    accessibleOutput = new AccessibleOutputHandler(accessibleOutputOptionReader);
+    accessibleOutput = new AccessibleOutputHandler();
     Logger.Info("  AccessibleOutputHandler constructed");
     try
     {
@@ -566,7 +569,7 @@ var luaLogFilePath = Path.Join(luaLogFileDir, "Lua.log");
 Logger.Info("Waiting for Civ VI Lua.log to appear");
 Console.WriteLine("Waiting for Civ VI log file...");
 
-var logFileWatcher = new LogFileWatcher(mediator);
+var logFileWatcher = new LogTailSpeaker(mediator);
 var startupTimeout = TimeSpan.FromMinutes(2);
 var startupStart = DateTime.UtcNow;
 bool seenAlive = false;
