@@ -39,7 +39,14 @@ public static class Installer
     public static void Install(Action<string> log, Action<string> speak)
     {
         log("Opening install wizard...");
-        var context = new InstallContext { IsDryRun = false };
+        var context = new InstallContext
+        {
+            IsDryRun = false,
+            // First install if the install dir doesn't exist yet. Drives
+            // the WelcomePage subhead ("by Noel Romey, version X.Y.Z"),
+            // shown only on genuine first installs.
+            IsFirstInstall = !Directory.Exists(DefaultInstallDir),
+        };
         InstallWizardForm.Run(context);
         if (context.InstallError is null)
         {

@@ -5,20 +5,133 @@ than per-commit.
 
 ## Versioning
 
-Pre-release scheme: `0.1.N`, where `N` is a sequential build number that
-bumps once per shipped batch. We stay on `0.1.x` until the mod has a
-first-time user installer + auto-update path; the bump to `0.2.0` or
-`1.0.0` is reserved for that milestone, not for any in-game feature.
+`0.1.x` was the pre-installer pre-release scheme — sequential build
+numbers, bumped once per shipped batch. `0.2.0` shipped 2026-05-17 = the
+install wizard rewrite (the installer + auto-update milestone the
+scheme reserved this bump for). After 0.2.0 we resume sequential bumps
+(0.2.1, 0.2.2, ...) per shipped batch until the next major-feature
+milestone justifies `0.3.0` or `1.0.0`.
 
-The same number lives in three places and must move together:
+The same number lives in two places and must move together:
 
 - This file's top entry.
-- `<Version>` in `CivVIAccess.Launcher/CivVIAccess.Launcher.csproj`
-  (drives the .exe `FileVersion` / `ProductVersion`).
-- Future installer manifest (when the helper grows update support).
+- `<Version>` in `CivViAccess/CivViAccess.csproj` (drives the .exe
+  `FileVersion` / `ProductVersion`; the release workflow overrides
+  it via `-p:Version=<tag>` at publish time).
 
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
+
+## 0.2.0 — 2026-05-17 — Install wizard rewrite
+
+The 0.2.0 milestone. Replaces the 0.1.10 chained-TaskDialog install
+flow with a 5-page WinForms wizard — Welcome → Update channel →
+Ready to install → Installing → Done. Standard Next/Back/Cancel
+shape every Windows user recognizes; Back enables recovery from
+mistakes without re-running the installer. The wizard also serves
+as the canonical install UX for the future CAMM (Chameleon Access
+Mod Manager) extraction (see `CAMM_EXTRACTION_PLAN.md`).
+
+### Wizard pages
+
+- **Welcome**: heading + body summarizing what the installer does +
+  UAC heads-up. On a genuine first install (install dir doesn't
+  exist), a subhead reads "by Noel Romey, version 0.2.0" — hidden
+  on reinstall/update.
+- **Update channel**: read-only ComboBox with Stable (default) /
+  Latest / Off; live description Label updates on selection.
+  Arrowing through items speaks `"<mode>. <description>"` through
+  Tolk for deterministic announcements regardless of NVDA verbosity
+  settings.
+- **Ready to install**: summary block with install location +
+  chosen channel; note explaining the UAC prompt is coming and
+  pointing at both Apps & Features Modify AND re-running the
+  installer as ways to change the channel later. The host Next
+  button relabels to "Install" so the user knows the next click
+  commits.
+- **Installing**: marquee progress + status Label, all buttons
+  disabled (mid-install close isn't safe once elevation has been
+  granted). Spawns the launcher exe with `--install-from-wizard`
+  via runas; the elevated child runs `Installer.ApplyInstall` with
+  no UI. When the child exits, the wizard auto-advances.
+- **Done**: variant rendering. Success shows "Civ VI Access is
+  installed. Launch Civilization VI from Steam..." with Finish as
+  the only button. Failure shows the error message and tells the
+  user nothing was permanently changed.
+
+### Accessibility plumbing
+
+- **Tolk-driven page announcements** with a 250ms delay timer to
+  beat NVDA's focus-event race — page content speaks reliably
+  after focus has landed. Without the delay, NVDA's automatic
+  "Next button" announce queues over our content and the user
+  only hears the button name. Pattern documented in the
+  `reference_installer_wizard_speech_pattern` memory.
+- **Per-page initial focus** via `IWizardPage.InitialFocusControl`
+  — combobox on Channel, Install button on Ready, Next elsewhere.
+  Screen-reader users land on the primary control, not the
+  heading.
+- **Explicit `AccessibleName` + `AccessibleRole.StaticText`** on
+  every Label so NVDA's browse-mode reads them; mnemonic ampersands
+  stripped from button `AccessibleName` so screen readers don't
+  say "ampersand Install button".
+- **Cancel-confirm dialog** ("Continue installing" / "Yes, cancel
+  and exit") on every page where Cancel is enabled. Parents on the
+  wizard form (new `ownerHwnd` parameter on `Dialogs.ShowChoice`)
+  so Z-order is sane and the console window isn't yanked to the
+  front. Wired to both the Cancel button and `OnFormClosing` so
+  the title-bar X also triggers it. Installing page blocks close
+  entirely; Done page closes without prompt.
+
+### Architecture
+
+- **`Installer.ApplyInstall`** — the post-elevation install core
+  (copy launcher exe, extract Tolk DLLs, deploy mod payload to DLC
+  dir, register IFEO + Apps & Features) extracted as a public
+  method. Both the wizard's elevated child (`--install-from-wizard`)
+  and any future caller share one install implementation.
+- **`IWizardPage` interface** — pages declare `Title`,
+  `AnnouncementText`, `InitialFocusControl`, `NextButtonText`,
+  `ShowBackButton`, `ShowCancelButton`, `ButtonsEnabled`,
+  `CanGoNext` + events `CanGoNextChanged` and `AdvanceRequested`.
+  Host form drives transitions and speech timing; adding a page
+  is a self-contained `UserControl`.
+- **`InstallContext`** carries per-run state across pages:
+  `SelectedChannel`, `IsFirstInstall`, `IsDryRun`, `InstallError`.
+  `IsDryRun=true` (the default) drives `--wizard-test` dev
+  iteration with a 2-second simulation; `IsDryRun=false` (set by
+  `Installer.Install`) drives the real install path.
+
+### Build
+
+- `<UseWindowsForms>true</UseWindowsForms>` enables WinForms for
+  the wizard. Coexists with `<PublishAot>true</PublishAot>` via
+  `<_SuppressWinFormsTrimError>true</_SuppressWinFormsTrimError>`
+  — NETSDK1175 fires by default but the escape hatch is safe for
+  our intentionally-code-only wizard surface (no Designer files,
+  no data binding, no property grid). Trim warnings from
+  `System.Windows.Forms` etc. are advisory.
+- Expected exe size growth from ~7.5 MB (0.1.13) to ~12-15 MB.
+  Native AOT linker still required (CI loads MSVC via
+  `ilammy/msvc-dev-cmd@v1`).
+
+### Companion: CAMM extraction plan
+
+`CAMM_EXTRACTION_PLAN.md` lands alongside this release — a 620-line
+file-by-file template/glue/hybrid classification of the launcher,
+public-surface design (`CammModManifest` + `CammHost.RunAsync`),
+ten-step migration path with Civ VI Access as the test case,
+locale-catalog architecture, and open questions. Drives a future
+session.
+
+### Removed
+
+- `Installer.Install`'s TaskDialog chain (welcome + channel picker
+  + ready confirm + confirm-cancel loop) — replaced by wizard
+  pages.
+- `RelaunchSelfElevated` — only the legacy chain used it.
+- Uninstall keeps its TaskDialog flow per WIZARD_PLAN.md: it's a
+  single-binary confirm that doesn't benefit from a wizard shape.
 
 ## 0.1.13 — 2026-05-16 — Release pipeline fix (publish output path)
 
