@@ -19,12 +19,19 @@ public sealed class InstallWizardForm : Form
     private readonly Button _btnNext;
     private readonly Button _btnCancel;
     private readonly List<IWizardPage> _pages = new();
-    private readonly InstallContext _context = new();
+    private readonly InstallContext _context;
     private int _index = -1;
     private System.Windows.Forms.Timer? _speakTimer;
 
-    public InstallWizardForm()
+    // True once the user has confirmed cancel via the TaskDialog, so
+    // OnFormClosing knows to let Close() through without re-prompting.
+    // Also true when a programmatic close happens (post-install Finish
+    // click, etc.) so those don't trigger a spurious confirm.
+    private bool _cancelConfirmed;
+
+    public InstallWizardForm(InstallContext context)
     {
+        _context = context;
         Text = "Civilization VI Access Setup";
         ClientSize = new System.Drawing.Size(560, 420);
         StartPosition = FormStartPosition.CenterScreen;
@@ -101,9 +108,10 @@ public sealed class InstallWizardForm : Form
 
         _btnBack.Click += (_, _) => Navigate(-1);
         _btnNext.Click += (_, _) => Navigate(+1);
-        // Cancel-confirm dialog wires in step 5 of WIZARD_PLAN.md;
-        // for the scaffold, plain Close is fine.
-        _btnCancel.Click += (_, _) => Close();
+        // Cancel click routes through HandleCancel so the confirm
+        // dialog fires. Close() then triggers OnFormClosing again,
+        // which sees the _cancelConfirmed flag and skips re-prompting.
+        _btnCancel.Click += (_, _) => HandleCancel();
 
         AddPage(new WelcomePage());
         AddPage(new ChannelPage());
@@ -143,13 +151,76 @@ public sealed class InstallWizardForm : Form
         var target = _index + delta;
         if (target < 0 || target >= _pages.Count)
         {
-            // Past the last page: closes the form. Becomes Finish-
-            // wiring once DonePage lands (step 4 of WIZARD_PLAN.md).
+            // Past the last page = Finish on the Done page. Programmatic
+            // close — skip the cancel-confirm path because there's
+            // nothing left to cancel.
+            _cancelConfirmed = true;
             Close();
             return;
         }
         ShowPageUi(target);
         ActivatePage();
+    }
+
+    // Cancel-confirm dialog per WIZARD_PLAN.md. Pops a TaskDialog
+    // parented on the wizard form (not the console — passing our
+    // HWND keeps Z-order sane). Returns true if user confirms cancel,
+    // false to stay on the current page.
+    //
+    // Wired to both _btnCancel.Click and (via OnFormClosing) the
+    // title-bar X / Esc-as-cancel-shortcut.
+    private bool ConfirmCancel()
+    {
+        const int ID_CONTINUE = 1;
+        const int ID_CANCEL = 2;
+        var choice = Dialogs.ShowChoice(
+            title: "Cancel installation?",
+            mainInstruction: "Are you sure you want to cancel?",
+            content:
+                "Nothing has been installed yet. You can come back to " +
+                "the installer any time.",
+            choices: new[]
+            {
+                new Dialogs.ChoiceButton(ID_CONTINUE, "Continue installing",
+                    "Return to the wizard."),
+                new Dialogs.ChoiceButton(ID_CANCEL, "Yes, cancel and exit",
+                    "Close the installer without making any changes."),
+            },
+            defaultChoiceId: ID_CONTINUE,
+            warningIcon: true,
+            ownerHwnd: Handle);
+        return choice == ID_CANCEL;
+    }
+
+    private void HandleCancel()
+    {
+        if (ConfirmCancel())
+        {
+            _cancelConfirmed = true;
+            Close();
+        }
+    }
+
+    protected override void OnFormClosing(FormClosingEventArgs e)
+    {
+        if (e.CloseReason == CloseReason.UserClosing && !_cancelConfirmed && _index >= 0)
+        {
+            var page = _pages[_index];
+            if (!page.ButtonsEnabled)
+            {
+                // Installing page — block close entirely. Aborting
+                // mid-install isn't safe once UAC has been granted
+                // and files are mid-copy.
+                e.Cancel = true;
+            }
+            else if (page.ShowCancelButton)
+            {
+                if (!ConfirmCancel()) e.Cancel = true;
+                else _cancelConfirmed = true;
+            }
+            // ShowCancelButton == false (Done page) — let close proceed.
+        }
+        base.OnFormClosing(e);
     }
 
     // UI-only swap: install the page UserControl, update the button bar,
@@ -268,12 +339,19 @@ public sealed class InstallWizardForm : Form
     // launcher's main thread is MTA because top-level statements
     // can't carry [STAThread]. Spawn a dedicated UI thread, run the
     // message loop there, and join when the form closes.
-    public static void Run()
+    //
+    // Parameterless overload constructs a default InstallContext
+    // (IsDryRun = true) — appropriate for --wizard-test dev iteration.
+    // Real install flow (--install) calls Run(new InstallContext
+    // { IsDryRun = false }).
+    public static void Run() => Run(new InstallContext());
+
+    public static void Run(InstallContext context)
     {
         var ui = new Thread(() =>
         {
             ApplicationConfiguration.Initialize();
-            Application.Run(new InstallWizardForm());
+            Application.Run(new InstallWizardForm(context));
         });
         ui.SetApartmentState(ApartmentState.STA);
         ui.Start();

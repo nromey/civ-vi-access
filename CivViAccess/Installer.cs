@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.Versioning;
+using CivVIAccess.Launcher.Wizard;
 
 namespace CivVIAccess.Launcher;
 
@@ -24,159 +25,30 @@ public static class Installer
 
     public static string LauncherExeName => "CivViAccess.exe";
 
-    // Run from any directory (dev build, downloaded zip, wherever). We
-    // copy ourselves + sidecars to DefaultInstallDir, then register
-    // IFEO. Idempotent — running twice is safe and refreshes the files.
+    // Open the install wizard. Replaces the legacy TaskDialog chain
+    // (welcome → channel picker → ready confirm → UAC relaunch →
+    // ApplyInstall → completion dialog) as of WIZARD_PLAN.md step 7.
+    //
+    // The wizard's pages drive the pre-elevation UX (Welcome, Channel,
+    // Ready); InstallingPage spawns the elevated child via runas +
+    // --install-from-wizard (or calls ApplyInstall directly when
+    // already elevated); DonePage handles success/failure completion
+    // UX. log and speak are accepted for caller-signature compat and
+    // for the bare-exe entry's pre-wizard speech announcement — the
+    // wizard itself routes its own speech through Tolk.
     public static void Install(Action<string> log, Action<string> speak)
     {
-        if (!IfeoInstaller.IsRunningElevated())
+        log("Opening install wizard...");
+        var context = new InstallContext { IsDryRun = false };
+        InstallWizardForm.Run(context);
+        if (context.InstallError is null)
         {
-            // Welcome dialog BEFORE UAC. TaskDialog command-link buttons
-            // give us literal verb labels — "Continue" / "Exit installer"
-            // — instead of the OK/Cancel that MessageBox would force.
-            // Screen readers announce the verbs, sighted users don't
-            // have to scan the body to figure out which button does
-            // what.
-            const int ID_CONTINUE = 1;
-            const int ID_EXIT = 2;
-            var welcome = Dialogs.ShowChoice(
-                title: "Civilization VI Access — Install",
-                mainInstruction: "Install Civilization VI Access on this computer?",
-                content:
-                    "After install, launching Civilization VI from Steam (or any " +
-                    "shortcut) will automatically activate the screen-reader " +
-                    "accessibility mod.\n\n" +
-                    "The installer will:\n" +
-                    "  • Copy launcher files to " + DefaultInstallDir + "\n" +
-                    "  • Deploy mod files to Civ VI's DLC directory\n" +
-                    "  • Register Steam-launch redirect (so launches activate the mod)\n" +
-                    "  • Register in Apps & Features (for easy uninstall later)\n\n" +
-                    "You will be prompted to grant administrator permission (Windows " +
-                    "UAC) at the end, after you choose your update channel.",
-                choices: new[]
-                {
-                    new Dialogs.ChoiceButton(ID_CONTINUE, "Continue to update channel selection",
-                        "Pick your update channel next, then confirm and install."),
-                    new Dialogs.ChoiceButton(ID_EXIT, "Exit installer",
-                        "Close this installer without making any changes."),
-                },
-                defaultChoiceId: ID_CONTINUE);
-            if (welcome != ID_CONTINUE)
-            {
-                speak("Install cancelled.");
-                log("Install cancelled by user at welcome dialog.");
-                return;
-            }
-
-            // Channel picker BEFORE elevation so the user's choice can
-            // be persisted to launcher.ini (in %LocalAppData%, user-
-            // writable) without needing admin. The elevated install
-            // process will then read this setting later when launches
-            // happen.
-            var currentSettings = LauncherSettings.LoadOrCreate(LauncherSettings.DefaultPath);
-            var picked = Dialogs.ShowChannelPicker(currentSettings.UpdateChannel);
-            UpdateChannel effectiveChannel;
-            if (picked is UpdateChannel choice)
-            {
-                currentSettings.UpdateChannel = choice;
-                try { currentSettings.Save(LauncherSettings.DefaultPath); }
-                catch (Exception ex) { log($"Could not save update channel: {ex.Message}"); }
-                log($"Update channel set to: {choice}");
-                effectiveChannel = choice;
-            }
-            else
-            {
-                log($"Update channel unchanged (still {currentSettings.UpdateChannel}).");
-                effectiveChannel = currentSettings.UpdateChannel;
-            }
-
-            // Explicit commit-step confirmation before UAC. The welcome
-            // dialog described what would happen in the abstract; the
-            // channel picker collected a setting. Neither said "and now
-            // I'm going to start the install." Without this, the user
-            // picks a channel and the next thing they see is a UAC
-            // prompt — a surprising handoff that conflates configure
-            // with commit. TaskDialog with literal "Install" /
-            // "Cancel installation" buttons makes the next click
-            // unambiguous; cancel triggers a second confirm because
-            // this is the last point before UAC and accidentally
-            // bailing means re-running the whole flow.
-            const int ID_INSTALL = 1;
-            const int ID_CANCEL_INSTALL = 2;
-            while (true)
-            {
-                var ready = Dialogs.ShowChoice(
-                    title: "Civilization VI Access — Ready to Install",
-                    mainInstruction: "Ready to install. Click Install to continue.",
-                    content:
-                        "Settings:\n" +
-                        "  • Install location: " + DefaultInstallDir + "\n" +
-                        "  • Update channel: " + effectiveChannel + "\n\n" +
-                        "Clicking Install will prompt for administrator permission " +
-                        "(Windows UAC). You can change the update channel later from " +
-                        "Windows Settings → Apps → Installed Apps → Civ VI Access " +
-                        "→ Modify.",
-                    choices: new[]
-                    {
-                        new Dialogs.ChoiceButton(ID_INSTALL, "Install",
-                            "Apply these settings and start installation."),
-                        new Dialogs.ChoiceButton(ID_CANCEL_INSTALL, "Cancel installation",
-                            "Don't install. Exit without making any changes."),
-                    },
-                    defaultChoiceId: ID_INSTALL);
-
-                if (ready == ID_INSTALL) break;
-
-                // Confirm cancel — this is the last commit point, and
-                // an accidental click here means re-launching the
-                // installer from scratch. Give one chance to back out
-                // of the cancel.
-                const int ID_REALLY_CANCEL = 1;
-                const int ID_RETURN = 2;
-                var confirmCancel = Dialogs.ShowChoice(
-                    title: "Civilization VI Access — Cancel Installation?",
-                    mainInstruction: "Cancel installation and exit?",
-                    content:
-                        "Nothing has been installed yet. If you exit now, no changes " +
-                        "will be made to your computer.",
-                    choices: new[]
-                    {
-                        new Dialogs.ChoiceButton(ID_RETURN, "Go back to install",
-                            "Return to the Ready to Install screen."),
-                        new Dialogs.ChoiceButton(ID_REALLY_CANCEL, "Yes, cancel and exit",
-                            "Exit the installer without installing."),
-                    },
-                    defaultChoiceId: ID_RETURN);
-                if (confirmCancel == ID_REALLY_CANCEL)
-                {
-                    speak("Install cancelled.");
-                    log("Install cancelled by user at ready-to-install confirmation.");
-                    return;
-                }
-                // else loop and re-show the Ready dialog
-            }
-
-            RelaunchSelfElevated("--install");
-            Environment.Exit(0);
+            log("Wizard closed.");
         }
-
-        // Elevated path: do the actual work, then show the TaskDialog
-        // completion dialog. The wizard-driven install reuses
-        // ApplyInstall directly (its own Done page handles completion
-        // UX, so it skips the TaskDialog).
-        ApplyInstall(log, speak);
-
-        var installedLauncher = Path.Combine(DefaultInstallDir, LauncherExeName);
-        Dialogs.ShowInfo(
-            "Civilization VI Access — Install Complete",
-            "Civ VI Access has been installed successfully.\n\n" +
-            "To use the mod: launch Civilization VI from Steam as you normally would. " +
-            "The accessibility mod will start automatically each time.\n\n" +
-            "Installation location: " + DefaultInstallDir + "\n" +
-            "Settings file: " + DefaultInstallDir + "\\launcher.ini\n\n" +
-            "To uninstall later: run\n" +
-            "    \"" + installedLauncher + "\" --uninstall\n\n" +
-            "Click OK to finish.");
+        else
+        {
+            log($"Wizard closed with install error: {context.InstallError}");
+        }
     }
 
     // The post-elevation work, factored out so both the TaskDialog
@@ -458,13 +330,6 @@ public static class Installer
             (installDirCleaned ? "  • Launcher files at " + DefaultInstallDir + "\n" : "") +
             leftInPlaceLine + "\n" +
             "Click OK to finish.");
-    }
-
-    private static void RelaunchSelfElevated(string arg)
-    {
-        var exe = Environment.ProcessPath
-            ?? throw new InvalidOperationException("Cannot determine current exe path.");
-        RelaunchElevated(exe, arg);
     }
 
     private static void RelaunchElevated(string exe, string arg)

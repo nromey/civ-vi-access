@@ -167,11 +167,11 @@ if (HasFlag(userArgs, "--config"))
     return 0;
 }
 
-// Dev-only entry point: opens the install wizard scaffold without
-// running the actual install. Yanked once the wizard replaces the
-// TaskDialog install chain in Installer.Install (step 7 of
-// WIZARD_PLAN.md). Lets us iterate on wizard UI without re-running
-// the full install flow each time.
+// Dev-only entry point: opens the wizard with IsDryRun=true so the
+// Install button fires the 2-second simulation instead of a real
+// UAC + install. Lets us iterate on the wizard UI without touching
+// Program Files every keystroke. --install opens the same wizard
+// with IsDryRun=false (the real install path).
 if (HasFlag(userArgs, "--wizard-test"))
 {
     if (OperatingSystem.IsWindows())

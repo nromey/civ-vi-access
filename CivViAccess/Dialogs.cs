@@ -270,14 +270,21 @@ public static partial class Dialogs
         ChoiceButton[] choices,
         bool allowCancel = true,
         int defaultChoiceId = 0,
-        bool warningIcon = false)
+        bool warningIcon = false,
+        IntPtr? ownerHwnd = null)
     {
         if (choices is null || choices.Length == 0)
         {
             throw new ArgumentException("ShowChoice requires at least one choice button.", nameof(choices));
         }
 
-        var ownerHwnd = GetOwnerHwnd();
+        // When called from the install wizard, callers pass the wizard
+        // form's HWND so the TaskDialog parents on the wizard (correct
+        // Z-order, no console-yank). When called from the legacy
+        // TaskDialog install flow, the default null falls back to the
+        // console-window-as-owner behavior that handles Win11's
+        // foreground-stealing rules for console-only apps.
+        var effectiveOwner = ownerHwnd ?? GetOwnerHwnd();
 
         // Build the button text strings: TDF_USE_COMMAND_LINKS treats
         // the first \n as a heading-to-note separator, so concatenate
@@ -322,7 +329,7 @@ public static partial class Dialogs
             var config = new TASKDIALOGCONFIG
             {
                 cbSize = (uint)Marshal.SizeOf<TASKDIALOGCONFIG>(),
-                hwndParent = ownerHwnd,
+                hwndParent = effectiveOwner,
                 hInstance = IntPtr.Zero,
                 dwFlags = flags,
                 dwCommonButtons = 0,
