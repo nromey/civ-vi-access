@@ -14,16 +14,15 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
 
-    <!-- 0.2.0 = install wizard rewrite milestone. The version scheme
-         reserved this bump for the first-time-user installer + auto-
-         update path; the wizard rewrite is exactly that. After 0.2.0
-         we resume sequential bumps (0.2.1, 0.2.2, ...) per shipped
-         batch — see CHANGELOG.md. The release workflow overrides this
-         via -p:Version=<tag> at publish time, so for signed releases
-         the binary metadata always matches the git tag. This default
-         value is what local dotnet build / dotnet publish produce
-         in dev. -->
-    <Version>0.2.0</Version>
+    <!-- 0.3.0 = CAMM-consumer milestone. As of this version Civ VI
+         Access is built on the CAMM framework (github.com/nromey/camm,
+         pinned via the /camm/ submodule) rather than carrying its own
+         copies of the launcher/wizard/installer code. Reservations:
+         0.2.0 = install wizard rewrite, 0.3.0 = CAMM consumption. The
+         release workflow overrides this via -p:Version=<tag> at
+         publish time. This default is what local dotnet build /
+         dotnet publish produce in dev. -->
+    <Version>0.3.0</Version>
 
     <!-- Distributed exe name has no dots, all camelCase. The project
          folder + namespace can keep their existing "CivVIAccess.Launcher"

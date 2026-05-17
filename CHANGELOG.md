@@ -22,6 +22,48 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.3.0 — 2026-05-17 — Built on CAMM v0.1.0
+
+Architectural milestone: Civ VI Access is now a thin consumer of the
+[CAMM](https://github.com/nromey/camm) framework, pinned to the
+`v0.1.0` tag via the `camm/` git submodule. Roughly 2,900 lines of
+launcher / installer / wizard / speech / lifecycle code that used to
+live in this repo now lives in CAMM and is shared with any other
+accessibility-mod author who wires CAMM in.
+
+CivViAccess/ now holds 203 LOC across four files:
+- `Program.cs` (36): builds the CAMM manifest, calls
+  `CammHost.RunAsync(args, manifest)`.
+- `CivViGameInstance.cs` (71): implements `Camm.IGameInstance`. The
+  Steam path to `CivilizationVI.exe`, the `%LocalAppData%\Firaxis
+  Games\Sid Meier's Civilization VI\Logs\Lua.log` location for log-
+  tail speech, EULA-aware launch announcement (reads
+  `UserOptions.txt`'s `CopyrightAccept` line), the post-exit
+  "Civilization VI closed." line.
+- `Speech/CivViMessageSanitizer.cs` (52): implements
+  `Camm.Speech.IMessageSanitizer` with the existing regex map for
+  Civ VI's `[ICON_*]`, `[COLOR:*]`, `[NEWLINE]`, and `<WORD>:
+  #SCREENREADER` markup.
+- `Speech/CivViScreenReaderMarkerProtocol.cs` (44): implements
+  `Camm.Speech.IScreenReaderMarkerProtocol` with the `#SCREENREADER`
+  prefix and `[NOINTERRUPT]` option parsing.
+
+Plus the `CivViAccessMod/` mod payload directory, `app.manifest`, and
+`CivViAccess.csproj` (a `<ProjectReference>` to `camm/Camm/Camm.csproj`
+plus embedded-resource globs for the Tolk DLLs at
+`camm/third_party/tolk/dist/x64/` and the mod payload).
+
+Behavioral parity with 0.2.0 — same install wizard, same IFEO
+transparent-launch, same auto-update behavior, same per-user state
+locations. Verified via `dotnet run -- --version` (output identical
+to 0.2.0); the real install / launch / uninstall flow will be
+verified against the 0.3.0 signed release.
+
+CAMM extraction roadmap from `CAMM_EXTRACTION_PLAN.md`:
+- ✅ Steps 1-6, 8-10 of the plan.
+- ⏭️ Step 7 (LocaleCatalog + en.json for localizable visible strings)
+  ships as CAMM 0.1.1, no version bump required on this side.
+
 ## 0.2.0 — 2026-05-17 — Install wizard rewrite
 
 The 0.2.0 milestone. Replaces the 0.1.10 chained-TaskDialog install
