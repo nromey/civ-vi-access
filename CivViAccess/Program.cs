@@ -27,29 +27,35 @@ using System.Diagnostics;
 // .pending launcher swaps in cleanly, regardless of which mode we'd
 // otherwise enter.
 
-// Configure CAMM with the per-mod values it needs at runtime. Sets
-// folder names, GitHub release coordinates, IFEO target binaries,
-// game process names, mod payload metadata, and Apps & Features
-// display strings. Step 5 of the extraction plan replaces this with
-// a manifest object passed to CammHost.RunAsync.
-CammConfig.LocalAppDataFolderName = "CivVIAccess";
-CammConfig.LauncherExeName = Installer.LauncherExeName;
-CammConfig.LauncherAssetNamePattern = "CivViAccess-{0}.exe";
-CammConfig.GitHubReleasesOwner = "nromey";
-CammConfig.GitHubReleasesRepo = "civ-vi-access";
-CammConfig.UserAgent = "CivVIAccess.Launcher";
-CammConfig.IfeoTargetExeNames = new[] { "CivilizationVI.exe", "CivilizationVI_DX12.exe" };
-CammConfig.GameProcessNames = new[] { "CivilizationVI", "CivilizationVI_DX12" };
-CammConfig.ModPayloadFolderName = "CivViAccessMod";
-CammConfig.ModPayloadSentinelFileName = "CivViAccessMod.modinfo";
-CammConfig.ModPayloadDefaultDestination = () =>
-    @"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Civilization VI\DLC\CivViAccessMod";
-CammConfig.AppsAndFeaturesKeyName = "CivVIAccess";
-CammConfig.DisplayName = "Civ VI Access";
-CammConfig.Publisher = "Noel Romey";
-CammConfig.ProjectUrl = "https://github.com/nromey/civ-vi-access";
+// Construct the CAMM manifest and hand it to the host. Every CAMM
+// module reads per-mod state from CammHost.Manifest at call time.
+// CammHost.Initialize must run BEFORE any other CAMM call (Logger,
+// TolkBootstrap, Updater, etc.) — they throw on uninitialized access.
+//
+// Step 6+ of the extraction plan moves the routing flow below into
+// CammHost.RunAsync(args, manifest); at that point this file shrinks
+// to manifest-build + RunAsync call + Civ-VI-specific hooks.
+CammHost.Initialize(new CammModManifest
+{
+    LocalAppDataFolderName = "CivVIAccess",
+    LauncherExeName = Installer.LauncherExeName,
+    LauncherAssetNamePattern = "CivViAccess-{0}.exe",
+    GitHubReleasesOwner = "nromey",
+    GitHubReleasesRepo = "civ-vi-access",
+    UserAgent = "CivVIAccess.Launcher",
+    IfeoTargetExeNames = new[] { "CivilizationVI.exe", "CivilizationVI_DX12.exe" },
+    GameProcessNames = new[] { "CivilizationVI", "CivilizationVI_DX12" },
+    ModPayloadFolderName = "CivViAccessMod",
+    ModPayloadSentinelFileName = "CivViAccessMod.modinfo",
+    ModPayloadDefaultDestination = () =>
+        @"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Civilization VI\DLC\CivViAccessMod",
+    AppsAndFeaturesKeyName = "CivVIAccess",
+    DisplayName = "Civ VI Access",
+    Publisher = "Noel Romey",
+    ProjectUrl = "https://github.com/nromey/civ-vi-access",
+});
 
-Logger.StartSession("startup", "CivVIAccess");
+Logger.StartSession("startup");
 
 try { Console.Title = "Civ VI Access Launcher"; } catch { /* console may be redirected */ }
 
@@ -88,7 +94,7 @@ if (File.Exists(Updater.RedeployMarkerPath))
 // way, by the time AccessibleOutputHandler hits a Tolk P/Invoke, the
 // DLL loader can resolve it.
 Logger.Info("Step 2: TolkBootstrap.PrepareRuntime");
-try { TolkBootstrap.PrepareRuntime("CivViAccess"); Logger.Info("  PrepareRuntime returned"); }
+try { TolkBootstrap.PrepareRuntime(); Logger.Info("  PrepareRuntime returned"); }
 catch (Exception ex) { Logger.Exception("PrepareRuntime threw", ex); throw; }
 
 Logger.Info("Step 3: AccessibleOutputHandler init");
