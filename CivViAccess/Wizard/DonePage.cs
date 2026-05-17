@@ -6,13 +6,19 @@ namespace CivVIAccess.Launcher.Wizard;
 [SupportedOSPlatform("windows")]
 public sealed class DonePage : UserControl, IWizardPage
 {
-    private const string HeadingText = "Install complete";
-    private const string BodyText =
+    private const string SuccessHeading = "Install complete";
+    private const string FailureHeading = "Install failed";
+
+    private const string SuccessBody =
         "Civilization VI Access is installed.\r\n\r\n" +
         "Launch Civilization VI from Steam — the accessibility mod " +
         "activates automatically.\r\n\r\n" +
         "Per-user settings live at " +
         "%LocalAppData%\\CivVIAccess\\launcher.ini.";
+
+    private readonly Label _heading;
+    private readonly Label _body;
+    private string _announcement = string.Empty;
 
     public string Title => "Done";
     public bool CanGoNext => true;
@@ -25,7 +31,7 @@ public sealed class DonePage : UserControl, IWizardPage
     public bool ShowCancelButton => false;
     public string NextButtonText => "&Finish";
 
-    public string AnnouncementText => HeadingText + ". " + BodyText;
+    public string AnnouncementText => _announcement;
 
     public event EventHandler? CanGoNextChanged { add { } remove { } }
     public event EventHandler? AdvanceRequested { add { } remove { } }
@@ -34,30 +40,55 @@ public sealed class DonePage : UserControl, IWizardPage
     {
         Dock = DockStyle.Fill;
 
-        var heading = new Label
+        _heading = new Label
         {
-            Text = HeadingText,
             Font = new System.Drawing.Font("Segoe UI", 14F, System.Drawing.FontStyle.Bold),
             AutoSize = true,
             Location = new System.Drawing.Point(24, 24),
-            AccessibleName = HeadingText,
             AccessibleRole = AccessibleRole.StaticText,
         };
 
-        var body = new Label
+        _body = new Label
         {
-            Text = BodyText,
             AutoSize = false,
             Location = new System.Drawing.Point(24, 80),
-            Size = new System.Drawing.Size(500, 200),
-            AccessibleName = BodyText,
+            Size = new System.Drawing.Size(500, 240),
             AccessibleRole = AccessibleRole.StaticText,
         };
 
-        Controls.Add(heading);
-        Controls.Add(body);
+        Controls.Add(_heading);
+        Controls.Add(_body);
     }
 
-    public void OnEnter(InstallContext context) { }
+    public void OnEnter(InstallContext context)
+    {
+        // Variant selection happens at activation time so OnEnter can
+        // read whichever state the install actually landed in. The
+        // heading + body Labels are dynamic; AnnouncementText also
+        // tracks via _announcement so the spoken text matches what's
+        // on screen.
+        if (context.InstallError is null)
+        {
+            _heading.Text = SuccessHeading;
+            _heading.AccessibleName = SuccessHeading;
+            _body.Text = SuccessBody;
+            _body.AccessibleName = SuccessBody;
+            _announcement = SuccessHeading + ". " + SuccessBody;
+        }
+        else
+        {
+            var bodyText =
+                "The installer could not complete.\r\n\r\n" +
+                "Reason: " + context.InstallError + "\r\n\r\n" +
+                "Nothing has been changed permanently. You can close " +
+                "this window and run the installer again to retry.";
+            _heading.Text = FailureHeading;
+            _heading.AccessibleName = FailureHeading;
+            _body.Text = bodyText;
+            _body.AccessibleName = bodyText;
+            _announcement = FailureHeading + ". " + bodyText;
+        }
+    }
+
     public void OnLeave(InstallContext context) { }
 }

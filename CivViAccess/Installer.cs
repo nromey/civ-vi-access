@@ -160,6 +160,37 @@ public static class Installer
             Environment.Exit(0);
         }
 
+        // Elevated path: do the actual work, then show the TaskDialog
+        // completion dialog. The wizard-driven install reuses
+        // ApplyInstall directly (its own Done page handles completion
+        // UX, so it skips the TaskDialog).
+        ApplyInstall(log, speak);
+
+        var installedLauncher = Path.Combine(DefaultInstallDir, LauncherExeName);
+        Dialogs.ShowInfo(
+            "Civilization VI Access — Install Complete",
+            "Civ VI Access has been installed successfully.\n\n" +
+            "To use the mod: launch Civilization VI from Steam as you normally would. " +
+            "The accessibility mod will start automatically each time.\n\n" +
+            "Installation location: " + DefaultInstallDir + "\n" +
+            "Settings file: " + DefaultInstallDir + "\\launcher.ini\n\n" +
+            "To uninstall later: run\n" +
+            "    \"" + installedLauncher + "\" --uninstall\n\n" +
+            "Click OK to finish.");
+    }
+
+    // The post-elevation work, factored out so both the TaskDialog
+    // flow (Install above) and the wizard flow (--install-from-wizard
+    // in Program.cs) can reuse it. MUST be called from an elevated
+    // process — the caller is responsible for elevation handling and
+    // for any pre-install UI (welcome, channel pick, ready confirm).
+    //
+    // Steps: copy launcher exe + Tolk DLLs to install dir, deploy mod
+    // payload to DLC dir, register IFEO redirect, register Apps &
+    // Features. Idempotent — running twice is safe and refreshes
+    // files.
+    public static void ApplyInstall(Action<string> log, Action<string> speak)
+    {
         var destDir = DefaultInstallDir;
         Directory.CreateDirectory(destDir);
 
@@ -258,17 +289,6 @@ public static class Installer
         }
 
         speak("Civ VI Access installed.");
-
-        Dialogs.ShowInfo(
-            "Civilization VI Access — Install Complete",
-            "Civ VI Access has been installed successfully.\n\n" +
-            "To use the mod: launch Civilization VI from Steam as you normally would. " +
-            "The accessibility mod will start automatically each time.\n\n" +
-            "Installation location: " + DefaultInstallDir + "\n" +
-            "Settings file: " + DefaultInstallDir + "\\launcher.ini\n\n" +
-            "To uninstall later: run\n" +
-            "    \"" + installedLauncher + "\" --uninstall\n\n" +
-            "Click OK to finish.");
     }
 
     public static void Uninstall(Action<string> log, Action<string> speak)

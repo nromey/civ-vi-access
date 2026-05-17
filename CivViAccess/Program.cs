@@ -183,6 +183,26 @@ if (HasFlag(userArgs, "--wizard-test"))
     return 0;
 }
 
+// Headless install entry point used by the wizard's InstallingPage.
+// Wizard spawns this elevated via runas — same exe re-launched with
+// this flag does Installer.ApplyInstall and returns 0 on success / 1
+// on failure. No TaskDialog UI; the wizard's Done page handles
+// completion UX. Different from --install which still drives the
+// legacy TaskDialog flow (will be retired in WIZARD_PLAN.md step 7).
+if (HasFlag(userArgs, "--install-from-wizard"))
+{
+    try
+    {
+        Installer.ApplyInstall(Log, Speak);
+        return 0;
+    }
+    catch (Exception ex)
+    {
+        Logger.Exception("ApplyInstall (--install-from-wizard) threw", ex);
+        return 1;
+    }
+}
+
 // Transparent invocation: Windows IFEO prepended us to a CivilizationVI.exe
 // launch, so userArgs[0] is the full path to the real game binary and
 // userArgs[1..] are whatever original args Steam (or a shortcut) used.
