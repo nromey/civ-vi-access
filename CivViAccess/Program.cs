@@ -1,3 +1,4 @@
+using Camm;
 using CivVIAccess.Launcher;
 using CivVIAccess.Launcher.Wizard;
 using DavyKager;
@@ -26,7 +27,7 @@ using System.Diagnostics;
 // .pending launcher swaps in cleanly, regardless of which mode we'd
 // otherwise enter.
 
-Logger.StartSession("startup");
+Logger.StartSession("startup", "CivVIAccess");
 
 try { Console.Title = "Civ VI Access Launcher"; } catch { /* console may be redirected */ }
 
@@ -65,7 +66,7 @@ if (File.Exists(Updater.RedeployMarkerPath))
 // way, by the time AccessibleOutputHandler hits a Tolk P/Invoke, the
 // DLL loader can resolve it.
 Logger.Info("Step 2: TolkBootstrap.PrepareRuntime");
-try { TolkBootstrap.PrepareRuntime(); Logger.Info("  PrepareRuntime returned"); }
+try { TolkBootstrap.PrepareRuntime("CivViAccess"); Logger.Info("  PrepareRuntime returned"); }
 catch (Exception ex) { Logger.Exception("PrepareRuntime threw", ex); throw; }
 
 Logger.Info("Step 3: AccessibleOutputHandler init");
@@ -137,7 +138,7 @@ if (HasFlag(userArgs, "--config"))
     var configSettings = LauncherSettings.LoadOrCreate(LauncherSettings.DefaultPath);
     if (OperatingSystem.IsWindows())
     {
-        var picked = Dialogs.ShowChannelPicker(configSettings.UpdateChannel);
+        var picked = ChannelPickerDialog.Show(configSettings.UpdateChannel);
         if (picked is UpdateChannel choice)
         {
             configSettings.UpdateChannel = choice;
@@ -305,7 +306,7 @@ if (userArgs.Length == 0 && ModDeployer.FindModSourceDir() is null)
                     return 0;
                 case ID_SETTINGS:
                     var alreadyInstalledSettings = LauncherSettings.LoadOrCreate(LauncherSettings.DefaultPath);
-                    var picked = Dialogs.ShowChannelPicker(alreadyInstalledSettings.UpdateChannel);
+                    var picked = ChannelPickerDialog.Show(alreadyInstalledSettings.UpdateChannel);
                     if (picked is UpdateChannel newChan)
                     {
                         alreadyInstalledSettings.UpdateChannel = newChan;

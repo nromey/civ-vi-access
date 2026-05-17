@@ -82,23 +82,40 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
 
+  <!--
+    CAMM is a git submodule at /camm/, pinned to a specific tag (see
+    .gitmodules + commit SHA). The framework code (Logger, SemVer,
+    ProcessLauncher, TolkBootstrap, Dialogs) lives there as of 0.0.1;
+    we consume it via ProjectReference rather than NuGet (see
+    CAMM_EXTRACTION_PLAN.md for the rationale — single-maintainer
+    low-overhead workflow with version pinning via submodule SHA).
+
+    Tolk's vendored C# binding also lives in CAMM and is exposed via
+    its <Compile Include> there — no need to re-include here.
+  -->
   <ItemGroup>
-    <Compile Include="..\third_party\tolk\dotnet\Tolk.cs" Link="Tolk\Tolk.cs" />
+    <ProjectReference Include="..\camm\Camm\Camm.csproj" />
   </ItemGroup>
 
   <!--
     Tolk DLLs are embedded as resources (logical name `tolk/<filename>`)
     so the launcher exe is genuinely standalone — drop the .exe anywhere
-    and TolkBootstrap.EnsureNativeDllsPresent extracts the sidecars next
-    to it on first run. This unlocks the "download a single file, double-
-    click to install" UX. Native AOT compiles them in as binary blobs.
+    and Camm.TolkBootstrap extracts the sidecars next to it on first
+    run. This unlocks the "download a single file, double-click to
+    install" UX. Native AOT compiles them in as binary blobs.
 
-    All DLLs in this directory are x64 — name of the folder enforces it
-    and the launcher's <PlatformTarget>x64</PlatformTarget> would refuse
-    to load a 32-bit DLL anyway.
+    The DLL source lives in CAMM at camm/third_party/tolk/dist/x64/
+    (so all CAMM consumers share one vendored copy). CAMM's library
+    deliberately does NOT embed these resources — the consuming exe
+    must, so TolkBootstrap reading from Assembly.GetEntryAssembly()
+    finds them.
+
+    All DLLs in this directory are x64 — folder name enforces it
+    and the launcher's <PlatformTarget>x64</PlatformTarget> would
+    refuse to load a 32-bit DLL anyway.
   -->
   <ItemGroup>
-    <EmbeddedResource Include="..\third_party\tolk\dist\x64\*.dll">
+    <EmbeddedResource Include="..\camm\third_party\tolk\dist\x64\*.dll">
       <LogicalName>tolk/%(Filename)%(Extension)</LogicalName>
     </EmbeddedResource>
   </ItemGroup>
