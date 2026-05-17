@@ -107,6 +107,9 @@ public sealed class InstallWizardForm : Form
 
         AddPage(new WelcomePage());
         AddPage(new ChannelPage());
+        AddPage(new ReadyPage());
+        AddPage(new InstallingPage());
+        AddPage(new DonePage());
         // UI-only show during construction. ActivatePage (in OnShown
         // and Navigate) drives OnEnter + focus + Tolk speak — keeping
         // those out of the constructor avoids speaking before the
@@ -123,6 +126,13 @@ public sealed class InstallWizardForm : Form
         page.CanGoNextChanged += (s, _) =>
         {
             if (_index >= 0 && ReferenceEquals(_pages[_index], s)) UpdateButtons();
+        };
+        // AdvanceRequested lets pages that do async work (Installing)
+        // tell the host "advance now" without holding a reference to
+        // the host. Same active-page guard as CanGoNextChanged.
+        page.AdvanceRequested += (s, _) =>
+        {
+            if (_index >= 0 && ReferenceEquals(_pages[_index], s)) Navigate(+1);
         };
     }
 
@@ -157,7 +167,20 @@ public sealed class InstallWizardForm : Form
             _pageHost.Controls.Add(uc);
         }
         UpdateButtons();
+        ApplyNextButtonText(page);
         SetPageFocus();
+    }
+
+    // Pages that commit irreversible actions (Ready → Install) relabel
+    // the Next button so the user reading by keyboard knows the next
+    // click is meaningful. The mnemonic prefix `&` is stripped for the
+    // AccessibleName so screen readers say "Install button" not
+    // "ampersand Install button".
+    private void ApplyNextButtonText(IWizardPage page)
+    {
+        var text = page.NextButtonText;
+        _btnNext.Text = text;
+        _btnNext.AccessibleName = text.Replace("&", "");
     }
 
     // Fires the page lifecycle: OnEnter + delayed Tolk announcement.
@@ -173,8 +196,14 @@ public sealed class InstallWizardForm : Form
 
     private void UpdateButtons()
     {
-        _btnBack.Enabled = _index > 0;
-        _btnNext.Enabled = _pages[_index].CanGoNext;
+        var page = _pages[_index];
+        var globallyEnabled = page.ButtonsEnabled;
+        _btnBack.Visible = page.ShowBackButton;
+        _btnBack.Enabled = globallyEnabled && _index > 0;
+        _btnNext.Visible = !string.IsNullOrEmpty(page.NextButtonText);
+        _btnNext.Enabled = globallyEnabled && page.CanGoNext;
+        _btnCancel.Visible = page.ShowCancelButton;
+        _btnCancel.Enabled = globallyEnabled;
     }
 
     // Initial focus per page. Page-specific override (combobox on

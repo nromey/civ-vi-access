@@ -4,30 +4,33 @@ using System.Windows.Forms;
 namespace CivVIAccess.Launcher.Wizard;
 
 [SupportedOSPlatform("windows")]
-public sealed class WelcomePage : UserControl, IWizardPage
+public sealed class DonePage : UserControl, IWizardPage
 {
-    private const string HeadingText = "Install Civilization VI Access";
+    private const string HeadingText = "Install complete";
     private const string BodyText =
-        "This installer will copy the launcher to Program Files " +
-        "and register Civilization VI Access with Windows.\r\n\r\n" +
-        "Windows will prompt for administrator permission later " +
-        "in this installer.";
+        "Civilization VI Access is installed.\r\n\r\n" +
+        "Launch Civilization VI from Steam — the accessibility mod " +
+        "activates automatically.\r\n\r\n" +
+        "Per-user settings live at " +
+        "%LocalAppData%\\CivVIAccess\\launcher.ini.";
 
-    public string Title => "Welcome";
+    public string Title => "Done";
     public bool CanGoNext => true;
-    public string AnnouncementText => HeadingText + ". " + BodyText;
-
-    // null = host uses its default (Next button). Welcome has no
-    // input control to focus, so Next is the right initial target.
     public Control? InitialFocusControl => null;
 
-    // No-op accessors: this page never raises these events, but the
-    // interface requires the members. Empty add/remove satisfies the
-    // contract without triggering CS0067 on an unraised field event.
+    // Done page is the terminal step: no Back (the install already
+    // happened — going back is meaningless), no Cancel (nothing left
+    // to cancel). Finish is the only action.
+    public bool ShowBackButton => false;
+    public bool ShowCancelButton => false;
+    public string NextButtonText => "&Finish";
+
+    public string AnnouncementText => HeadingText + ". " + BodyText;
+
     public event EventHandler? CanGoNextChanged { add { } remove { } }
     public event EventHandler? AdvanceRequested { add { } remove { } }
 
-    public WelcomePage()
+    public DonePage()
     {
         Dock = DockStyle.Fill;
 

@@ -30,6 +30,7 @@ public sealed class ChannelPage : UserControl, IWizardPage
     public bool CanGoNext => true;
     public Control? InitialFocusControl => _combo;
     public event EventHandler? CanGoNextChanged { add { } remove { } }
+    public event EventHandler? AdvanceRequested { add { } remove { } }
 
     public string AnnouncementText =>
         HeadingText + ". Currently selected: " + SelectedChannel + ". " +
