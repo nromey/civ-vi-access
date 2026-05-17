@@ -48,6 +48,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # As of 0.3.0 the launcher is built on the CAMM framework
+          # (github.com/nromey/camm), pulled in as a submodule at
+          # /camm/. Without submodule init the build fails to resolve
+          # the <ProjectReference> to camm/Camm/Camm.csproj.
+          submodules: recursive
 
       # Extract the version number from the tag (strip the leading 'v').
       # Used both for the binary metadata and for the release asset name.
