@@ -20,10 +20,15 @@ return await CammHost.RunAsync(args, new CammModManifest
     UserAgent = "CivVIAccess.Launcher",
     IfeoTargetExeNames = new[] { "CivilizationVI.exe", "CivilizationVI_DX12.exe" },
     GameProcessNames = new[] { "CivilizationVI", "CivilizationVI_DX12" },
-    ModPayloadFolderName = "CivViAccessMod",
-    ModPayloadSentinelFileName = "CivViAccessMod.modinfo",
-    ModPayloadDefaultDestination = () =>
-        @"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Civilization VI\DLC\CivViAccessMod",
+    ModPayloads = new[]
+    {
+        new ModPayload(
+            Name: "mod",
+            FolderName: "CivViAccessMod",
+            SentinelFileName: "CivViAccessMod.modinfo",
+            DefaultDestination: () =>
+                @"C:\Program Files (x86)\Steam\steamapps\common\Sid Meier's Civilization VI\DLC\CivViAccessMod"),
+    },
     AppsAndFeaturesKeyName = "CivVIAccess",
     DisplayName = "Civ VI Access",
     Publisher = "Noel Romey",
