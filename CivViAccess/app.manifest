@@ -19,6 +19,22 @@
   </dependency>
 
   <!--
+    Execution level. asInvoker means the launcher runs at the user's
+    own privilege level — no UAC prompt at startup. Critical for any
+    exe whose filename contains install/setup/update/patch (Windows'
+    installer-detection heuristic auto-elevates such exes without
+    this block). Harmless when not needed; included so the template
+    is reusable for adopters with installer-named binaries.
+  -->
+  <trustInfo xmlns="urn:schemas-microsoft-com:asm.v3">
+    <security>
+      <requestedPrivileges>
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
+      </requestedPrivileges>
+    </security>
+  </trustInfo>
+
+  <!--
     DPI awareness — declare per-monitor v2 so TaskDialog renders
     crisply on high-DPI displays instead of being bitmap-stretched.
     The launcher otherwise has no UI surface so this is the only
