@@ -181,7 +181,15 @@ local function resolveControl(spec, kind)
         return spec.control
     end
     if type(spec.controlName) ~= "string" then
-        print("[BaseMenuItems " .. kind .. "] needs control or controlName")
+        -- Quiet when this item is parameter-backed (parameter-mode
+        -- Pulldown / ParameterCheckbox don't need a Controls.X widget —
+        -- the parameter object IS the backing). Civ VI parameter-driven
+        -- screens build their controls dynamically and there's no stable
+        -- name to bind to. The warning is still useful for legacy items
+        -- that should have one.
+        if spec.parameter == nil then
+            print("[BaseMenuItems " .. kind .. "] needs control or controlName")
+        end
         return nil
     end
     local c = Controls[spec.controlName]
@@ -601,7 +609,7 @@ function BaseMenuItems.Group(spec)
             end
         end
         local parts = { resolveLabel(self) }
-        local groupTag = loc("LOC_CIVVIACCESS_KIND_GROUP", "group")
+        local groupTag = loc("LOC_CIVVIACCESS_KIND_GROUP", "submenu")
         parts[#parts + 1] = groupTag
         if count > 0 then
             local itemsLabel = loc("LOC_CIVVIACCESS_GROUP_ITEMS", count == 1 and "1 item" or (count .. " items"), count)

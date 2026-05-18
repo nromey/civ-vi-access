@@ -67,6 +67,7 @@ local function parameterItem(parameter)
     -- we ship its own companion.
     if parameter.Array then
         return BaseMenuItems.Button({
+            parameter = parameter,   -- suppress the no-controlName warning
             labelText = parameter.Name,
             tooltipText = parameter.Description,
             activate = function()

@@ -183,7 +183,7 @@
             <Text>disabled</Text>
         </Row>
         <Row Tag="LOC_CIVVIACCESS_KIND_GROUP">
-            <Text>group</Text>
+            <Text>submenu</Text>
         </Row>
         <Row Tag="LOC_CIVVIACCESS_GROUP_ITEMS">
             <Text>{1_Count} items</Text>

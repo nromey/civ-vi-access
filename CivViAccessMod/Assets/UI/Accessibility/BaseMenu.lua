@@ -104,17 +104,33 @@ end
 -- matters when controls are constructed dynamically by the engine
 -- (AdvancedSetup's parameter framework rebuilds drivers on ruleset / mode
 -- changes).
+--
+-- Cached for the duration of a single show. Invalidated on hide so the
+-- next show re-runs the function. Without this cache, every cursor query
+-- (which happens many times per arrow press — onUp/onDown each call
+-- currentItems multiple times) re-executes the items function, which
+-- in AdvancedSetup's case rebuilds 50+ ParameterCheckbox / Pulldown items
+-- by iterating g_GameParameters.Parameters. The resulting print spam
+-- floods Lua.log with non-speech lines between actual #SCREENREADER lines.
 local function resolveItems(handler)
-    local spec = handler._itemsSpec
-    if type(spec) == "function" then
-        local ok, result = pcall(spec)
-        if not ok then
-            print("[BaseMenu '" .. handler.name .. "'] items fn failed: " .. tostring(result))
-            return {}
-        end
-        return result or {}
+    if handler._cachedItems ~= nil then
+        return handler._cachedItems
     end
-    return spec or {}
+    local spec = handler._itemsSpec
+    local result
+    if type(spec) == "function" then
+        local ok, fnResult = pcall(spec)
+        if not ok then
+            print("[BaseMenu '" .. handler.name .. "'] items fn failed: " .. tostring(fnResult))
+            result = {}
+        else
+            result = fnResult or {}
+        end
+    else
+        result = spec or {}
+    end
+    handler._cachedItems = result
+    return result
 end
 
 -- Walk the drill path to the items table at handler._level. Each parent
@@ -541,9 +557,13 @@ function BaseMenu.install(ContextPtr, spec)
         end
         if bIsHide then
             -- Reset so the next show re-announces header + first item from
-            -- the top. Cursor state is recomputed on show.
+            -- the top. Cursor state is recomputed on show. Drop the cached
+            -- items list so the next show rebuilds (parameter values may
+            -- have changed during the hide, e.g. user came back from a
+            -- modal that toggled a game mode).
             handler._initialized = false
             handler._activeSubMenu = nil
+            handler._cachedItems = nil
             return
         end
         if onShow ~= nil then
