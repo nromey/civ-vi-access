@@ -22,6 +22,106 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.3.1-pre — 2026-05-18 — AdvancedSetup accessibility (work in progress)
+
+Pre-release. Starts the AdvancedSetup (Create Game) screen
+accessibility companion + introduces a reusable per-screen
+BaseMenu framework adapted from the Civ V Access architecture. The
+screen is exposed to keyboard navigation and screen-reader speech,
+but several pieces are deliberately deferred — see "Known gaps"
+below.
+
+### BaseMenu framework
+
+`CivViAccessMod/Assets/UI/Accessibility/BaseMenu.lua` (cursor + nav
+state machine) and `BaseMenuItems.lua` (item factories) replace the
+previous per-screen ad-hoc kb wiring with a declarative items
+description per screen. A screen registers its items via
+`BaseMenu.install(ContextPtr, spec)`; the framework handles the
+cursor, drill / undrill, announcement, prior-handler chaining, and
+on-demand verbose description (Ctrl+T).
+
+Bindings:
+- Up / Down / Home / End — navigate within current level (wraps
+  at level 1; deeper levels cross into sibling groups).
+- Enter / Space — drill into a Group; activate any other item.
+- Left — at depth > 1, walk back up a level.
+- Right — drill into Group; reserved for slider adjust.
+- Esc — clear sub-menu (Pulldown picker) if open, else fall
+  through to the screen's existing back / cancel.
+- F1 — re-speak displayName + preamble (screen header).
+- Ctrl+T — re-speak the current item with its tooltip /
+  parameter description appended. Default announce is terse
+  (label + state); long help is on demand. The motivating bug:
+  multi-paragraph Game Mode / Victory descriptions in the default
+  announce got cut mid-word by the next nav keystroke, producing
+  unintelligible fragments.
+
+Item kinds: `Button`, `Checkbox`, `Pulldown` (with parameter +
+selectEntry modes), `ParameterCheckbox` (for Civ VI's bool / GameMode
+parameter framework), `Group` (static `items` or dynamic `itemsFn`
+with optional caching), `Choice` (label-only row, no widget
+backing). Slider / Textfield item kinds intentionally not built —
+AdvancedSetup has no obvious need for them; add when a future
+screen does.
+
+### AdvancedSetup companion
+
+`Accessibility/AdvancedSetupAccess.lua` walks
+`g_GameParameters.Parameters` at show-time and classifies each
+parameter:
+- Globals (Ruleset, Map Type, Difficulty, Game Speed, Era,
+  Disaster Intensity, etc.) → Pulldown at the top level.
+- `parameter.Domain == "bool"` or `GroupId == "GameModes"` →
+  ParameterCheckbox at L1 or inside the Game Modes group.
+- `parameter.GroupId` starts with "Victory" → ParameterCheckbox
+  inside the Victory Conditions group.
+- `parameter.Array` (CityStates, LeaderPool1/2) → Button placeholder
+  that announces "picker not yet accessible" (see Known gaps).
+- Per-player parameters → drilled inside the Players group.
+
+Top-level shape: globals → Players group → Game Modes group →
+Victory Conditions group → Defaults / Close / Start.
+
+`Frontend/AdvancedSetup.lua` is the thin fork: verbatim base file
+plus `include("ScreenReader"); include("AdvancedSetupAccess");`
+at the bottom (after `Initialize()` so the base screen's
+`OnShow` / `OnHide` / `OnInputHandler` globals exist and are
+captured by the companion).
+
+### Known gaps (deferred — followups)
+
+- City-states / leader-pool pickers (Array parameters) announce
+  "picker not yet accessible" but route to no companion. Each
+  picker is its own modal screen and needs its own per-screen fork
+  + companion.
+- Per-slot Remove button inside the Players group is not surfaced
+  yet (the engine builds it on a per-instance container that
+  isn't trivially reachable from the parameter framework — needs
+  a stable hook).
+- Rich civ-pulldown announcement (leader / civ / uniques per the
+  in-memory leader-civ-boons plan) is plumbed via the Pulldown's
+  `entryAnnounceFn` parameter but not yet supplied by
+  AdvancedSetupAccess. Easy add once the format is decided.
+
+### Risks to watch in pre-release testing
+
+- BaseMenu uses `ContextPtr:SetShowHideHandler` to install its
+  wrapper alongside the base's `SetShowHandler` / `SetHideHandler`.
+  If Civ VI's engine dispatches the show and showHide slots
+  independently, the base's `OnShow` / `OnHide` may fire twice
+  (once from the engine, once via our priorShow / priorHide
+  chain). The pattern mirrors Civ V Access's production-tested
+  approach so we ship it as-is; if double-fire effects surface,
+  swap to a Notify pattern where the fork explicitly calls into
+  `AdvancedSetupAccess.NotifyShow` / `NotifyHide`. Documented
+  inline in `BaseMenu.lua`.
+- Combined with CAMM v0.5.1's single-instance mutex, fast nav
+  through Victory / Game Modes should land "label, state" cleanly
+  in the screen reader. If you still hear truncated readouts,
+  the mutex didn't engage (check Task Manager for duplicate
+  launchers) or the terse-announce change is regressed.
+
 ## 0.3.0 — 2026-05-17 — Built on CAMM v0.1.0
 
 Architectural milestone: Civ VI Access is now a thin consumer of the

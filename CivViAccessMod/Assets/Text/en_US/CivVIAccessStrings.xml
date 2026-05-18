@@ -172,5 +172,48 @@
             <Text>Options keyboard help. Use this dialog to adjust various options related to Civilization VI's gameplay. Press Page Down or Tab to move to the next tab. Press Page Up to move to the previous tab. Use the Up and Down arrow keys to move between items in the current tab. Press Home or End to jump to the first or last item. Press the Left or Right arrow key to adjust sliders by 5 percent or to cycle through pulldown options. Hold the Control key and press Left or Right to adjust sliders by 20 percent. Press Enter or Space to activate buttons and toggle checkboxes. Press Escape to close Options without saving.</Text>
         </Row>
 
+        <!-- BaseMenu framework: shared kind tags and value renderers. -->
+        <Row Tag="LOC_CIVVIACCESS_CHECK_ON">
+            <Text>checked</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_CHECK_OFF">
+            <Text>unchecked</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_DISABLED">
+            <Text>disabled</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_KIND_GROUP">
+            <Text>group</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_GROUP_ITEMS">
+            <Text>{1_Count} items</Text>
+        </Row>
+
+        <!-- AdvancedSetup screen labels. -->
+        <Row Tag="LOC_CIVVIACCESS_SCREEN_ADVANCED_SETUP">
+            <Text>Create Game</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_GROUP_PLAYERS">
+            <Text>Players</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_GROUP_GAME_MODES">
+            <Text>Game Modes</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_GROUP_VICTORY_CONDITIONS">
+            <Text>Victory Conditions</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_AI_SLOT">
+            <Text>Slot {1_Num}, {2_Leader}</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_AI_SLOT_GENERIC">
+            <Text>Slot {1_Num}</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE">
+            <Text>{1_Name}: picker is not yet accessible. Use mouse to configure.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_SETUP_PARAMETER_ERROR">
+            <Text>Setup has an unresolved error. Start is disabled.</Text>
+        </Row>
+
     </BaseGameText>
 </GameData>
