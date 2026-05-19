@@ -305,6 +305,53 @@ function BaseMenuItems.Checkbox(spec)
     return item
 end
 
+-- VirtualCheckbox ------------------------------------------------------------
+--
+-- Pure-state checkbox without an engine widget. The caller supplies
+-- getValue() / setValue(newOn) closures so the item reflects and commits
+-- through whatever state the caller owns (a local table, a parameter
+-- mirror, etc.). Used by multi-select pickers where items are built
+-- dynamically by an engine InstanceManager and there's no stable
+-- Controls.X to bind to.
+--
+-- Spec: same label / tooltip fields as Checkbox, plus:
+--   getValue() -> bool   read current state
+--   setValue(newOn)      commit new state
+--   isNavigable(self)    optional; defaults to always navigable
+
+function BaseMenuItems.VirtualCheckbox(spec)
+    assert(type(spec.getValue) == "function", "VirtualCheckbox needs getValue fn")
+    assert(type(spec.setValue) == "function", "VirtualCheckbox needs setValue fn")
+    local item = {
+        kind = "checkbox",
+        _getValue = spec.getValue,
+        _setValue = spec.setValue,
+    }
+    copyCommonFields(spec, item)
+    item.isNavigable = function(self)
+        if type(spec.isNavigable) == "function" then
+            return spec.isNavigable(self)
+        end
+        return true
+    end
+    item.isActivatable = function(self) return true end
+    local function valueText()
+        local on = item._getValue()
+        return loc(on and "LOC_CIVVIACCESS_CHECK_ON" or "LOC_CIVVIACCESS_CHECK_OFF",
+            on and "checked" or "unchecked")
+    end
+    function item:announce(menu)
+        return composeSpeech(self, { resolveLabel(self), valueText() })
+    end
+    item.describe = genericDescribe
+    function item:activate(menu)
+        local newValue = not self._getValue()
+        self._setValue(newValue)
+        OutputMessageToScreenReader(self:announce(menu))
+    end
+    return item
+end
+
 -- Pulldown ------------------------------------------------------------------
 --
 -- Civ VI's AdvancedSetup uses parameter-driven pulldowns: the control is

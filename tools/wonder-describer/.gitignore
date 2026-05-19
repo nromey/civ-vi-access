@@ -1,0 +1,7 @@
+# Local image cache — game art doesn't belong in the repo. Drop your
+# extracted / screenshotted PNGs into images/ locally; they don't ship.
+images/
+
+# Python virtualenvs
+.venv/
+__pycache__/

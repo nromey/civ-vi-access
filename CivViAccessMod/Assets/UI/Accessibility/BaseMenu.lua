@@ -215,12 +215,17 @@ local function announceItem(handler, item, nointerrupt)
     -- (_level > 1), OR we ARE a Pulldown sub-handler whose entries the
     -- user is arrowing through (_parent ~= nil — pushSubMenu creates a
     -- fresh handler with its own _level=1, so the parent-pointer is the
-    -- only signal that we're in a sub).
+    -- only signal that we're in a sub), OR the screen opted in to
+    -- always-chatty via spec.alwaysVerbose (pickers and other modals
+    -- that the user reached BY drilling in from another screen — the
+    -- handler itself starts at L1 but conceptually the whole screen is
+    -- already a sub).
     --
     -- Fall back to announce() if describe is missing on this item kind.
     local verboseOn = Verbosity ~= nil and Verbosity.isOn()
     local deepEnough = (handler._level or 1) > 1
         or handler._parent ~= nil
+        or handler.alwaysVerbose == true
     local useDescribe = verboseOn and deepEnough
         and type(item.describe) == "function"
     local ok, text = pcall(function()
@@ -350,8 +355,24 @@ local function onRight(handler)
     end
 end
 
+-- Resolve displayName at speak time so screens whose name comes from a
+-- runtime parameter (e.g. the multi-select picker, whose title depends
+-- on which Array param launched it) can pass a function instead of a
+-- frozen-at-install string.
+local function resolveDisplayName(handler)
+    local d = handler.displayName
+    if type(d) == "function" then
+        local ok, result = pcall(d)
+        if ok and type(result) == "string" then
+            return result
+        end
+        return ""
+    end
+    return d or ""
+end
+
 local function readHeader(handler)
-    speak(handler.displayName)
+    speak(resolveDisplayName(handler))
     local preamble = resolvePreamble(handler)
     if preamble ~= nil and preamble ~= "" then
         speak(preamble, true)
@@ -508,13 +529,17 @@ end
 function BaseMenu.create(spec)
     assert(type(spec) == "table", "BaseMenu.create needs spec table")
     assert(type(spec.name) == "string" and spec.name ~= "", "spec.name required")
-    assert(type(spec.displayName) == "string" and spec.displayName ~= "", "spec.displayName required")
+    assert(
+        (type(spec.displayName) == "string" and spec.displayName ~= "")
+        or type(spec.displayName) == "function",
+        "spec.displayName required (string or function returning string)")
     assert(spec.items ~= nil, "spec.items required (table or function)")
 
     local handler = {
         name = spec.name,
         displayName = spec.displayName,
         preamble = spec.preamble,
+        alwaysVerbose = spec.alwaysVerbose == true,
         _itemsSpec = spec.items,
         _level = 1,
         _indices = { 1 },

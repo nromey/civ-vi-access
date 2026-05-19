@@ -22,6 +22,71 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.3.2 — 2026-05-19 — Natural Wonders picker + AD pipeline scaffold
+
+Ships the first of the three Array-domain pickers (Select Natural
+Wonders) plus the build-time scaffolding for AI-generated visual
+descriptions ("image audio-description") of game art. City-States and
+Leader Pool 1/2 pickers still stub; both follow the same shape and
+land next.
+
+### MultiSelectWindow companion
+
+`Frontend/MultiSelectWindow.lua` is a thin fork of the engine's
+generic multi-select modal (used for Natural Wonders and any future
+non-special-cased Array param). `Accessibility/MultiSelectWindowAccess.lua`
+mirrors the engine's `m_SelectedValues` via
+`LuaEvents.MultiSelectWindow_Initialize`, builds a `VirtualCheckbox`
+per entry, and commits via
+`LuaEvents.MultiSelectWindow_SetParameterValues` which the existing
+AdvancedSetup handler picks up. Select All / Select None / OK / Back
+are wired.
+
+`AdvancedSetupAccess.lua`'s Array-button stub now opens the engine
+modal (fires the same `_Initialize` event the engine's mouse-click
+path fires) for non-special-cased params; CityStates / LeaderPool1 /
+LeaderPool2 still announce "picker not yet accessible" until their
+own pickers ship.
+
+### BaseMenu / BaseMenuItems additions
+
+- `BaseMenuItems.VirtualCheckbox` — pure-state checkbox without an
+  engine widget. Spec passes `getValue` / `setValue` closures so the
+  item reflects and commits through caller-owned state. Used by the
+  picker for its dynamic entry list (engine InstanceManager builds
+  the visual instances; there's no stable `Controls.X` to bind to).
+- `BaseMenu.install` accepts a `displayName` function (resolved at
+  speak time, not install time) so screens whose title comes from a
+  runtime parameter — the picker, whose title is the Array param's
+  Name — can pass a closure instead of a frozen string.
+- New `alwaysVerbose = true` spec flag. The picker opts in: it's
+  itself a drilled-in modal, but as a fresh BaseMenu handler it
+  starts at `_level = 1` with no `_parent`, so the standard L2+
+  chatty gate would force terse. The flag tells the gate "treat me
+  as already deep" so chatty kicks in throughout.
+
+### AD pipeline scaffold (tools/wonder-describer/)
+
+Build-time Python tool that runs game-art images through Gemini and
+emits Civ VI LOC XML files registered via `<UpdateText>`. Output is
+two LOC rows per image (`<prefix>_<stem>_SHORT`,
+`<prefix>_<stem>_LONG`) so the picker companion (and future
+consumers) call `Locale.Lookup` for screen-reader visual
+descriptions. Translation parity with all other mod text.
+
+- Per-category prompts in `prompts/` — natural-wonders, world-
+  wonders, leaders, units, buildings, civilizations. Add more as
+  surfaces come online.
+- `--dry-run` flag for prompt iteration against a single image
+  (prints to stdout, no JSON / XML written).
+- `--limit N` for starter batches.
+- Resume is automatic (entries already in JSON are skipped unless
+  `--force`).
+- JSON is the canonical store; XML is the mod-shipping artifact.
+
+API key (`GEMINI_API_KEY`) is local-only. CI never calls Gemini —
+the XML output is committed and shipped.
+
 ## 0.3.1 — 2026-05-19 — AdvancedSetup accessibility (single-player nav)
 
 Lands the AdvancedSetup (Create Game) screen accessibility companion

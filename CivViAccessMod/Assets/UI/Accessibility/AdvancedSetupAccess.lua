@@ -122,23 +122,42 @@ local function parameterItem(parameter, gameParameters)
 
     local item
 
-    -- Array parameters (CityStates, LeaderPool1/2) are modal pickers. We
-    -- expose them as a Button that re-fires the same activate path the
-    -- engine wires; the picker itself remains the engine's modal until
-    -- we ship its own companion.
+    -- Array parameters (CityStates, LeaderPool1/2, NaturalWonders) are
+    -- modal pickers. Three engine modals back these:
+    --   CityStates  -> LuaEvents.CityStatePicker_Initialize     (not yet)
+    --   LeaderPool* -> LuaEvents.LeaderPicker_Initialize        (not yet)
+    --   everything else -> LuaEvents.MultiSelectWindow_Initialize (Natural
+    --                  Wonders, accessible via MultiSelectWindowAccess)
+    -- Route the activation to the engine event + show the modal;
+    -- accessible nav is handled by whichever companion picks up the
+    -- show. Params without a shipped companion still announce the stub
+    -- so the user knows the modal won't be navigable.
     if parameter.Array then
         item = BaseMenuItems.Button({
-            parameter = parameter,   -- suppress the no-controlName warning
+            parameter = parameter,
             labelFn = labelFn,
             tooltipFn = tooltipFn,
             activate = function()
-                -- For LeaderPool / CityStates, the engine's CreatePicker
-                -- driver hooks into LuaEvents.<Picker>_Initialize. We don't
-                -- have direct access to the driver's button, so we don't
-                -- yet wire a real open here. Once the picker companion
-                -- ships this will be replaced.
-                OutputMessageToScreenReader(
-                    Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE", resolveLocText(parameter.Name)))
+                local pid = parameter.ParameterId
+                if pid == "CityStates" then
+                    OutputMessageToScreenReader(
+                        Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE",
+                            resolveLocText(parameter.Name)))
+                elseif pid == "LeaderPool1" or pid == "LeaderPool2" then
+                    OutputMessageToScreenReader(
+                        Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE",
+                            resolveLocText(parameter.Name)))
+                else
+                    -- MultiSelectWindow path (Natural Wonders et al.).
+                    if Controls and Controls.MultiSelectWindow ~= nil then
+                        LuaEvents.MultiSelectWindow_Initialize(parameter)
+                        Controls.MultiSelectWindow:SetHide(false)
+                    else
+                        OutputMessageToScreenReader(
+                            Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE",
+                                resolveLocText(parameter.Name)))
+                    end
+                end
             end,
         })
     elseif parameter.Domain == "bool" or isGameModeParameter(parameter) then
