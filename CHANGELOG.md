@@ -22,6 +22,54 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.3.3 — 2026-05-19 — City-States picker + percent-escape speech fix
+
+Ships the second of the three Array-domain pickers (Select City-States)
+and resolves a global speech-pipeline gotcha: Civ VI's `print` runs
+printf-style format processing on its argument, so any LOC text
+containing `%` followed by a letter (e.g. "+15% Science",
+"+5% Production") was being parsed as a format specifier, finding no
+arg, and **silently nulling the entire output line**. Affected every
+long-form announcement that included a percent-yield bonus — the
+city-state picker exposed it first (Geneva, Taruga, others read as
+empty) but the trap was global. Fix lives at the speech gateway, so
+every call site through `OutputMessageToScreenReader` is protected.
+
+### CityStatePicker companion
+
+`Frontend/CityStatePicker.lua` thin fork +
+`Accessibility/CityStatePickerAccess.lua` companion. Same shape as
+the MultiSelectWindow companion shipped in 0.3.2 plus per-state
+metadata: each city-state reads as `<name>, <category>` (terse —
+"Geneva, scientific") so a fast scan tells you the type, and the
+Suzerain bonus text (ruleset-aware: Bonus / Bonus_XP1 / Bonus_XP2
+per active expansion) is the chatty / Ctrl+T payload. Bonus text and
+category come from `DB.ConfigurationQuery` against the `CityStates`
+table, matching the engine's lookup path.
+
+AdvancedSetupAccess Array-button stub now opens the engine modal for
+`CityStates` in addition to non-special-cased Array params; Leader
+Pool 1/2 remain stubbed.
+
+Deferred from this picker (not blockers): the in-modal CityStateCount
+slider (adjust from parent AdvancedSetup until a Slider item kind
+lands in BaseMenu) and the sort-by-name/type pulldown (default name
+sort is fine for v1).
+
+### Percent-escape speech fix
+
+`ScreenReader.lua`'s `OutputMessageToScreenReader` now doubles every
+`%` in the body before passing to `print` (two-line `body:gsub("%%",
+"%%%%")` insertion). The printf processor consumes the doubled `%%`
+and emits a literal `%`, so the log line carries the correct single
+`%`, the launcher's log tail forwards "+15% Science" verbatim, and
+Tolk speaks it correctly.
+
+Affects every speech path, not just the picker. Many Civ VI LOC
+strings (building yields, district adjacencies, wonder bonuses,
+policy effects) embed `%` for percent values — those were all
+intermittently silent on long announcements before this fix.
+
 ## 0.3.2 — 2026-05-19 — Natural Wonders picker + AD pipeline scaffold
 
 Ships the first of the three Array-domain pickers (Select Natural

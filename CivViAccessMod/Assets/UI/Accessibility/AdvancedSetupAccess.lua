@@ -140,9 +140,14 @@ local function parameterItem(parameter, gameParameters)
             activate = function()
                 local pid = parameter.ParameterId
                 if pid == "CityStates" then
-                    OutputMessageToScreenReader(
-                        Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE",
-                            resolveLocText(parameter.Name)))
+                    if Controls and Controls.CityStatePicker ~= nil then
+                        LuaEvents.CityStatePicker_Initialize(parameter, gameParameters)
+                        Controls.CityStatePicker:SetHide(false)
+                    else
+                        OutputMessageToScreenReader(
+                            Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE",
+                                resolveLocText(parameter.Name)))
+                    end
                 elseif pid == "LeaderPool1" or pid == "LeaderPool2" then
                     OutputMessageToScreenReader(
                         Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE",

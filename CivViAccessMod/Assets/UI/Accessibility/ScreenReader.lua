@@ -55,6 +55,14 @@ function OutputMessageToScreenReader(message: string, nointerrupt: boolean)
     if body == "" then
         return;
     end
+    -- Civ VI's print runs printf-style format processing on its argument,
+    -- so a stray '%' followed by a letter (e.g. "+15% Science") is parsed
+    -- as a format spec, finds no arg, and silently nulls the entire
+    -- output line — the body never reaches Lua.log and the screen reader
+    -- speaks nothing. This was hit by city-state Suzerain bonuses that
+    -- contain percent-yield language (Geneva, Taruga). Double the '%' so
+    -- the format processor emits a literal '%' instead.
+    body = body:gsub("%%", "%%%%");
     if nointerrupt == true then
         print(PREFIX_NO_INTERRUPT .. body);
     else
