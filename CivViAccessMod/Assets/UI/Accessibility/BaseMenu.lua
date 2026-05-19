@@ -42,9 +42,10 @@
 --   Right              same as Enter on a Group; no-op otherwise. (Sliders
 --                      will adjust here when added.)
 --   Left               at level > 1, back up a level. No-op at level 1.
---   Escape             clears a sub-menu (Pulldown) if open; otherwise
---                      falls through to priorInput at any drill depth — Esc
---                      never walks back one level at a time. Use Left.
+--   Escape             clears a sub-menu (Pulldown) if open; otherwise at
+--                      level > 1 backs up one level (same as Left); at
+--                      level 1 falls through to priorInput so the engine's
+--                      cancel wiring closes the screen.
 --   F1                 re-speak displayName + preamble (re-evaluates a
 --                      function preamble for live state).
 --   Ctrl+T             re-speak the current item WITH its tooltip /
@@ -60,6 +61,7 @@
 -- owns input for the parent screen's lifetime.
 
 include("ScreenReader")
+include("Verbosity")
 
 BaseMenu = {}
 
@@ -201,7 +203,30 @@ local function announceItem(handler, item, nointerrupt)
     if item == nil then
         return
     end
+    -- Verbosity gate: chatty mode speaks describe() (label + value +
+    -- tooltip / parameter description); terse speaks the lighter
+    -- announce() and leaves description to Ctrl+T. Chatty only kicks in
+    -- at L2+ — L1 parameter tooltips are mostly generic ("Choose the
+    -- ruleset...") and add noise; the real win is inside drilled-in
+    -- pulldowns where each entry's description is the only useful
+    -- differentiator (leader, map type, world age, etc.).
+    --
+    -- "L2+" means either: drilled into a Group on this handler
+    -- (_level > 1), OR we ARE a Pulldown sub-handler whose entries the
+    -- user is arrowing through (_parent ~= nil — pushSubMenu creates a
+    -- fresh handler with its own _level=1, so the parent-pointer is the
+    -- only signal that we're in a sub).
+    --
+    -- Fall back to announce() if describe is missing on this item kind.
+    local verboseOn = Verbosity ~= nil and Verbosity.isOn()
+    local deepEnough = (handler._level or 1) > 1
+        or handler._parent ~= nil
+    local useDescribe = verboseOn and deepEnough
+        and type(item.describe) == "function"
     local ok, text = pcall(function()
+        if useDescribe then
+            return item:describe(handler)
+        end
         return item:announce(handler)
     end)
     if not ok then
@@ -250,66 +275,21 @@ local function goBackLevel(handler)
     announceItem(handler, currentItems(handler)[currentIndex(handler)])
 end
 
+-- Up/Down wrap within the current level at all depths. Earlier behavior
+-- had L2+ cross-jump to sibling groups on past-end (Civ V Access
+-- convention), but Noel found it confusing — drilling into Slot 1 and
+-- arrowing down past its last param would silently land in Slot 2's
+-- params. Strict scope is clearer: drill into a group, arrow up/down
+-- wraps within it, Left to exit, then arrow to the next sibling and
+-- drill explicitly.
 local function onUp(handler)
     local items = currentItems(handler)
-    local cur = currentIndex(handler)
-    if handler._level == 1 then
-        moveToIndex(handler, nextValidIndex(items, cur, -1, true))
-        return
-    end
-    local prev = nextValidIndex(items, cur, -1, false)
-    if prev ~= nil then
-        moveToIndex(handler, prev)
-    else
-        -- Past start: step out to previous sibling at parent level, last
-        -- valid child.
-        local parentLevel = handler._level - 1
-        local parents = itemsAtLevel(handler, parentLevel)
-        local newParentIdx = nextValidIndex(parents, handler._indices[parentLevel], -1, true)
-        if newParentIdx == nil or parents[newParentIdx].kind ~= "group" then
-            return
-        end
-        handler._indices[parentLevel] = newParentIdx
-        local newItems = currentItems(handler)
-        local target = nextValidIndex(newItems, #newItems + 1, -1, false)
-        if target == nil then
-            return
-        end
-        handler._indices[handler._level] = target
-        playNavSound()
-        speak(parents[newParentIdx]:announce(handler))
-        announceItem(handler, newItems[target], true)
-    end
+    moveToIndex(handler, nextValidIndex(items, currentIndex(handler), -1, true))
 end
 
 local function onDown(handler)
     local items = currentItems(handler)
-    local cur = currentIndex(handler)
-    if handler._level == 1 then
-        moveToIndex(handler, nextValidIndex(items, cur, 1, true))
-        return
-    end
-    local nxt = nextValidIndex(items, cur, 1, false)
-    if nxt ~= nil then
-        moveToIndex(handler, nxt)
-    else
-        local parentLevel = handler._level - 1
-        local parents = itemsAtLevel(handler, parentLevel)
-        local newParentIdx = nextValidIndex(parents, handler._indices[parentLevel], 1, true)
-        if newParentIdx == nil or parents[newParentIdx].kind ~= "group" then
-            return
-        end
-        handler._indices[parentLevel] = newParentIdx
-        local newItems = currentItems(handler)
-        local target = nextValidIndex(newItems, 0, 1, false)
-        if target == nil then
-            return
-        end
-        handler._indices[handler._level] = target
-        playNavSound()
-        speak(parents[newParentIdx]:announce(handler))
-        announceItem(handler, newItems[target], true)
-    end
+    moveToIndex(handler, nextValidIndex(items, currentIndex(handler), 1, true))
 end
 
 local function onHome(handler)
@@ -410,6 +390,23 @@ local function onActivate(handler)
         local first = nextValidIndex(items, 0, 1, false) or 1
         handler._indices[1] = first
         handler._initialized = true
+        -- Debounce the first-open announce. Civ VI's screen-init sequence
+        -- can fire ShowHide twice in rapid succession (engine refreshes
+        -- the screen mid-setup), and the second fire clears _initialized
+        -- via the hide handler then re-enters first-init here. Without
+        -- the debounce we re-speak displayName with INTERRUPT mode and
+        -- cut the first announcement mid-word (user heard "create create"
+        -- on AdvancedSetup first-open).
+        local now = (os and os.clock and os.clock()) or 0
+        local sinceLastOpen = handler._lastOpenAnnounceAt
+            and (now - handler._lastOpenAnnounceAt)
+            or 1e9
+        if sinceLastOpen < 0.5 then
+            -- Recent open announce just fired; this is a spurious
+            -- re-init. Skip the speech, keep the cursor reset.
+            return
+        end
+        handler._lastOpenAnnounceAt = now
         readHeader(handler)
         announceItem(handler, items[first], true)
         return
@@ -498,6 +495,16 @@ function BaseMenu.announceCurrent(handler)
     announceItem(handler, currentItems(handler)[currentIndex(handler)])
 end
 
+-- Drop the cached items list so the next nav re-runs the items spec
+-- function. Use this when the underlying parameter set changes mid-show
+-- (e.g. Civ VI's GameSetup_RefreshParameters fires after a ruleset
+-- change). Companion code should call this from their chained
+-- UI_PostRefreshParameters hook or equivalent.
+function BaseMenu.invalidateItemsCache(handler)
+    if handler == nil then return end
+    handler._cachedItems = nil
+end
+
 function BaseMenu.create(spec)
     assert(type(spec) == "table", "BaseMenu.create needs spec table")
     assert(type(spec.name) == "string" and spec.name ~= "", "spec.name required")
@@ -582,6 +589,7 @@ function BaseMenu.install(ContextPtr, spec)
         local args = { ... }
         local msg, key
         local ctrlDown = false
+        local altDown = false
         local pInputStruct
         if type(args[1]) == "number" then
             msg = args[1]
@@ -603,6 +611,10 @@ function BaseMenu.install(ContextPtr, spec)
                 local cok, cdown = pcall(function() return pInputStruct:IsControlDown() end)
                 if cok then ctrlDown = cdown == true end
             end
+            if type(pInputStruct.IsAltDown) == "function" then
+                local aok, adown = pcall(function() return pInputStruct:IsAltDown() end)
+                if aok then altDown = adown == true end
+            end
         end
 
         if msg ~= KEY_UP_MSG then
@@ -618,8 +630,16 @@ function BaseMenu.install(ContextPtr, spec)
                 BaseMenu.popSubMenu(handler._activeSubMenu)
                 return true
             end
-            -- Otherwise fall through to the screen's existing back / cancel
-            -- wiring (Esc never walks back one level at a time — use Left).
+            -- Inside a drilled-down group: Esc pops one level (mirrors
+            -- Left). Without this, Esc at any depth fell through to the
+            -- engine's cancel and closed the whole screen, surprising
+            -- users who expected one-level-up semantics.
+            if handler._level and handler._level > 1 then
+                goBackLevel(handler)
+                return true
+            end
+            -- At L1: fall through to the screen's existing back / cancel
+            -- wiring (Esc closes the screen, same as the engine default).
             if priorInput ~= nil then
                 return priorInput(...)
             end
@@ -630,6 +650,18 @@ function BaseMenu.install(ContextPtr, spec)
         -- Handled before dispatchKey because dispatchKey ignores modifiers.
         if ctrlDown and key == Keys.T then
             describeCurrent(handler)
+            return true
+        end
+
+        -- Alt+V: toggle chatty / terse verbosity. Speak only the new mode
+        -- and let the user's next arrow speak the item in that mode. An
+        -- earlier version re-announced the current item immediately so
+        -- the user "heard the difference," but that doubled the work per
+        -- press and made rapid toggling feel laggy. The mode utterance
+        -- alone is fast enough to toggle in quick succession.
+        if altDown and key == Keys.V and Verbosity ~= nil then
+            local on = Verbosity.toggle()
+            speak(on and "Verbose on" or "Verbose off", false)
             return true
         end
 

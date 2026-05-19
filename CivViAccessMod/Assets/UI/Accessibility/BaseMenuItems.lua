@@ -126,12 +126,16 @@ BaseMenuItems.appendTooltip = appendTooltip
 BaseMenuItems.resolveLabel = resolveLabel
 BaseMenuItems.resolveTooltip = resolveTooltip
 
--- Shared isNavigable / isActivatable for control-backed items.
+-- Shared isNavigable / isActivatable.
+--
+-- A missing _control is NOT a navigability failure — parameter-mode items
+-- (Pulldown / Button backed by a g_GameParameters or per-player
+-- SetupParameters object instead of a Controls.X widget) deliberately have
+-- no control reference because Civ VI builds those drivers dynamically and
+-- there's no stable Controls.X to bind to. The widget-based gates only
+-- apply when a control IS present.
 local function isNavigable(self)
-    if self._control == nil then
-        return false
-    end
-    if self._control.IsHidden ~= nil and self._control:IsHidden() then
+    if self._control ~= nil and self._control.IsHidden ~= nil and self._control:IsHidden() then
         return false
     end
     if self._visibilityControl ~= nil and self._visibilityControl.IsHidden ~= nil and self._visibilityControl:IsHidden() then
@@ -144,7 +148,7 @@ local function isActivatable(self)
     if not isNavigable(self) then
         return false
     end
-    if self._control.IsDisabled ~= nil and self._control:IsDisabled() then
+    if self._control ~= nil and self._control.IsDisabled ~= nil and self._control:IsDisabled() then
         return false
     end
     return true
@@ -345,14 +349,29 @@ function BaseMenuItems.Pulldown(spec)
     item.isNavigable = isNavigable
     item.isActivatable = isActivatable
 
-    -- Current value text for the parent's announcement. Parameter mode
-    -- reads parameter.Value.Name; entries mode delegates to labelFn (caller
-    -- supplies it because we can't infer the "current entry" without help).
+    -- Current value text for the parent's announcement. Civ VI's setup
+    -- framework leaves parameter.Value in one of three shapes:
+    --   * table with .Name (most pulldowns: Map, Ruleset, Difficulty, ...)
+    --   * raw number (Disaster Intensity=2, GameRandomSeed, CityStateCount)
+    --   * raw string (rare, but defensive)
+    -- For non-table values, look up the matching entry in parameter.Values
+    -- by .Value equality and return its .Name; if no match, stringify.
     local function currentValueText()
-        if item._parameter ~= nil and item._parameter.Value ~= nil then
-            return item._parameter.Value.Name
+        if item._parameter == nil or item._parameter.Value == nil then
+            return nil
         end
-        return nil
+        local v = item._parameter.Value
+        if type(v) == "table" then
+            return v.Name
+        end
+        if type(item._parameter.Values) == "table" then
+            for _, entry in ipairs(item._parameter.Values) do
+                if entry.Value == v then
+                    return entry.Name
+                end
+            end
+        end
+        return tostring(v)
     end
 
     function item:announce(menu)
@@ -418,7 +437,19 @@ function BaseMenuItems.Pulldown(spec)
                 return table.concat(parts, ", ")
             end
             subItem.describe = function(self, m)
-                return appendTooltip(self:announce(m), self._entry.Description)
+                -- Description on parameter Values rows is a raw LOC key
+                -- (e.g. LOC_MAP_CONTINENTS_DESCRIPTION); resolve before
+                -- speech so Ctrl+T reads the human text instead of the key.
+                local desc = self._entry.Description
+                if desc ~= nil and desc ~= "" and Locale ~= nil
+                    and Locale.Lookup ~= nil then
+                    local resolved = Locale.Lookup(desc)
+                    if resolved ~= nil and resolved ~= ""
+                        and resolved ~= desc then
+                        desc = resolved
+                    end
+                end
+                return appendTooltip(self:announce(m), desc)
             end
             subItem.activate = function(self, m)
                 if not self:isActivatable() then

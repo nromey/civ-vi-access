@@ -56,20 +56,81 @@ local function isGameModeParameter(parameter)
 end
 
 local function isVictoryParameter(parameter)
-    if parameter.GroupId == nil then return false end
-    return string.find(parameter.GroupId, "^Victory") ~= nil
+    -- Civ VI uses GroupId "Victories" (plural). Earlier pattern "^Victory"
+    -- failed to match "Victories" because position 7 differs (Y vs I),
+    -- causing every victory param to leak into the global L1 list instead
+    -- of the Victory Conditions submenu.
+    return parameter.GroupId == "Victories"
 end
 
-local function parameterItem(parameter)
+-- Resolve a parameter Name/Description that might be a raw LOC key into
+-- displayable text. Civ VI's parameter framework leaves these as keys
+-- (LOC_PLAYER_TEAM, LOC_LEADER_TYPE etc.) for the UI to look up at render
+-- time; passing them straight to the screen reader makes the user hear
+-- the literal "loc player team" pronounced.
+--
+-- Failure detection: Civ VI's Locale.Lookup of an unknown key returns
+-- the key itself (sometimes unchanged, sometimes case-folded). Match on
+-- case-insensitive equality OR the returned string having a "LOC_" prefix.
+-- On lookup failure, sanitize the key into human-readable text by
+-- stripping the LOC_ prefix and converting underscores to spaces.
+local function sanitizeKey(key)
+    if key == nil or key == "" then return "" end
+    local clean = key
+    clean = clean:gsub("^LOC_", ""):gsub("^Loc_", ""):gsub("^loc_", "")
+    clean = clean:gsub("_", " ")
+    clean = clean:lower()
+    return clean
+end
+
+local function resolveLocText(value)
+    if value == nil or value == "" then return "" end
+    if Locale == nil or Locale.Lookup == nil then return value end
+    local ok, resolved = pcall(Locale.Lookup, value)
+    if not ok or resolved == nil or resolved == "" then
+        return sanitizeKey(value)
+    end
+    -- Lookup-failed signals: result equals input (case-insensitive), OR
+    -- result still has the LOC_ prefix.
+    if string.upper(resolved) == string.upper(value)
+        or string.find(resolved, "^[Ll][Oo][Cc]_") then
+        return sanitizeKey(value)
+    end
+    return resolved
+end
+
+-- gameParameters defaults to g_GameParameters but per-slot parameters
+-- live in their own SetupParameters object (GetPlayerParameters(playerID)),
+-- so playerSlotItems passes that instead. The commit path
+-- (SetParameterValue) goes through whichever object is passed.
+local function parameterItem(parameter, gameParameters)
+    gameParameters = gameParameters or g_GameParameters
+
+    -- isNavigable closure that checks the parameter's visibility flags
+    -- dynamically. Civ VI flips parameter.Visible on ruleset / mode
+    -- changes (e.g. Gathering Storm climate params hidden under Standard
+    -- ruleset). Static items can't be filtered out after-the-fact unless
+    -- we return false from isNavigable here.
+    local function paramVisible()
+        if parameter.Hidden == true then return false end
+        if parameter.Visible == false then return false end
+        return true
+    end
+
+    local labelFn = function() return resolveLocText(parameter.Name) end
+    local tooltipFn = function() return resolveLocText(parameter.Description) end
+
+    local item
+
     -- Array parameters (CityStates, LeaderPool1/2) are modal pickers. We
     -- expose them as a Button that re-fires the same activate path the
     -- engine wires; the picker itself remains the engine's modal until
     -- we ship its own companion.
     if parameter.Array then
-        return BaseMenuItems.Button({
+        item = BaseMenuItems.Button({
             parameter = parameter,   -- suppress the no-controlName warning
-            labelText = parameter.Name,
-            tooltipText = parameter.Description,
+            labelFn = labelFn,
+            tooltipFn = tooltipFn,
             activate = function()
                 -- For LeaderPool / CityStates, the engine's CreatePicker
                 -- driver hooks into LuaEvents.<Picker>_Initialize. We don't
@@ -77,29 +138,42 @@ local function parameterItem(parameter)
                 -- yet wire a real open here. Once the picker companion
                 -- ships this will be replaced.
                 OutputMessageToScreenReader(
-                    Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE", parameter.Name))
+                    Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE", resolveLocText(parameter.Name)))
             end,
         })
-    end
-
-    if parameter.Domain == "bool" or isGameModeParameter(parameter) then
-        return BaseMenuItems.ParameterCheckbox({
+    elseif parameter.Domain == "bool" or isGameModeParameter(parameter) then
+        item = BaseMenuItems.ParameterCheckbox({
             parameter = parameter,
-            gameParameters = g_GameParameters,
-            labelText = parameter.Name,
-            tooltipText = parameter.Description,
+            gameParameters = gameParameters,
+            labelFn = labelFn,
+            tooltipFn = tooltipFn,
+        })
+    else
+        -- Default: pulldown over parameter.Values. Empty Values means a
+        -- no-op pulldown (sub-menu has nothing to show); we still emit
+        -- the item so the user hears the label rather than the parameter
+        -- disappearing.
+        item = BaseMenuItems.Pulldown({
+            parameter = parameter,
+            gameParameters = gameParameters,
+            labelFn = labelFn,
+            tooltipFn = tooltipFn,
         })
     end
 
-    -- Default: pulldown over parameter.Values. Empty Values means a no-op
-    -- pulldown (sub-menu has nothing to show); we still emit the item so
-    -- the user hears the label rather than the parameter disappearing.
-    return BaseMenuItems.Pulldown({
-        parameter = parameter,
-        gameParameters = g_GameParameters,
-        labelText = parameter.Name,
-        tooltipText = parameter.Description,
-    })
+    -- Layer the parameter-visibility check on top of the factory's
+    -- default isNavigable. Civ VI flips parameter.Visible on ruleset /
+    -- mode changes; without the dynamic check, the item stays in the
+    -- list and reads as "silent" or shows stale entries.
+    local baseIsNavigable = item.isNavigable
+    item.isNavigable = function(self)
+        if not paramVisible() then return false end
+        if type(baseIsNavigable) == "function" then
+            return baseIsNavigable(self)
+        end
+        return true
+    end
+    return item
 end
 
 -- Player slot ---------------------------------------------------------------
@@ -108,34 +182,52 @@ local function slotLabel(playerID)
     return function()
         local config = PlayerConfigurations and PlayerConfigurations[playerID]
         if config == nil then
-            return Locale.Lookup("LOC_CIVVIACCESS_AI_SLOT_GENERIC", playerID + 1)
+            return "Slot " .. tostring(playerID + 1)
         end
         local leaderTypeID = config.GetLeaderTypeID and config:GetLeaderTypeID() or -1
         local leaderName
         if leaderTypeID == -1 then
-            leaderName = Locale.Lookup("LOC_RANDOM_LEADER_NAME")
+            -- LOC_RANDOM_LEADER_NAME isn't reliably resolved by Locale.Lookup
+            -- in this context (returns the key literal). Use a fixed string.
+            -- Engine displays this as "Random" in the pulldown text.
+            leaderName = "Random"
         else
-            leaderName = Locale.Lookup(config:GetLeaderName())
+            local key = config:GetLeaderName()
+            local resolved = Locale.Lookup(key)
+            -- Locale.Lookup returns the key when the LOC isn't found.
+            -- Fall back to a sanitized form of the key in that case.
+            if resolved == key then
+                resolved = key:gsub("^LOC_LEADER_", ""):gsub("_NAME$", ""):gsub("_", " "):lower()
+            end
+            leaderName = resolved
         end
-        return Locale.Lookup("LOC_CIVVIACCESS_AI_SLOT", playerID + 1, leaderName)
+        return "Slot " .. tostring(playerID + 1) .. ", " .. leaderName
     end
 end
 
--- Find parameters that belong to a specific player slot. The Civ VI
--- parameter framework names these "Player<X>" with X varying by parameter
--- (PlayerLeader, PlayerLeader2, PlayerHandicap, etc.). We match against
--- parameter.PlayerId since that's the canonical link the framework sets.
+-- Per-slot parameters (PlayerLeader, PlayerDifficulty, PlayerColorAlternate
+-- etc.) live in a SEPARATE collection from the global g_GameParameters.
+-- PlayerSetupLogic.lua creates a SetupParameters object per player_id and
+-- stores it in g_PlayerParameters; GetPlayerParameters(player_id) returns
+-- it. The shape is identical to g_GameParameters — a .Parameters dict and
+-- a :SetParameterValue method — so we can wrap each one with our standard
+-- Pulldown / ParameterCheckbox.
 local function playerSlotItems(playerID)
     return function()
         local items = {}
-        if g_GameParameters == nil or g_GameParameters.Parameters == nil then
-            return items
-        end
-        -- Iterate Parameters dict and pull out anything bound to this slot.
-        for _, parameter in pairs(g_GameParameters.Parameters) do
-            if parameter.PlayerId == playerID then
-                items[#items + 1] = parameterItem(parameter)
-            end
+        if GetPlayerParameters == nil then return items end
+        local playerParams = GetPlayerParameters(playerID)
+        if playerParams == nil or playerParams.Parameters == nil then return items end
+        -- Iterate the player's parameters dict. parameterItem chooses
+        -- Pulldown / ParameterCheckbox / Button based on parameter shape;
+        -- we pass playerParams as the gameParameters arg so commits go
+        -- through the right SetupParameters object for this slot. The
+        -- item's own isNavigable will re-check parameter.Visible /
+        -- parameter.Hidden dynamically (Civ VI flips those on ruleset
+        -- changes), so we include everything here and let the item
+        -- decide whether it should appear.
+        for _, parameter in pairs(playerParams.Parameters) do
+            items[#items + 1] = parameterItem(parameter, playerParams)
         end
         -- Remove button when legal: the engine sets RemoveButton:SetHide
         -- based on min-player constraints; our wrapper reads that hide
@@ -163,7 +255,12 @@ local function playersChildren()
     end
     items[#items + 1] = BaseMenuItems.Button({
         controlName = "AddAIButton",
-        labelText = Locale.Lookup("LOC_SETUP_ADD_AI_PLAYER"),
+        labelFn = function()
+            -- AddAIButton is an image button with no visible text in the
+            -- engine; fall back to a fixed string. (Localizing this would
+            -- require a string the base game doesn't provide.)
+            return "Add A I Player"
+        end,
         activate = function()
             if OnAddAIButton ~= nil then
                 OnAddAIButton()
@@ -193,7 +290,11 @@ local function topLevelItems()
                 gameModeParams[#gameModeParams + 1] = parameter
             elseif isVictoryParameter(parameter) then
                 victoryParams[#victoryParams + 1] = parameter
-            elseif parameter.Hidden ~= true then
+            else
+                -- Include unconditionally; per-item isNavigable does the
+                -- dynamic visibility check (Civ VI flips parameter.Visible
+                -- on ruleset / mode changes, e.g. Gathering Storm climate
+                -- params hidden under Standard ruleset).
                 globalParams[#globalParams + 1] = parameter
             end
         end
@@ -249,24 +350,39 @@ local function topLevelItems()
         end
     end
 
-    -- Action row.
+    -- Action row. Query the actual control text via labelFn — Locale.Lookup
+    -- on these LOC keys was returning the key literally (e.g.
+    -- "LOC_SETUP_DEFAULT") because the strings aren't reliably loaded by
+    -- the time items are built. The buttons themselves are populated by
+    -- the engine before our items list runs, so reading their text is
+    -- definitive.
+    local function controlText(controlName, fallback)
+        return function()
+            local c = Controls and Controls[controlName]
+            if c == nil then return fallback end
+            local ok, text = pcall(function() return c:GetText() end)
+            if not ok or text == nil or text == "" then return fallback end
+            return text
+        end
+    end
+
     items[#items + 1] = BaseMenuItems.Button({
         controlName = "DefaultButton",
-        labelText = Locale.Lookup("LOC_SETUP_DEFAULT"),
+        labelFn = controlText("DefaultButton", "Defaults"),
         activate = function()
             if OnDefaultButton ~= nil then OnDefaultButton() end
         end,
     })
     items[#items + 1] = BaseMenuItems.Button({
         controlName = "CloseButton",
-        labelText = Locale.Lookup("LOC_BACK_BUTTON"),
+        labelFn = controlText("CloseButton", "Back"),
         activate = function()
             if OnBackButton ~= nil then OnBackButton() end
         end,
     })
     items[#items + 1] = BaseMenuItems.Button({
         controlName = "StartButton",
-        labelText = Locale.Lookup("LOC_START_GAME"),
+        labelFn = controlText("StartButton", "Start Game"),
         activate = function()
             if OnStartButton ~= nil then OnStartButton() end
         end,
@@ -275,7 +391,7 @@ local function topLevelItems()
     return items
 end
 
-BaseMenu.install(ContextPtr, {
+local _menuHandler = BaseMenu.install(ContextPtr, {
     name = "AdvancedSetup",
     displayName = Locale.Lookup("LOC_CIVVIACCESS_SCREEN_ADVANCED_SETUP"),
     items = topLevelItems,
@@ -304,3 +420,22 @@ BaseMenu.install(ContextPtr, {
         -- repair here.
     end,
 })
+
+-- Chain UI_PostRefreshParameters so the BaseMenu's items cache invalidates
+-- when Civ VI's parameter set changes mid-show. Without this, switching
+-- ruleset (e.g. Gathering Storm -> Standard) leaves the prior expansion's
+-- parameters in our cached items list — user hears Calendar / Temperature
+-- / Precipitation params that the engine has flipped to Visible=false but
+-- which are still wrapped in our items DSL with stale data.
+local _priorPostRefresh = UI_PostRefreshParameters
+function UI_PostRefreshParameters()
+    if _priorPostRefresh ~= nil then
+        local ok, err = pcall(_priorPostRefresh)
+        if not ok then
+            print("[AdvancedSetupAccess] priorPostRefresh failed: " .. tostring(err))
+        end
+    end
+    if _menuHandler ~= nil then
+        BaseMenu.invalidateItemsCache(_menuHandler)
+    end
+end

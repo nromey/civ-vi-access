@@ -16,6 +16,7 @@
     <ImportFiles id="SRAccess_FE_UpdateFiles">
       <File priority="10001">Assets/UI/ToolTips/PlotToolTip.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScreenReader.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/Verbosity.lua</File>
       <File priority="10001">Assets/UI/Accessibility/BaseMenu.lua</File>
       <File priority="10001">Assets/UI/Accessibility/BaseMenuItems.lua</File>
       <File priority="10001">Assets/UI/Accessibility/MainMenuAccess.lua</File>
@@ -62,6 +63,7 @@
     <File>Assets/UI/Accessibility/ScreenReader.lua</File>
     <File>Assets/UI/Accessibility/ScreenReaderEventHandlers.lua</File>
     <File>Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
+    <File>Assets/UI/Accessibility/Verbosity.lua</File>
     <File>Assets/UI/Accessibility/BaseMenu.lua</File>
     <File>Assets/UI/Accessibility/BaseMenuItems.lua</File>
     <File>Assets/UI/Accessibility/MainMenuAccess.lua</File>
