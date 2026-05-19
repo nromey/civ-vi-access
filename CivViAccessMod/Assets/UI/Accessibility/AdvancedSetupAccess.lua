@@ -149,9 +149,14 @@ local function parameterItem(parameter, gameParameters)
                                 resolveLocText(parameter.Name)))
                     end
                 elseif pid == "LeaderPool1" or pid == "LeaderPool2" then
-                    OutputMessageToScreenReader(
-                        Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE",
-                            resolveLocText(parameter.Name)))
+                    if Controls and Controls.LeaderPicker ~= nil then
+                        LuaEvents.LeaderPicker_Initialize(parameter, gameParameters)
+                        Controls.LeaderPicker:SetHide(false)
+                    else
+                        OutputMessageToScreenReader(
+                            Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE",
+                                resolveLocText(parameter.Name)))
+                    end
                 else
                     -- MultiSelectWindow path (Natural Wonders et al.).
                     if Controls and Controls.MultiSelectWindow ~= nil then

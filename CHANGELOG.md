@@ -22,6 +22,38 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.3.4 — 2026-05-19 — Leader Pool picker (picker trio complete)
+
+Ships the third and last Array-domain picker. Leader Pool 1 and
+Leader Pool 2 are now fully keyboard- and screen-reader-navigable;
+the picker trio (Natural Wonders, City-States, Leader Pools) is
+complete and the largest remaining accessibility hole on AdvancedSetup
+is closed.
+
+### LeaderPicker companion
+
+`Frontend/LeaderPicker.lua` thin fork +
+`Accessibility/LeaderPickerAccess.lua` companion. Per-entry data
+comes from the engine's `GetPlayerInfo` (PlayerSetupLogic.lua),
+cached per Domain+Value so repeated arrows don't re-hit
+`DB.CachedQuery`. This is the richest payload of the three pickers:
+
+- Terse: `<leader>, <civ>` (e.g. "Trajan, Rome"). Some leaders share
+  faces across DLC packs and the civ disambiguates them.
+- Chatty / Ctrl+T: leader ability + civilization ability + uniques
+  list, all `Locale.Lookup`-ed. This is the entire point — picking a
+  leader without hearing the abilities is just naming faces blind.
+
+`AdvancedSetupAccess.lua`'s Array-button stub now opens the engine
+modal for `LeaderPool1` and `LeaderPool2` in addition to `CityStates`
+(0.3.3) and the generic MultiSelectWindow path (0.3.2). All four
+Array params on AdvancedSetup are accessible end-to-end.
+
+Action row: Select All / Select None / OK / Back. The engine's third
+preset ("Leaders with no Hall-of-Fame wins") is intentionally not
+exposed — niche, and the BaseMenu button surface stays tight. Easy to
+add as a fourth button if someone asks.
+
 ## 0.3.3 — 2026-05-19 — City-States picker + percent-escape speech fix
 
 Ships the second of the three Array-domain pickers (Select City-States)

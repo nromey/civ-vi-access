@@ -25,6 +25,7 @@
       <File priority="10001">Assets/UI/Accessibility/AdvancedSetupAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/MultiSelectWindowAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/CityStatePickerAccess.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/LeaderPickerAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ContextHelp.lua</File>
       <File priority="10001">Assets/UI/Panels/StatusMessagePanel.lua</File>
       <File priority="10001">Assets/UI/Panels/NotificationPanel.lua</File>
@@ -35,6 +36,7 @@
       <File priority="10001">Assets/UI/Frontend/AdvancedSetup.lua</File>
       <File priority="10001">Assets/UI/Frontend/MultiSelectWindow.lua</File>
       <File priority="10001">Assets/UI/Frontend/CityStatePicker.lua</File>
+      <File priority="10001">Assets/UI/Frontend/LeaderPicker.lua</File>
       <File priority="10001">Assets/UI/Options.lua</File>
     </ImportFiles>
     <UpdateText id="SRAccess_FE_Text">
@@ -76,6 +78,7 @@
     <File>Assets/UI/Accessibility/AdvancedSetupAccess.lua</File>
     <File>Assets/UI/Accessibility/MultiSelectWindowAccess.lua</File>
     <File>Assets/UI/Accessibility/CityStatePickerAccess.lua</File>
+    <File>Assets/UI/Accessibility/LeaderPickerAccess.lua</File>
     <File>Assets/UI/Accessibility/ContextHelp.lua</File>
     <File>Assets/UI/Accessibility/TutorialAccess.lua</File>
     <File>Assets/UI/Options.lua</File>
@@ -86,6 +89,7 @@
     <File>Assets/UI/Frontend/AdvancedSetup.lua</File>
     <File>Assets/UI/Frontend/MultiSelectWindow.lua</File>
     <File>Assets/UI/Frontend/CityStatePicker.lua</File>
+    <File>Assets/UI/Frontend/LeaderPicker.lua</File>
     <File>Assets/UI/Panels/NotificationPanel.lua</File>
     <File>Assets/UI/Panels/ProductionPanel.lua</File>
     <File>Assets/UI/Panels/StatusMessagePanel.lua</File>
