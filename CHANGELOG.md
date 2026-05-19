@@ -22,6 +22,80 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.3.5 — 2026-05-19 — Numeric inputs, pulldown L/R cycling, picker hints
+
+AdvancedSetup is now end-to-end editable from the keyboard: every
+parameter the engine exposes is reachable, readable, and changeable
+without touching the mouse. Three independent additions plus a
+small UX polish ride this release.
+
+### Edit-mode primitive in BaseMenu
+
+`BaseMenu.lua` gains a `_editMode` state and `handleEditMode`
+dispatch. When an item enters edit mode (digit-typing), the input
+handler routes digits / Backspace / Enter / Esc through the edit
+handler before any nav; every other key is swallowed so typing
+can't accidentally trigger nav. Edit mode resets on screen hide.
+
+### NumberInput + Slider item kinds
+
+`BaseMenuItems.NumberInput` for Domain `int` / `uint` / `text`
+(the random seed fields). Enter starts edit mode with an empty
+buffer; type a fresh value digit-by-digit; Backspace pops, Enter
+commits via `SetParameterValue` + `BroadcastGameConfig`, Esc
+cancels. Each typed digit is spoken; commit speaks "set to N".
+
+`BaseMenuItems.Slider` for `Values.Type == "IntRange"`
+(CityStateCount, Disaster Intensity). Left / Right step ±1 within
+`MinimumValue..MaximumValue`, committing each step immediately. At
+a bound, the same value is re-spoken (silently stuck). Enter still
+drops into edit mode for exact jumps far from the current value.
+
+`AdvancedSetupAccess.parameterItem` now detects these shapes before
+falling through to Pulldown.
+
+### Pulldown Left / Right cycling
+
+`BaseMenuItems.Pulldown` gains an `adjust(menu, ±1)` method that
+cycles through `parameter.Values` in place, wrapping at the ends,
+committing each step. BaseMenu's existing onLeft / onRight
+machinery already calls `adjust` on items that implement it
+(that's how Slider works), so the wiring is automatic.
+
+Verbosity-aware: in chatty mode the cycle appends the per-value
+description ("rainfall, Wet. Increases rainfall yields..."),
+matching what the user would hear arrowing through the drilled-in
+sub-menu. Terse mode reads label + value only. Enter still drills
+into the sub-menu for users who want to browse all options.
+
+Pickers (Array params) are unaffected — they're `Button` kind, not
+Pulldown, and `Button` has no `adjust`. Left / Right on a picker
+no-ops; Enter still opens the modal.
+
+### Picker affordance hints (chatty)
+
+A blind user at L1 has no audible cue that a picker button is
+actionable since pickers have no current-value display. In chatty
+mode, picker labels now read as a full action sentence:
+
+- City-States → "Press Enter to pick city-states that will be available in the game"
+- Leader Pool 1 / 2 → "Press Enter to select Leader Pool 1 (or 2) members"
+- Natural Wonders → "Press Enter to pick natural wonders that will be available in the game"
+
+Per-picker phrasing lives in a `PICKER_HINTS` map keyed by
+ParameterId; unknown / future pickers fall back to a generic
+", press Enter to open" suffix. Terse mode keeps the engine label
+intact.
+
+### Leader Pool button label normalization
+
+The Select All / Select None buttons in the Leader picker now use
+`LOC_SELECT_ALL` / `LOC_SELECT_NONE` instead of the engine's
+preset-pulldown LOC keys (`LOC_LEADER_PICK_PRESET_ALL` / `_NONE`),
+which resolve to bare "All" / "None". All three pickers' action
+rows now read identically: "Select All", "Select None", "OK",
+"Back".
+
 ## 0.3.4 — 2026-05-19 — Leader Pool picker (picker trio complete)
 
 Ships the third and last Array-domain picker. Leader Pool 1 and

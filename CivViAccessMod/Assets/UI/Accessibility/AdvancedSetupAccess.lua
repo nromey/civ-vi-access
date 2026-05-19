@@ -132,10 +132,43 @@ local function parameterItem(parameter, gameParameters)
     -- accessible nav is handled by whichever companion picks up the
     -- show. Params without a shipped companion still announce the stub
     -- so the user knows the modal won't be navigable.
+    -- Picker buttons have no current-value display (the engine shows
+    -- a count or "..." visually), so a blind user at L1 has no audible
+    -- cue that Enter opens a modal. AdvancedSetup doesn't set
+    -- alwaysVerbose on itself, so chatty's describe path doesn't fire
+    -- at L1 — instead, fold an action-specific hint into the label
+    -- dynamically when Verbosity is on.
+    --
+    -- Each known picker gets a custom phrasing that states what the
+    -- user is about to do; unknown / future pickers fall back to a
+    -- generic ", press Enter to open" suffix so they're at least
+    -- announced as actionable. To add a new picker hint, append to
+    -- PICKER_HINTS keyed by ParameterId; same pattern extends to any
+    -- future in-game pickers that show up as Array params.
+    --
+    -- In chatty mode the action hint REPLACES the engine label
+    -- (otherwise the engine label and the action sentence say
+    -- overlapping things — "Select City-States. Press Enter to pick
+    -- city states..."). Terse mode keeps the engine label intact.
+    local PICKER_HINTS = {
+        CityStates     = "Press Enter to pick city-states that will be available in the game",
+        LeaderPool1    = "Press Enter to select Leader Pool 1 members",
+        LeaderPool2    = "Press Enter to select Leader Pool 2 members",
+        NaturalWonders = "Press Enter to pick natural wonders that will be available in the game",
+    }
     if parameter.Array then
+        local pickerLabelFn = function()
+            local base = resolveLocText(parameter.Name)
+            if Verbosity ~= nil and Verbosity.isOn() then
+                local hint = PICKER_HINTS[parameter.ParameterId]
+                if hint ~= nil then return hint end
+                return base .. ", press Enter to open"
+            end
+            return base
+        end
         item = BaseMenuItems.Button({
             parameter = parameter,
-            labelFn = labelFn,
+            labelFn = pickerLabelFn,
             tooltipFn = tooltipFn,
             activate = function()
                 local pid = parameter.ParameterId
@@ -172,6 +205,27 @@ local function parameterItem(parameter, gameParameters)
         })
     elseif parameter.Domain == "bool" or isGameModeParameter(parameter) then
         item = BaseMenuItems.ParameterCheckbox({
+            parameter = parameter,
+            gameParameters = gameParameters,
+            labelFn = labelFn,
+            tooltipFn = tooltipFn,
+        })
+    elseif parameter.Domain == "int" or parameter.Domain == "uint"
+        or parameter.Domain == "text" then
+        -- Free-form numeric / text entry (random seeds). The engine
+        -- renders these as a text input; we expose them as a
+        -- NumberInput that drops into edit mode on Enter.
+        item = BaseMenuItems.NumberInput({
+            parameter = parameter,
+            gameParameters = gameParameters,
+            labelFn = labelFn,
+            tooltipFn = tooltipFn,
+        })
+    elseif parameter.Values ~= nil and parameter.Values.Type == "IntRange" then
+        -- Bounded integer slider (CityStateCount, Disaster Intensity).
+        -- Left / Right step ±1 within MinimumValue..MaximumValue; Enter
+        -- drops into edit mode for exact jumps.
+        item = BaseMenuItems.Slider({
             parameter = parameter,
             gameParameters = gameParameters,
             labelFn = labelFn,

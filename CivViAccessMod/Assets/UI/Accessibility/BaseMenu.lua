@@ -199,6 +199,17 @@ local function nextValidIndex(items, start, step, wrap)
     return nil
 end
 
+-- Map a key value to its decimal digit 0-9, or nil if the key isn't a
+-- digit. Handles both top-row (VK_0..VK_9 = 0x30..0x39) and numpad
+-- (VK_NUMPAD0..VK_NUMPAD9 = 0x60..0x69) variants. Civ VI's Keys table
+-- naming differs across screens for digit keys; comparing raw VK codes
+-- sidesteps that.
+local function digitFromKey(key)
+    if key >= 48 and key <= 57 then return key - 48 end
+    if key >= 96 and key <= 105 then return key - 96 end
+    return nil
+end
+
 local function announceItem(handler, item, nointerrupt)
     if item == nil then
         return
@@ -239,6 +250,62 @@ local function announceItem(handler, item, nointerrupt)
         return
     end
     speak(text, nointerrupt)
+end
+
+-- Edit-mode dispatch. When handler._editMode is set, this routes the
+-- key event: digits append to the buffer, Backspace pops, Enter commits
+-- via item:commitEdit(value), Esc cancels. Any other key is swallowed
+-- so the user can type freely without accidentally triggering nav.
+--
+-- _editMode shape: { item, buffer (string), originalValue }. Buffer
+-- starts empty so the user types a fresh value rather than editing the
+-- existing string; arrow-step on Sliders covers the "small adjustment"
+-- case. Empty buffer + Enter = cancel (no value to commit).
+local function handleEditMode(handler, key)
+    local em = handler._editMode
+    if em == nil then return false end
+
+    if key == Keys.VK_ESCAPE then
+        handler._editMode = nil
+        speak("cancelled", false)
+        announceItem(handler, currentItems(handler)[currentIndex(handler)])
+        return true
+    end
+
+    if key == Keys.VK_RETURN then
+        if em.buffer == "" then
+            handler._editMode = nil
+            speak("cancelled", false)
+        else
+            local parsed = tonumber(em.buffer)
+            handler._editMode = nil
+            if parsed ~= nil and type(em.item.commitEdit) == "function" then
+                em.item:commitEdit(parsed, handler)
+            else
+                speak("invalid value", false)
+            end
+        end
+        announceItem(handler, currentItems(handler)[currentIndex(handler)])
+        return true
+    end
+
+    if key == Keys.VK_BACK then
+        if #em.buffer > 0 then
+            em.buffer = em.buffer:sub(1, -2)
+            speak(em.buffer == "" and "empty" or em.buffer, false)
+        end
+        return true
+    end
+
+    local digit = digitFromKey(key)
+    if digit ~= nil then
+        em.buffer = em.buffer .. tostring(digit)
+        speak(tostring(digit), false)
+        return true
+    end
+
+    -- Any other key while in edit mode is swallowed (no nav while editing).
+    return true
 end
 
 local function moveToIndex(handler, newIndex)
@@ -595,6 +662,7 @@ function BaseMenu.install(ContextPtr, spec)
             -- modal that toggled a game mode).
             handler._initialized = false
             handler._activeSubMenu = nil
+            handler._editMode = nil
             handler._cachedItems = nil
             return
         end
@@ -647,6 +715,14 @@ function BaseMenu.install(ContextPtr, spec)
                 return priorInput(...)
             end
             return false
+        end
+
+        -- Edit-mode interception. While a NumberInput / Slider is in
+        -- edit mode, digits / Backspace / Enter / Esc go to the edit
+        -- handler; everything else is swallowed so the user can type
+        -- without nav side effects.
+        if handler._editMode ~= nil then
+            return handleEditMode(handler, key)
         end
 
         if key == Keys.VK_ESCAPE then

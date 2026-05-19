@@ -548,6 +548,76 @@ function BaseMenuItems.Pulldown(spec)
         })
     end
 
+    -- Left / Right cycle through parameter.Values in place without
+    -- drilling. Wraps at the ends. Commits each step immediately via
+    -- the same SetParameterValue path Enter-and-drill uses, so the
+    -- engine sees identical state.
+    --
+    -- Verbosity-aware: in chatty mode we append the per-value
+    -- description (the entry's RawDescription / Description, resolved
+    -- via Locale.Lookup) so cycling reads "rainfall, Wet. Increases
+    -- rainfall yields..." Otherwise terse "rainfall, Wet" matching
+    -- the L1 announce convention.
+    --
+    -- Parameter-mode only. Entries-mode pulldowns (rare; no current
+    -- consumer) would need their own selectEntry cycle; defer until
+    -- a screen needs it.
+    function item:adjust(menu, direction)
+        local p = self._parameter
+        if p == nil or self._gameParameters == nil
+            or type(p.Values) ~= "table" or #p.Values == 0 then
+            return
+        end
+        -- Locate current entry. parameter.Value can be the entry table
+        -- or (rarely) a raw value; match either.
+        local currentIdx = nil
+        for i, v in ipairs(p.Values) do
+            if p.Value == v then
+                currentIdx = i
+                break
+            end
+            if type(p.Value) == "table" and p.Value.Value == v.Value then
+                currentIdx = i
+                break
+            end
+            if p.Value == v.Value then
+                currentIdx = i
+                break
+            end
+        end
+        if currentIdx == nil then currentIdx = 1 end
+        local newIdx = currentIdx + direction
+        if newIdx < 1 then newIdx = #p.Values end
+        if newIdx > #p.Values then newIdx = 1 end
+        local newEntry = p.Values[newIdx]
+        local ok, err = pcall(function()
+            self._gameParameters:SetParameterValue(p, newEntry)
+            if Network ~= nil and Network.BroadcastGameConfig ~= nil then
+                Network.BroadcastGameConfig()
+            end
+        end)
+        if not ok then
+            print("[BaseMenu pulldown '" .. tostring(self.controlName)
+                .. "'] adjust commit failed: " .. tostring(err))
+            return
+        end
+        local label = resolveLabel(self)
+        local valueName = (newEntry.Name and Locale.Lookup(newEntry.Name)) or ""
+        local base = label .. ", " .. valueName
+        local verboseOn = Verbosity ~= nil and Verbosity.isOn()
+        if verboseOn then
+            local desc = newEntry.RawDescription or newEntry.Description
+            if desc ~= nil and desc ~= "" then
+                local resolved = Locale.Lookup(desc)
+                if resolved ~= nil and resolved ~= "" and resolved ~= desc then
+                    OutputMessageToScreenReader(base .. ". " .. resolved)
+                    return
+                end
+            end
+        end
+        OutputMessageToScreenReader(base)
+    end
+
     return item
 end
 
@@ -639,6 +709,112 @@ function BaseMenuItems.ParameterCheckbox(spec)
         end
         OutputMessageToScreenReader(self:announce(menu))
     end
+    return item
+end
+
+-- NumberInput ---------------------------------------------------------------
+--
+-- A numeric parameter rendered as an edit-on-Enter text field. Used for
+-- Domain="int" / "uint" / "text" parameters (random seeds, etc.) — the
+-- engine renders these as free-form text-input controls. Our flow:
+--   * Enter / Space activates edit mode (BaseMenu captures digits).
+--   * User types digits (Backspace pops, Enter commits, Esc cancels).
+--   * On commit, the new integer goes through SetParameterValue.
+--
+-- Buffer starts EMPTY: the user types a fresh value rather than editing
+-- the old one. Pressing Enter with empty buffer is a no-op cancel —
+-- combined with the Slider's arrow-step adjustment this gives a clean
+-- "small change = arrows, exact value = type it" split.
+
+function BaseMenuItems.NumberInput(spec)
+    assert(spec.parameter ~= nil, "NumberInput needs parameter")
+    assert(spec.gameParameters ~= nil, "NumberInput needs gameParameters")
+    local item = {
+        kind = "number",
+        _parameter = spec.parameter,
+        _gameParameters = spec.gameParameters,
+    }
+    copyCommonFields(spec, item)
+    item.isNavigable = isNavigable
+    item.isActivatable = function(self) return true end
+
+    function item:announce(menu)
+        local value = self._parameter.Value
+        return composeSpeech(self, {
+            resolveLabel(self),
+            tostring(value or "")
+        })
+    end
+    item.describe = genericDescribe
+
+    function item:activate(menu)
+        menu._editMode = {
+            item = self,
+            buffer = "",
+            originalValue = self._parameter.Value,
+        }
+        OutputMessageToScreenReader(
+            "edit, current " .. tostring(self._parameter.Value or "(none)"))
+    end
+
+    function item:commitEdit(newValue, menu)
+        local ok, err = pcall(function()
+            self._gameParameters:SetParameterValue(self._parameter, newValue)
+            if Network ~= nil and Network.BroadcastGameConfig ~= nil then
+                Network.BroadcastGameConfig()
+            end
+        end)
+        if not ok then
+            print("[BaseMenuItems NumberInput] commit failed: " .. tostring(err))
+            OutputMessageToScreenReader("commit failed")
+        else
+            OutputMessageToScreenReader("set to " .. tostring(newValue))
+        end
+    end
+
+    return item
+end
+
+-- Slider --------------------------------------------------------------------
+--
+-- An IntRange parameter (parameter.Values.Type == "IntRange",
+-- MinimumValue / MaximumValue defined). Behaves like NumberInput PLUS
+-- Left / Right arrows step the value by 1 within the bound range, no
+-- edit mode required. This matches the natural keyboard-slider idiom:
+-- arrow for small adjustment, Enter-then-type for exact jump.
+--
+-- Stepping commits immediately (each Left / Right is a single
+-- SetParameterValue call). Reaches a bound silently — the spoken new
+-- value tells the user they're stuck.
+
+function BaseMenuItems.Slider(spec)
+    local item = BaseMenuItems.NumberInput(spec)
+    item.kind = "slider"
+
+    function item:adjust(menu, direction)
+        local current = self._parameter.Value or 0
+        local values = self._parameter.Values
+        local minV = (values and values.MinimumValue) or 0
+        local maxV = (values and values.MaximumValue) or current
+        local newValue = current + direction
+        if newValue < minV then newValue = minV end
+        if newValue > maxV then newValue = maxV end
+        if newValue ~= current then
+            local ok, err = pcall(function()
+                self._gameParameters:SetParameterValue(self._parameter, newValue)
+                if Network ~= nil and Network.BroadcastGameConfig ~= nil then
+                    Network.BroadcastGameConfig()
+                end
+            end)
+            if not ok then
+                print("[BaseMenuItems Slider] adjust failed: " .. tostring(err))
+                OutputMessageToScreenReader("commit failed")
+                return
+            end
+        end
+        OutputMessageToScreenReader(tostring(newValue))
+    end
+
     return item
 end
 

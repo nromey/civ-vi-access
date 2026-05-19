@@ -184,12 +184,19 @@ local function buildItems()
             setValue = function(newOn) setItemChecked(entry.Value, newOn) end,
         })
     end
+    -- Use LOC_SELECT_ALL / LOC_SELECT_NONE for cross-picker consistency
+    -- with the City-States and Natural Wonders pickers (those resolve to
+    -- "Select All" / "Select None"). The engine's leader-specific
+    -- LOC_LEADER_PICK_PRESET_ALL / _NONE resolve to bare "All" / "None"
+    -- since the engine wraps them in a "Preset" pulldown context where
+    -- the noun is implicit; here they're standalone Buttons so we want
+    -- the verb-and-noun form.
     items[#items + 1] = BaseMenuItems.Button({
-        labelText = Locale.Lookup("LOC_LEADER_PICK_PRESET_ALL"),
+        labelText = Locale.Lookup("LOC_SELECT_ALL"),
         activate = function() setAll(true) end,
     })
     items[#items + 1] = BaseMenuItems.Button({
-        labelText = Locale.Lookup("LOC_LEADER_PICK_PRESET_NONE"),
+        labelText = Locale.Lookup("LOC_SELECT_NONE"),
         activate = function() setAll(false) end,
     })
     items[#items + 1] = BaseMenuItems.Button({
