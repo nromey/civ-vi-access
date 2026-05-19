@@ -22,7 +22,7 @@
          release workflow overrides this via -p:Version=<tag> at
          publish time. This default is what local dotnet build /
          dotnet publish produce in dev. -->
-    <Version>0.3.1-pre</Version>
+    <Version>0.3.1</Version>
 
     <!-- Distributed exe name has no dots, all camelCase. The project
          folder + namespace can keep their existing "CivVIAccess.Launcher"

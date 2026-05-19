@@ -22,14 +22,14 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
-## 0.3.1-pre — 2026-05-18 — AdvancedSetup accessibility (work in progress)
+## 0.3.1 — 2026-05-19 — AdvancedSetup accessibility (single-player nav)
 
-Pre-release. Starts the AdvancedSetup (Create Game) screen
-accessibility companion + introduces a reusable per-screen
-BaseMenu framework adapted from the Civ V Access architecture. The
-screen is exposed to keyboard navigation and screen-reader speech,
-but several pieces are deliberately deferred — see "Known gaps"
-below.
+Lands the AdvancedSetup (Create Game) screen accessibility companion
++ a reusable per-screen BaseMenu framework adapted from the Civ V
+Access architecture. The screen is fully keyboard- and screen-reader-
+navigable for single-player setup; the Array-domain pickers (City-
+States, Leader Pool 1/2, Natural Wonders) remain stubbed (see
+"Known gaps").
 
 ### BaseMenu framework
 
@@ -89,12 +89,52 @@ at the bottom (after `Initialize()` so the base screen's
 `OnShow` / `OnHide` / `OnInputHandler` globals exist and are
 captured by the companion).
 
-### Known gaps (deferred — followups)
+### Polish landed 2026-05-19
 
-- City-states / leader-pool pickers (Array parameters) announce
-  "picker not yet accessible" but route to no companion. Each
-  picker is its own modal screen and needs its own per-screen fork
-  + companion.
+- Per-slot params now come from `GetPlayerParameters(playerID)`, not
+  `g_GameParameters`, so slot drill reads leader / handicap / team /
+  color correctly.
+- Pulldown `currentValueText` handles non-table `parameter.Value`
+  (Disaster Intensity, GameRandomSeed, MapRandomSeed, CityStateCount,
+  ...) — looks up in `parameter.Values` by Value equality, falls back
+  to `tostring`. Previously crashed on `.Value.Name` index.
+- `isVictoryParameter` matches `GroupId == "Victories"` literal; the
+  earlier `^Victory` Lua pattern silently leaked all victory params
+  into L1 because position 7 differs (Y vs I).
+- `UI_PostRefreshParameters` hook invalidates the BaseMenu items
+  cache on ruleset / mode flip, so Gathering Storm → Standard drops
+  Calendar / Disaster Intensity / Diplomatic Victory live.
+- Per-item `isNavigable` consults `parameter.Visible` dynamically.
+- Action-row buttons read live `Controls.X:GetText()` instead of
+  unresolved `LOC_SETUP_DEFAULT` etc.
+- Pulldown sub-entry `describe` resolves `Description` LOC keys, so
+  Ctrl+T on map types / world ages reads prose ("Continents. Multiple
+  separate landmasses…") instead of `LOC_MAP_CONTINENTS_DESCRIPTION`.
+
+### Escape semantics
+
+`Esc` pops one level when drilled into a group or sub-menu (mirrors
+Left arrow) and only falls through to the engine's close at L1.
+Previously fell through at every depth, surprising users who
+expected one-level-up semantics.
+
+### Verbosity (Alt+V)
+
+New `Verbosity.lua` module + `Alt+V` toggle. Chatty mode swaps the
+arrow-key landing from `announce()` (label + value) to `describe()`
+(label + value + tooltip / parameter description). Gated to L2+
+(group children or Pulldown sub-entries) so generic L1 tooltips
+don't add noise; the win is at sub-menu depth where each entry's
+description is the only useful differentiator (leader, map type,
+world age). Default chatty. `Ctrl+T` continues to force `describe`
+regardless of mode.
+
+### Known gaps (deferred)
+
+- Array-domain pickers (City-States, Leader Pool 1/2, Natural
+  Wonders) still announce "picker not yet accessible." Each picker
+  is its own modal screen and needs its own per-screen fork +
+  companion. Next deliberate work item on this screen.
 - Per-slot Remove button inside the Players group is not surfaced
   yet (the engine builds it on a per-instance container that
   isn't trivially reachable from the parameter framework — needs
@@ -103,6 +143,11 @@ captured by the companion).
   in-memory leader-civ-boons plan) is plumbed via the Pulldown's
   `entryAnnounceFn` parameter but not yet supplied by
   AdvancedSetupAccess. Easy add once the format is decided.
+- Rapid back-to-back screen-reader interrupts (e.g. Alt+V Alt+V
+  inside ~200 ms) can swallow the leading utterance. CAMM's
+  `LogTailSpeaker` polls Lua.log every 200 ms and coalesces
+  interrupts within a window; the Lua side fires correctly. Bundled
+  with the future Prism / Tolk abstraction in CAMM.
 
 ### Risks to watch in pre-release testing
 
