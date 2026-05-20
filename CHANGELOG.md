@@ -22,6 +22,18 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.3.7 — 2026-05-19 — Consume CAMM v0.5.5 (fixes v0.3.6 build break)
+
+v0.3.6's CAMM v0.5.4 pin had a build break (Timer name ambiguous
+against System.Windows.Forms.Timer with WinForms enabled); CI
+failed at publish. v0.5.5 fixes the disambiguation. This is a
+pure consumption bump; no CivViAccess code changes beyond the
+submodule pointer.
+
+The sticky-Alt+V behavior fix (rapid-interrupt coalesce window)
+and the "Updating mod" speech-shortening — both intended for
+v0.3.6 — now actually ship.
+
 ## 0.3.6 — 2026-05-19 — Consume CAMM v0.5.4 (sticky Alt+V fix)
 
 Submodule pin bump to CAMM v0.5.4, which lands two speech-pipeline
