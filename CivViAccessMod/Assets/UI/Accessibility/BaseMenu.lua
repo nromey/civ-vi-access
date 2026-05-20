@@ -252,15 +252,23 @@ local function announceItem(handler, item, nointerrupt)
     speak(text, nointerrupt)
 end
 
--- Edit-mode dispatch. When handler._editMode is set, this routes the
--- key event: digits append to the buffer, Backspace pops, Enter commits
--- via item:commitEdit(value), Esc cancels. Any other key is swallowed
--- so the user can type freely without accidentally triggering nav.
+-- Edit-mode dispatch with cursor-aware editing. When handler._editMode
+-- is set, this routes the key event: digits insert at cursor, Backspace
+-- deletes left of cursor, Delete deletes right of cursor, Left / Right /
+-- Home / End move the cursor, Enter commits via item:commitEdit(value),
+-- Esc cancels. Any other key is swallowed so the user can type freely
+-- without accidentally triggering nav.
 --
--- _editMode shape: { item, buffer (string), originalValue }. Buffer
--- starts empty so the user types a fresh value rather than editing the
--- existing string; arrow-step on Sliders covers the "small adjustment"
--- case. Empty buffer + Enter = cancel (no value to commit).
+-- _editMode shape: { item, buffer (string), cursor (int), originalValue }.
+-- Buffer starts at the current value with cursor at the end — users
+-- changing a few trailing digits backspace-and-retype; users typing a
+-- totally fresh value Home+Delete the existing first. This is the
+-- standard edit-line idiom and what screen-reader users expect from
+-- text input.
+--
+-- Cursor is an index *between* characters: 0 means "before the first
+-- char," #buffer means "after the last char." Inserting at cursor C
+-- places the new char at position C+1 in 1-based Lua string indexing.
 local function handleEditMode(handler, key)
     local em = handler._editMode
     if em == nil then return false end
@@ -289,9 +297,59 @@ local function handleEditMode(handler, key)
         return true
     end
 
+    if key == Keys.VK_LEFT then
+        if em.cursor > 0 then
+            em.cursor = em.cursor - 1
+            local ch = em.buffer:sub(em.cursor + 1, em.cursor + 1)
+            speak(ch == "" and "start" or ch, false)
+        else
+            speak("start", false)
+        end
+        return true
+    end
+
+    if key == Keys.VK_RIGHT then
+        if em.cursor < #em.buffer then
+            em.cursor = em.cursor + 1
+            if em.cursor >= #em.buffer then
+                speak("end", false)
+            else
+                local ch = em.buffer:sub(em.cursor + 1, em.cursor + 1)
+                speak(ch, false)
+            end
+        else
+            speak("end", false)
+        end
+        return true
+    end
+
+    if key == Keys.VK_HOME then
+        em.cursor = 0
+        local ch = em.buffer:sub(1, 1)
+        speak(em.buffer == "" and "empty" or (ch .. ", start"), false)
+        return true
+    end
+
+    if key == Keys.VK_END then
+        em.cursor = #em.buffer
+        speak(em.buffer == "" and "empty" or "end", false)
+        return true
+    end
+
     if key == Keys.VK_BACK then
-        if #em.buffer > 0 then
-            em.buffer = em.buffer:sub(1, -2)
+        -- Delete the character LEFT of the cursor.
+        if em.cursor > 0 then
+            em.buffer = em.buffer:sub(1, em.cursor - 1) .. em.buffer:sub(em.cursor + 1)
+            em.cursor = em.cursor - 1
+            speak(em.buffer == "" and "empty" or em.buffer, false)
+        end
+        return true
+    end
+
+    if key == Keys.VK_DELETE then
+        -- Delete the character UNDER the cursor (right of cursor index).
+        if em.cursor < #em.buffer then
+            em.buffer = em.buffer:sub(1, em.cursor) .. em.buffer:sub(em.cursor + 2)
             speak(em.buffer == "" and "empty" or em.buffer, false)
         end
         return true
@@ -299,7 +357,8 @@ local function handleEditMode(handler, key)
 
     local digit = digitFromKey(key)
     if digit ~= nil then
-        em.buffer = em.buffer .. tostring(digit)
+        em.buffer = em.buffer:sub(1, em.cursor) .. tostring(digit) .. em.buffer:sub(em.cursor + 1)
+        em.cursor = em.cursor + 1
         speak(tostring(digit), false)
         return true
     end

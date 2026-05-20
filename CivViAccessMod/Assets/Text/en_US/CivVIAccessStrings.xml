@@ -193,6 +193,9 @@
         <Row Tag="LOC_CIVVIACCESS_SCREEN_ADVANCED_SETUP">
             <Text>Create Game</Text>
         </Row>
+        <Row Tag="LOC_CIVVIACCESS_SCREEN_SCENARIO_SETUP">
+            <Text>Scenario Setup</Text>
+        </Row>
         <Row Tag="LOC_CIVVIACCESS_GROUP_PLAYERS">
             <Text>Players</Text>
         </Row>

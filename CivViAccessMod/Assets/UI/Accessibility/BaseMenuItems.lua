@@ -429,7 +429,44 @@ function BaseMenuItems.Pulldown(spec)
         end
         return composeSpeech(self, parts)
     end
-    item.describe = genericDescribe
+    -- Pulldown describe favors the PER-VALUE description (the
+    -- selected entry's RawDescription/Description) over the
+    -- parameter's generic Description. Per-value descriptions are
+    -- the actual differentiator users need at chatty time:
+    -- "Ruleset, Standard Rules. This is a standard Civilization VI
+    -- game" tells you what you're picking; "Ruleset, Standard Rules.
+    -- Choose the ruleset to play by" tells you nothing.
+    --
+    -- This also keeps the arrow-to-item announce in sync with the
+    -- Left/Right cycle announce (which already reads per-value
+    -- description via adjust()). Without this they'd diverge —
+    -- arrowing to a pulldown spoke the generic parameter blurb,
+    -- cycling its values spoke the per-value description.
+    --
+    -- Falls back to the parameter-level tooltip (genericDescribe's
+    -- behavior) when there's no per-value description to lean on —
+    -- entries-mode pulldowns, parameter.Value not in table form, etc.
+    function item:describe(menu)
+        local base = self:announce(menu)
+        local desc = nil
+        if self._parameter ~= nil
+            and type(self._parameter.Value) == "table" then
+            local entry = self._parameter.Value
+            local key = entry.RawDescription or entry.Description
+            if key ~= nil and key ~= "" then
+                local resolved = Locale.Lookup(key)
+                if resolved ~= nil and resolved ~= ""
+                    and resolved ~= key then
+                    desc = resolved
+                end
+            end
+        end
+        if desc == nil then
+            desc = resolveTooltip(self)
+        end
+        if desc == nil or desc == "" then return base end
+        return appendTooltip(base, desc)
+    end
 
     -- Build the sub-menu entries list from the parameter / entriesFn.
     local function buildSubItems(menu)
@@ -748,13 +785,21 @@ function BaseMenuItems.NumberInput(spec)
     item.describe = genericDescribe
 
     function item:activate(menu)
+        -- Seed buffer with the current value so users editing a long
+        -- number (random seed, etc.) don't have to retype the whole
+        -- thing — they Home+Delete to clear or Backspace from the end
+        -- to trim. Cursor at end matches standard edit-line conventions
+        -- and means typing a new digit just appends until you move.
+        local current = tostring(self._parameter.Value or "")
         menu._editMode = {
             item = self,
-            buffer = "",
+            buffer = current,
+            cursor = #current,
             originalValue = self._parameter.Value,
         }
         OutputMessageToScreenReader(
-            "edit, current " .. tostring(self._parameter.Value or "(none)"))
+            "edit, current value " .. (current == "" and "(none)" or current)
+            .. ". Use left and right to navigate, backspace to delete, enter to commit, escape to cancel.")
     end
 
     function item:commitEdit(newValue, menu)

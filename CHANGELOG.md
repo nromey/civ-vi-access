@@ -22,6 +22,76 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.3.9 — 2026-05-19 — Scenarios + edit-line cursor + per-value chatty (game setup complete)
+
+**Milestone: the full game-setup arc is end-to-end accessible.**
+Every screen, parameter, and picker the engine exposes for starting
+a new game can be reached, read, and changed from the keyboard with
+a screen reader: Create Game (AdvancedSetup), Scenarios (this
+release), all four pickers (Natural Wonders, City-States, Leader
+Pool 1, Leader Pool 2), every parameter shape (Pulldown, Checkbox,
+NumberInput, Slider, Group, Button). The next release line
+(0.4.x) starts in-game work.
+
+### ScenarioSetup companion
+
+`Frontend/ScenarioSetup.lua` thin fork +
+`Accessibility/ScenarioSetupAccess.lua` companion — mirrors the
+AdvancedSetup pattern. ScenarioSetup uses the same parameter
+framework, so the existing item factories (Pulldown / Checkbox /
+Slider / NumberInput / Button-as-picker), the same picker
+companions (MultiSelectWindow / CityStatePicker / LeaderPicker),
+and the same Players group all light up automatically.
+
+Screen-specific tweaks:
+- **Scenario pulldown pinned to the top** of L1 (regardless of its
+  SortIndex) since it's the dominant choice — picking a scenario
+  reshapes every other parameter on the screen.
+- **`alwaysVerbose = true`** at the BaseMenu level: scenarios is a
+  "browse and pick" screen where descriptions are the actual
+  differentiator. Chatty mode reads per-value descriptions on every
+  arrow landing, not just on L/R cycle. AdvancedSetup stays terse
+  at L1 — different screen, different default.
+
+The "Advanced Setup" button (visual-pane toggle for sighted users)
+is intentionally NOT surfaced — our companion reads every parameter
+from `g_GameParameters` regardless of which pane the engine is
+showing, so the toggle is functionally redundant.
+
+### NumberInput edit-line cursor nav
+
+`BaseMenu.handleEditMode` now implements a proper edit line for
+NumberInput / Slider edit-mode (the seed fields most prominently).
+Previously typing was "fresh value only, no cursor" — users editing
+a 9-digit random seed had to retype the whole thing. Now:
+
+- Buffer **starts at the current value** with cursor at the end.
+- **Left / Right** move cursor by one digit and speak the digit at
+  the new position.
+- **Home / End** jump to start / end of buffer.
+- **Backspace** deletes left of cursor; **Delete** deletes under
+  cursor (right of cursor index).
+- Digit keys insert at cursor position.
+- Enter commits parsed buffer; Esc cancels.
+
+Initial announce reads the current value + a brief usage hint so
+users know the edit affordances on first use.
+
+### Pulldown describe reads per-value description (universal)
+
+`BaseMenuItems.Pulldown` now overrides `describe` to prefer the
+selected entry's `RawDescription` / `Description` (per-value) over
+the parameter's generic `Description`. In chatty mode arrowing to
+a Pulldown now reads the same content the Left/Right cycle reads —
+"Ruleset, Standard Rules. This is a standard Civilization VI game"
+instead of "Ruleset, Standard Rules. Choose the ruleset to play by".
+
+The change is universal — affects every Pulldown in every screen
+when chatty kicks in. ScenarioSetup feels the impact at L1 because
+of `alwaysVerbose`; AdvancedSetup feels it inside drilled-in groups
+(L2+) where chatty already fired. Strictly an improvement; no
+regressions identified.
+
 ## 0.3.8 — 2026-05-19 — Consume CAMM v0.5.6 (replace coalesce with dedupe)
 
 CAMM v0.5.6 replaces the v0.5.4/v0.5.5 deferred-pending coalesce

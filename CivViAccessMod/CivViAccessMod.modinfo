@@ -23,6 +23,7 @@
       <File priority="10001">Assets/UI/Accessibility/LoadGameMenuAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/OptionsAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/AdvancedSetupAccess.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScenarioSetupAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/MultiSelectWindowAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/CityStatePickerAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/LeaderPickerAccess.lua</File>
@@ -34,6 +35,7 @@
       <File priority="10001">Assets/UI/Frontend/IntroScreen.lua</File>
       <File priority="10001">Assets/UI/Frontend/LoadGameMenu.lua</File>
       <File priority="10001">Assets/UI/Frontend/AdvancedSetup.lua</File>
+      <File priority="10001">Assets/UI/Frontend/ScenarioSetup.lua</File>
       <File priority="10001">Assets/UI/Frontend/MultiSelectWindow.lua</File>
       <File priority="10001">Assets/UI/Frontend/CityStatePicker.lua</File>
       <File priority="10001">Assets/UI/Frontend/LeaderPicker.lua</File>
@@ -76,6 +78,7 @@
     <File>Assets/UI/Accessibility/LoadGameMenuAccess.lua</File>
     <File>Assets/UI/Accessibility/OptionsAccess.lua</File>
     <File>Assets/UI/Accessibility/AdvancedSetupAccess.lua</File>
+    <File>Assets/UI/Accessibility/ScenarioSetupAccess.lua</File>
     <File>Assets/UI/Accessibility/MultiSelectWindowAccess.lua</File>
     <File>Assets/UI/Accessibility/CityStatePickerAccess.lua</File>
     <File>Assets/UI/Accessibility/LeaderPickerAccess.lua</File>
@@ -87,6 +90,7 @@
     <File>Assets/UI/Frontend/IntroScreen.lua</File>
     <File>Assets/UI/Frontend/LoadGameMenu.lua</File>
     <File>Assets/UI/Frontend/AdvancedSetup.lua</File>
+    <File>Assets/UI/Frontend/ScenarioSetup.lua</File>
     <File>Assets/UI/Frontend/MultiSelectWindow.lua</File>
     <File>Assets/UI/Frontend/CityStatePicker.lua</File>
     <File>Assets/UI/Frontend/LeaderPicker.lua</File>
