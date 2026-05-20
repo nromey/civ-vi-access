@@ -22,6 +22,23 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.3.8 — 2026-05-19 — Consume CAMM v0.5.6 (replace coalesce with dedupe)
+
+CAMM v0.5.6 replaces the v0.5.4/v0.5.5 deferred-pending coalesce
+window with a simpler identical-text dedupe. The coalesce broke
+normal flow — pressing Down arrow then Alt+V quickly caused the
+verbosity-toggle's "Verbose off" to be stomped by the next arrow
+announce in the pending slot, so users heard the arrow but never
+the toggle confirmation.
+
+After this bump, Down → Alt+V works as expected (the toggle's
+announce interrupts the arrow announce). Rapid same-key toggling
+(Alt+V Alt+V) still has Tolk's natural last-write-wins behavior;
+distinct enable/disable earcons are queued as future work to make
+that case more audible.
+
+Pure submodule consumption bump; no CivViAccess code changes.
+
 ## 0.3.7 — 2026-05-19 — Consume CAMM v0.5.5 (fixes v0.3.6 build break)
 
 v0.3.6's CAMM v0.5.4 pin had a build break (Timer name ambiguous
