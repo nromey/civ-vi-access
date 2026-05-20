@@ -31,11 +31,16 @@ verbosity-toggle's "Verbose off" to be stomped by the next arrow
 announce in the pending slot, so users heard the arrow but never
 the toggle confirmation.
 
-After this bump, Down → Alt+V works as expected (the toggle's
-announce interrupts the arrow announce). Rapid same-key toggling
-(Alt+V Alt+V) still has Tolk's natural last-write-wins behavior;
-distinct enable/disable earcons are queued as future work to make
-that case more audible.
+After this bump, **Down → Alt+V works as expected** (the toggle's
+announce interrupts the arrow announce). **Rapid same-key toggling
+(Alt+V Alt+V) is hit-and-miss** — Tolk's natural last-write-wins
+means rapid presses may produce only a fragment of the first
+utterance before the second interrupts. State always cycles
+correctly; the audible confirmation isn't fully reliable for spam.
+Prism wouldn't help (same interrupt model). The proper fix is
+distinct enable/disable **earcons** that don't compete in the
+speech race — planned via the ElevenLabs Creator trial once the
+Vermont travel settles.
 
 Pure submodule consumption bump; no CivViAccess code changes.
 
