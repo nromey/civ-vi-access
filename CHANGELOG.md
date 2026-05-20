@@ -22,6 +22,31 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.3.6 — 2026-05-19 — Consume CAMM v0.5.4 (sticky Alt+V fix)
+
+Submodule pin bump to CAMM v0.5.4, which lands two speech-pipeline
+fixes:
+
+- **Rapid-interrupt coalesce window** in
+  `AccessibleOutputHandler` — solves the "sticky Alt+V" symptom
+  where rapidly toggling verbosity produced silence even though
+  state cycled correctly. Tolk's `Output(text, interrupt=true)`
+  is last-write-wins, and a second interrupt within tens of ms
+  silenced the first before any audible part played. CAMM now
+  locks out interrupt-mode calls for 150ms after firing one and
+  holds the latest pending message to play when the window
+  expires. Single utterances pass through immediately; rapid
+  bursts collapse to first-played + last-pending. All speech
+  paths in CAMM funnel through a single chokepoint, so every
+  CivViAccess speech route is protected.
+- **Shorter update-speech utterance** — CAMM's "Updating to
+  version X.Y.Z." was reliably cut off by subsequent speech
+  events; replaced with "Updating mod" so the announcement
+  always lands.
+
+No CivViAccess-side code changes; this is a pure consumption
+bump. See `camm/CHANGELOG.md` for the upstream detail.
+
 ## 0.3.5 — 2026-05-19 — Numeric inputs, pulldown L/R cycling, picker hints
 
 AdvancedSetup is now end-to-end editable from the keyboard: every
