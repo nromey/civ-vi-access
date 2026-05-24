@@ -95,11 +95,44 @@ end
 -- Lean plot announce: terrain + feature + resource + units + city. Skips
 -- yields / appeal / continent / defense modifier / movement cost — those
 -- live behind Ctrl+T (verbose) per [[feedback-terse-announce-default]].
+--
+-- Respects fog of war so screen-reader users don't get information
+-- advantage over sighted players. Three states (Civ6Common.lua pattern):
+--   - Unrevealed (never explored): speak "Unexplored" only
+--   - Revealed but not visible (fog of war): terrain/feature/resource
+--     only — what player saw last time, no current units/cities
+--   - Visible (currently in sight): speak everything as before
 local function AnnouncePlot(plot)
     if plot == nil then
         OutputMessageToScreenReader("No plot");
         return;
     end
+    local x = plot:GetX();
+    local y = plot:GetY();
+
+    -- Visibility gate. PlayersVisibility[localPlayer] gives per-player
+    -- fog state. Civ6Common.lua line 115 uses the same pattern.
+    local localPlayer = (Game ~= nil and Game.GetLocalPlayer) and Game.GetLocalPlayer() or -1;
+    local pVis = (localPlayer >= 0 and PlayersVisibility ~= nil)
+                 and PlayersVisibility[localPlayer] or nil;
+    local isRevealed = true;
+    local isVisible  = true;
+    if pVis ~= nil then
+        if pVis.IsRevealed ~= nil then
+            local ok, r = pcall(function() return pVis:IsRevealed(x, y); end);
+            if ok then isRevealed = r; end
+        end
+        if pVis.IsVisible ~= nil then
+            local ok, v = pcall(function() return pVis:IsVisible(x, y); end);
+            if ok then isVisible = v; end
+        end
+    end
+
+    if not isRevealed then
+        OutputMessageToScreenReader("Unexplored");
+        return;
+    end
+
     local parts = {};
     local terrain = terrainName(plot);
     if terrain ~= "" then parts[#parts + 1] = terrain; end
@@ -108,8 +141,17 @@ local function AnnouncePlot(plot)
     local resource = resourceName(plot);
     if resource ~= "" then parts[#parts + 1] = resource; end
 
-    local x = plot:GetX();
-    local y = plot:GetY();
+    if not isVisible then
+        -- Fog of war: speak only the static terrain memory. Current units
+        -- and city state could have changed since the player last saw it.
+        if #parts == 0 then
+            OutputMessageToScreenReader("Unknown");
+            return;
+        end
+        OutputMessageToScreenReader(table.concat(parts, ". ") .. ". Fog of war.");
+        return;
+    end
+
     local city = Cities.GetCityInPlot(x, y);
     if city ~= nil then
         parts[#parts + 1] = StringifyCity(city);
