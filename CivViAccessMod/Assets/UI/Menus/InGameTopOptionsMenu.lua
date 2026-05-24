@@ -354,10 +354,16 @@ function OnCancelExit()
 	-- Begin CivViAccess mod change: dismiss the pause menu when NO was
 	-- chosen on an Alt+F4 prompt that raised the pause menu just to host
 	-- the popup. Without this, the user picks NO, the popup closes, and
-	-- they're left staring at the pause menu they never asked for.
+	-- they're left staring at the pause menu they never asked for. Also
+	-- speak confirmation so the user knows NO took effect — Noel
+	-- 2026-05-24 hit NO and had "no idea what it did" because nothing
+	-- audible signaled the cancel.
 	if m_isRaisedForExitConfirm then
 		m_isRaisedForExitConfirm = false;
 		Log.info("OnCancelExit: dismissing pause menu raised for Alt+F4 confirmation");
+		if OutputMessageToScreenReader ~= nil then
+			OutputMessageToScreenReader("Exit cancelled. Back to game.");
+		end
 		CloseImmediately();
 	end
 	-- End CivViAccess mod change
@@ -709,6 +715,19 @@ function OnYes( )
 	StrategicView_ClearReferenceMap();
 
 	UIManager:Log("Shutting down via user exit on menu.");
+	-- Begin CivViAccess mod change: Noel 2026-05-24 — exit-to-main-menu
+	-- transition is silent and takes several seconds while the game
+	-- shuts down and the main menu rebuilds. Speak so the user knows
+	-- something is happening and isn't staring at silence wondering if
+	-- the keypress registered.
+	if OutputMessageToScreenReader ~= nil then
+		if ms_ExitToMain then
+			OutputMessageToScreenReader("Returning to main menu.");
+		else
+			OutputMessageToScreenReader("Exiting game.");
+		end
+	end
+	-- End CivViAccess mod change
 	if(ms_ExitToMain) then
 		Events.ExitToMainMenu();
 	else

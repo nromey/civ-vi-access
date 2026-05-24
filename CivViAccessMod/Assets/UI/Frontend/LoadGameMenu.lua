@@ -4,7 +4,158 @@ include( "Civ6Common" );
 include( "LoadSaveMenu_Shared" );	-- Shared code between the LoadGameMenu and the SaveGameMenu
 include( "PopupDialog" );
 include( "LocalPlayerActionSupport" );
-include( "LoadGameMenuAccess" );
+
+-- ===========================================================================
+-- LoadGameMenuAccess: inlined from former
+-- Assets/UI/Accessibility/LoadGameMenuAccess.lua, same reason as
+-- MainMenuAccess (bug #24, log lines 619/624/etc. 2026-05-24 showed
+-- "attempt to index a nil value" at every LoadGameMenuAccess.* call
+-- site). Civ VI's include() returns from a process-wide cache without
+-- re-executing the file, leaving LoadGameMenuAccess nil in the
+-- LoadGameMenu Lua context. Inlining moves the table construction
+-- into LoadGameMenu's own top-level scope, which DOES re-run per
+-- context — bug #22 root cause.
+-- ===========================================================================
+
+include("ScreenReader");
+include("Log");
+
+print("[CivViAccess][INFO ] LoadGameMenu.lua: building LoadGameMenuAccess inline");
+
+LoadGameMenuAccess = {};
+
+do
+    local NAV_SOUND :string = "Main_Menu_Mouse_Over";
+    local m_navIndex :number = 0;  -- 1-based index into g_FileList (0 = no focus)
+
+    local function playNavSound()
+        if UI ~= nil and UI.PlaySound ~= nil then
+            UI.PlaySound(NAV_SOUND);
+        end
+    end
+
+    local function describeEntry(entry, ordinal, total)
+        if entry == nil then
+            return "";
+        end
+        local displayName = GetDisplayName(entry);
+        if entry.IsDirectory then
+            return Locale.Lookup("LOC_CIVVIACCESS_ENTRY_FOLDER", displayName);
+        end
+        if ordinal and total and total > 1 then
+            return Locale.Lookup("LOC_CIVVIACCESS_ENTRY_ORDINAL", displayName, ordinal, total);
+        end
+        return displayName;
+    end
+
+    local function focusEntry(idx, interrupt)
+        if g_FileList == nil or #g_FileList == 0 then
+            return;
+        end
+        if idx < 1 then idx = 1; end
+        if idx > #g_FileList then idx = #g_FileList; end
+        m_navIndex = idx;
+        SetSelected(idx);
+        playNavSound();
+        OutputMessageToScreenReader(describeEntry(g_FileList[idx], idx, #g_FileList), not interrupt);
+    end
+
+    local function moveBy(step)
+        local list = g_FileList;
+        if list == nil or #list == 0 then
+            return;
+        end
+        local target;
+        if m_navIndex < 1 then
+            target = (step > 0) and 1 or #list;
+        else
+            target = m_navIndex + step;
+            if target < 1 then target = #list; end
+            if target > #list then target = 1; end
+        end
+        focusEntry(target, true);
+    end
+
+    function LoadGameMenuAccess.NotifyShow()
+        -- Reset focus state on every show — list will repopulate via the
+        -- async query, announced via FileListQueryComplete below.
+        m_navIndex = 0;
+    end
+
+    local function onFileListReady()
+        local count = g_FileList and #g_FileList or 0;
+        if count == 0 then
+            m_navIndex = 0;
+            OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_LOADGAME_EMPTY"));
+            return;
+        end
+        local countKey = (count == 1) and "LOC_CIVVIACCESS_LOADGAME_COUNT_ONE"
+                                       or  "LOC_CIVVIACCESS_LOADGAME_COUNT_MANY";
+        local line = Locale.Lookup(countKey, count)
+            .. " " .. Locale.Lookup("LOC_CIVVIACCESS_LOADGAME_NAV_HELP");
+        OutputMessageToScreenReader(line);
+        focusEntry(1, false);
+    end
+
+    LuaEvents.FileListQueryComplete.Add(onFileListReady);
+
+    function LoadGameMenuAccess.OnInputStruct(pInputStruct)
+        local uiMsg = pInputStruct:GetMessageType();
+        if uiMsg ~= KeyEvents.KeyUp then
+            return false;
+        end
+        local key = pInputStruct:GetKey();
+        if key == Keys.VK_UP or key == Keys.VK_LEFT then
+            moveBy(-1);
+            return true;
+        end
+        if key == Keys.VK_DOWN or key == Keys.VK_RIGHT then
+            moveBy(1);
+            return true;
+        end
+        if key == Keys.VK_HOME then
+            focusEntry(1, true);
+            return true;
+        end
+        if key == Keys.VK_END then
+            if g_FileList ~= nil then
+                focusEntry(#g_FileList, true);
+            end
+            return true;
+        end
+        if key == Keys.VK_RETURN then
+            local actionBtn = Controls and Controls.ActionButton or nil;
+            local hidden    = actionBtn and actionBtn.IsHidden   and actionBtn:IsHidden();
+            local disabled  = actionBtn and actionBtn.IsDisabled and actionBtn:IsDisabled();
+            Log.info(string.format(
+                "LoadGameMenuAccess: VK_RETURN seen. navIndex=%s g_iSelectedFileEntry=%s"
+                .. " fileListSize=%s actionHidden=%s actionDisabled=%s",
+                tostring(m_navIndex),
+                tostring(g_iSelectedFileEntry),
+                tostring(g_FileList and #g_FileList or "nil"),
+                tostring(hidden), tostring(disabled)));
+            if m_navIndex >= 1 and g_FileList ~= nil
+               and m_navIndex <= #g_FileList then
+                if g_iSelectedFileEntry ~= m_navIndex and SetSelected ~= nil then
+                    Log.info("LoadGameMenuAccess: re-syncing SetSelected(" ..
+                             tostring(m_navIndex) .. ")");
+                    SetSelected(m_navIndex);
+                end
+                if OnActionButton ~= nil then
+                    Log.info("LoadGameMenuAccess: dispatching OnActionButton");
+                    OnActionButton();
+                    return true;
+                end
+            end
+            return false;
+        end
+        return false;
+    end
+end
+
+print("[CivViAccess][INFO ] LoadGameMenu.lua: LoadGameMenuAccess inline build complete");
+
+-- ===========================================================================
 
 
 local RELOAD_CACHE_ID: string = "LoadGameMenu";		-- hotloading

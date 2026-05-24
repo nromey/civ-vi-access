@@ -266,16 +266,7 @@ function OnUnitSelectionChanged(playerID :number, unitID :number,
         end
     end
 
-    -- Suppress name announce when UnitInfo.cycleAllUnits just spoke for
-    -- this selection — avoids double-speak that cascaded interrupts in the
-    -- CAMM dedupe + Tolk pipeline (bug #25b 2026-05-24). Time-window flag
-    -- ported from Civ V Access (CivVAccess_UnitControlSelection's
-    -- markUserInitiatedSelection / consumeUserInitiatedSelection).
-    local suppress = UnitInfo ~= nil and UnitInfo.shouldSuppressSelectionAnnounce
-                 and UnitInfo.shouldSuppressSelectionAnnounce();
-    if not suppress then
-        OutputMessageToScreenReader(ownUnitAnnouncement(pUnit));
-    end
+    OutputMessageToScreenReader(ownUnitAnnouncement(pUnit));
 
     local pois = GetAdjacentPointsOfInterestFrom(hexI, hexJ);
     local line = TurnPointsOfInterestIntoString(pois);

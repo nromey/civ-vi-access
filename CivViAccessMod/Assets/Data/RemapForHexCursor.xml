@@ -273,11 +273,20 @@
          GestureData="LOC_OPTIONS_KEY_SLASH"/>
     <Row ActionId="CIVVIACCESS_RecenterOnUnit" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_SLASH"/>
-    <!-- Cycle-all bindings: Ctrl+. for next, Ctrl+, for previous. -->
+    <!-- Cycle-all bindings: Shift+. for next, Shift+, for previous.
+         Originally Ctrl+./, (Civ V Access parity) but Ctrl is screen-
+         reader-native silence — NVDA/JAWS/Narrator all stop speech the
+         instant Ctrl is pressed. With CAMM's 200ms log-tail latency
+         our speech arrives DURING the Ctrl-held window and gets
+         silenced. Civ V Access uses direct Tolk FFI so its speech is
+         instant and avoids the silence window; we can't match that
+         from a log-tail architecture. Shift is a typing modifier with
+         no screen-reader meaning, so speech flows through normally.
+         Bug #25b 2026-05-24, see [[reference_screen_reader_key_conflicts]]. -->
     <Row ActionId="CIVVIACCESS_NextUnitAll" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_PERIOD"/>
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_PERIOD"/>
     <Row ActionId="CIVVIACCESS_PrevUnitAll" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_COMMA"/>
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_COMMA"/>
     <!-- Round 11: briefing re-read keys. R = repeat full briefing,
          T = abilities only, I = portrait description, S = Dawn of
          Man transcript. Mnemonic: R=Repeat, T=Traits, I=Image,

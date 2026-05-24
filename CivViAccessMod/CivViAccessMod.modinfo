@@ -24,11 +24,12 @@
       <File priority="10001">Assets/UI/Accessibility/Help.lua</File>
       <File priority="10001">Assets/UI/Accessibility/BaseMenu.lua</File>
       <File priority="10001">Assets/UI/Accessibility/BaseMenuItems.lua</File>
-      <!-- MainMenuAccess inlined into Assets/UI/Frontend/MainMenu.lua
-           on 2026-05-25 to defeat Civ VI's include() process-wide cache
-           that left MainMenuAccess nil on the 2nd MainMenu context load
-           (e.g. after exit-to-main-menu). See bug #24. -->
-      <File priority="10001">Assets/UI/Accessibility/LoadGameMenuAccess.lua</File>
+      <!-- MainMenuAccess + LoadGameMenuAccess both inlined into their
+           respective forks (Assets/UI/Frontend/MainMenu.lua and
+           Assets/UI/Frontend/LoadGameMenu.lua) to defeat Civ VI's
+           include() process-wide cache. Bug #24 (MainMenuAccess on
+           exit-to-main-menu) and bug #22 (LoadGameMenuAccess nil at
+           every call site per Lua.log runtime errors). -->
       <File priority="10001">Assets/UI/Accessibility/OptionsAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/AdvancedSetupAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScenarioSetupAccess.lua</File>
@@ -159,7 +160,6 @@
     <File>Assets/UI/Accessibility/Verbosity.lua</File>
     <File>Assets/UI/Accessibility/BaseMenu.lua</File>
     <File>Assets/UI/Accessibility/BaseMenuItems.lua</File>
-    <File>Assets/UI/Accessibility/LoadGameMenuAccess.lua</File>
     <File>Assets/UI/Accessibility/OptionsAccess.lua</File>
     <File>Assets/UI/Accessibility/AdvancedSetupAccess.lua</File>
     <File>Assets/UI/Accessibility/ScenarioSetupAccess.lua</File>

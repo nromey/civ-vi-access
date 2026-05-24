@@ -1609,15 +1609,15 @@ function OnNotificationAdded( playerID:number, notificationID:number )
 				-- Begin CivViAccess mod change: per-type AddSound is only
 				-- wired for ~30 of Civ VI's many notification types — the
 				-- rest add silently, leaving blind players with no audio
-				-- cue alongside the speech announce from
-				-- ScreenReaderEventHandlers.OnNotificationAdded. Fall back
-				-- to UI_Notification_Bar_Notch (the engine's own "a
-				-- notification appeared on the rail" sound, see
-				-- OnStackSizeChanged below) when no per-type sound is set
-				-- (bug #23 2026-05-24).
+				-- cue alongside the speech announce from SREH. Fall back
+				-- to ALERT_NEUTRAL — same "pay attention" chime the engine
+				-- uses for city starving / housing limit. UI_Notification
+				-- _Bar_Notch was tried first (2026-05-24) but Noel
+				-- reported it inaudible. ALERT_NEUTRAL is louder and
+				-- semantically correct ("look at the rail"). Bug #23.
 				local soundToPlay = handler.AddSound;
 				if soundToPlay == nil or soundToPlay == "" then
-					soundToPlay = "UI_Notification_Bar_Notch";
+					soundToPlay = "ALERT_NEUTRAL";
 				end
 				if m_isLoadComplete then
 					UI.PlaySound(soundToPlay);
