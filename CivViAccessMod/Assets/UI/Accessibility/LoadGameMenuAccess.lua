@@ -26,6 +26,7 @@
 -- right entry, and the existing Enter-loads-the-selected path Just Works.
 
 include("ScreenReader");
+include("Log");
 
 LoadGameMenuAccess = {};
 
@@ -162,6 +163,41 @@ function LoadGameMenuAccess.OnInputStruct(pInputStruct)
             focusEntry(#g_FileList, true);
         end
         return true;
+    end
+    -- Bug #22 2026-05-24: Enter wasn't activating saves. Reach into the
+    -- engine path ourselves rather than relying on KeyHandler →
+    -- OnActionButton fall-through. m_navIndex is our authoritative
+    -- focus; re-sync g_iSelectedFileEntry to match before dispatching
+    -- so the engine reads from a freshly-selected entry even if some
+    -- other code path cleared it between focus and Enter (e.g. a sort
+    -- change, an inspector refresh, etc.). Log every state in case a
+    -- gate still bites us so the next repro is debuggable from
+    -- Lua.log alone.
+    if key == Keys.VK_RETURN then
+        local actionBtn = Controls and Controls.ActionButton or nil;
+        local hidden    = actionBtn and actionBtn.IsHidden   and actionBtn:IsHidden();
+        local disabled  = actionBtn and actionBtn.IsDisabled and actionBtn:IsDisabled();
+        Log.info(string.format(
+            "LoadGameMenuAccess: VK_RETURN seen. navIndex=%s g_iSelectedFileEntry=%s"
+            .. " fileListSize=%s actionHidden=%s actionDisabled=%s",
+            tostring(m_navIndex),
+            tostring(g_iSelectedFileEntry),
+            tostring(g_FileList and #g_FileList or "nil"),
+            tostring(hidden), tostring(disabled)));
+        if m_navIndex >= 1 and g_FileList ~= nil
+           and m_navIndex <= #g_FileList then
+            if g_iSelectedFileEntry ~= m_navIndex and SetSelected ~= nil then
+                Log.info("LoadGameMenuAccess: re-syncing SetSelected(" ..
+                         tostring(m_navIndex) .. ")");
+                SetSelected(m_navIndex);
+            end
+            if OnActionButton ~= nil then
+                Log.info("LoadGameMenuAccess: dispatching OnActionButton");
+                OnActionButton();
+                return true;
+            end
+        end
+        return false;  -- falls through to KeyHandler if nav state isn't usable
     end
     return false;
 end

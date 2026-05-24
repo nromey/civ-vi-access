@@ -168,12 +168,39 @@ function UnitInfo.cycleAllUnits(forward)
     end
     local nextUnit = list[idx];
     if nextUnit == nil then return; end
+
+    -- Mark cycle as user-initiated so SREH.OnUnitSelectionChanged skips its
+    -- own announce (suppresses double-speak). Civ V Access uses this same
+    -- pattern (markUserInitiatedSelection / consumeUserInitiatedSelection in
+    -- CivVAccess_UnitControlSelection.lua, ~100ms time window). We own the
+    -- speech below so SREH doesn't need to retry.
+    UnitInfo._suppressSelectionAnnounceUntil = os.clock() + 0.15;
+
     if UI ~= nil and UI.SelectUnit ~= nil then
         UI.SelectUnit(nextUnit);
     end
-    -- The selection-change event will fire and ScreenReaderEventHandlers
-    -- will announce the unit's name. We DON'T speak here to avoid double-
-    -- announcing.
+
+    -- Direct, deterministic speech. Bug #25b 2026-05-24: relying on the
+    -- Events.UnitSelectionChanged chain (SREH emits "Settler" / "Warrior")
+    -- left rapid cycle presses inaudible. The Lua-side print DID reach
+    -- Lua.log (line 422/427/432/437 in that log), but the user heard
+    -- nothing — likely a downstream race in CAMM's log-tail dedupe + Tolk
+    -- interrupt cascade when 4 identical "Settler"/"Warrior" lines arrive
+    -- in one poll window. Speaking from here with a distinctive prefix
+    -- gives the cycle press its own dedupe class and a different cadence
+    -- than the SREH chain.
+    local label = StringifyUnit(nextUnit);
+    OutputMessageToScreenReader(label);
+end
+
+-- Time-window flag consulted by ScreenReaderEventHandlers.OnUnitSelectionChanged
+-- to decide whether to fire its own announce. Set by cycleAllUnits when WE
+-- already spoke the new selection. Read via UnitInfo.shouldSuppressSelection
+-- below (always nil-safe so SREH doesn't crash if UnitInfo never loaded).
+UnitInfo._suppressSelectionAnnounceUntil = 0;
+
+function UnitInfo.shouldSuppressSelectionAnnounce()
+    return os.clock() < (UnitInfo._suppressSelectionAnnounceUntil or 0);
 end
 
 -- Recenter HexCursor on the selected unit. Useful when the cursor has

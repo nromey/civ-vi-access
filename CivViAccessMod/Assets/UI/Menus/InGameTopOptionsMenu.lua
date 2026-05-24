@@ -61,6 +61,14 @@ local m_isEndGameOpen	: boolean = false;
 local m_isNeedRestoreOptions		: boolean = false;
 local m_isNeedRestoreSaveGameMenu	: boolean = false;
 local m_isNeedRestoreLoadGameMenu	: boolean = false;
+-- Begin CivViAccess mod change: Alt+F4 in-game routes through
+-- OnRequestClose which queues the pause-menu context to host the
+-- exit-confirmation popup. If the user picks NO, the popup closes but
+-- the pause menu stays raised (bug #26b 2026-05-24). Track when the
+-- pause menu was raised purely to host the exit prompt; OnCancelExit
+-- consults this and dequeues the context if so.
+local m_isRaisedForExitConfirm		: boolean = false;
+-- End CivViAccess mod change
 
 
 -- State variable to track that the menu is in the process of being closed and
@@ -343,6 +351,16 @@ function OnCancelExit()
 	if m_isNeedRestoreOptions then Controls.Options:SetHide( false); end
 	if m_isNeedRestoreSaveGameMenu then Controls.SaveGameMenu:SetHide( false); end
 	if m_isNeedRestoreLoadGameMenu then Controls.LoadGameMenu:SetHide( false ); end
+	-- Begin CivViAccess mod change: dismiss the pause menu when NO was
+	-- chosen on an Alt+F4 prompt that raised the pause menu just to host
+	-- the popup. Without this, the user picks NO, the popup closes, and
+	-- they're left staring at the pause menu they never asked for.
+	if m_isRaisedForExitConfirm then
+		m_isRaisedForExitConfirm = false;
+		Log.info("OnCancelExit: dismissing pause menu raised for Alt+F4 confirmation");
+		CloseImmediately();
+	end
+	-- End CivViAccess mod change
 end
 
 -- ===========================================================================
@@ -976,6 +994,11 @@ function OnRequestClose()
 		if UIManager:IsPopupQueueDisabled()==false then
 			if (ContextPtr:IsHidden() ) then
 				UIManager:QueuePopup( ContextPtr, PopupPriority.Utmost, { AlwaysVisibleInQueue = true } );
+				-- Begin CivViAccess mod change: remember we raised the pause
+				-- menu purely to host the exit prompt, so OnCancelExit can
+				-- dismiss it again if the user picks NO (bug #26b).
+				m_isRaisedForExitConfirm = true;
+				-- End CivViAccess mod change
 			end
 			print("[CivViAccess][INFO ] OnRequestClose: calling OnExitGameAskAreYouSure");
 			OnExitGameAskAreYouSure();

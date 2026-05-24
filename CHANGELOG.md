@@ -140,6 +140,52 @@ cycle to other units." Tab is bound to nothing in Civ VI's default
 bindings; the field-converged design). Hint now reads "Press period to
 cycle to the next unit that needs orders, comma for the previous."
 
+### Bug sweep (post-checkpoint, 2026-05-24)
+
+After the 0.5.0 checkpoint a marathon test session surfaced several
+follow-up bugs. Fixes landed on top before tag:
+
+- **MainMenuAccess include cache (#24)**. Civ VI's `include()` returns
+  from a process-wide cache on the second MainMenu context load (e.g.
+  after exit-to-main-menu), so `MainMenuAccess` was set on first load
+  but nil on every subsequent load — main-menu kb access silently died
+  mid-session. Inlined MainMenuAccess.lua into MainMenu.lua's own
+  top-level scope (which DOES re-run per context) and removed the
+  separate file from disk + modinfo. Diagnostic confirmed via Lua.log
+  line 5 vs 479 in the test session.
+- **Alt+F4 NO leaves pause menu open (#26b)**. When Alt+F4 fires
+  in-game with no pause menu raised, `OnRequestClose` queues the
+  pause-menu context to host the exit-confirmation popup. Picking NO
+  closed the popup but left the pause menu visible. Added an
+  `m_isRaisedForExitConfirm` flag — set when OnRequestClose queues the
+  context, consumed by OnCancelExit which now also dismisses the pause
+  menu in that case.
+- **Ctrl+./Ctrl+, cycle silent (#25b)**. Ctrl+./ Ctrl+, dispatched
+  fine and the SREH chain emitted `#SCREENREADER - Settler/Warrior`
+  lines to Lua.log, but Noel heard nothing. Likely a downstream
+  cascade: rapid identical-class lines hit CAMM's dedupe + Tolk's
+  interrupt-cascade and got eaten before any could speak. Made
+  `UnitInfo.cycleAllUnits` own the speech directly (single line per
+  press, distinctive from the SREH path) and added a time-window
+  suppression flag so SREH skips its own announce when cycle just
+  spoke. Ported from Civ V Access's
+  `markUserInitiatedSelection` / `consumeUserInitiatedSelection`
+  pattern.
+- **LoadGame Enter doesn't activate saves (#22)**. The path through
+  LoadGameMenu's KeyHandler → OnActionButton looked correct on paper
+  but Enter was a no-op in test. LoadGameMenuAccess now handles VK_RETURN
+  directly: re-syncs `g_iSelectedFileEntry` to our `m_navIndex` (in
+  case some other code path cleared it between focus and Enter) and
+  dispatches OnActionButton itself. Diagnostic logging on the path so
+  future regressions are debuggable from Lua.log alone.
+- **Generic notification chime on add (#23)**. Per-type AddSound is
+  only wired for ~30 of Civ VI's notification types — the rest added
+  silently, leaving blind players with no audio cue alongside the
+  speech announce. NotificationPanel shadow now falls back to
+  `UI_Notification_Bar_Notch` (the engine's own "a notification
+  appeared on the rail" sound from OnStackSizeChanged) when no
+  per-type AddSound is set.
+
 ### Known gaps (deferred to next phase)
 
 - **Multi-hex paths / target mode** ship in 0.5.1 (Phase 2).
