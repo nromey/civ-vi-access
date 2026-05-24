@@ -538,6 +538,15 @@ local function lookupActionIds()
 end
 
 local function onInputActionTriggered(actionId)
+    -- Context-teardown guard: this listener is subscribed at file load
+    -- in the FrontEnd context but the engine fires Events.Input
+    -- ActionTriggered globally. After LoadScreenClose, when R/T/I/S
+    -- press in-game, this handler is still invoked but the FrontEnd
+    -- globals it depends on (OutputMessageToScreenReader, Locale) are
+    -- nil — confirmed via Lua.log runtime errors 2026-05-24. Skip if
+    -- the speech infrastructure isn't available; there's no briefing
+    -- to re-read in-game anyway (briefing is LoadScreen-only).
+    if OutputMessageToScreenReader == nil or Locale == nil then return; end
     lookupActionIds();
     if _actionIds == nil then return; end
     if actionId == _actionIds.repeatBriefing then

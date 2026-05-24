@@ -485,6 +485,15 @@ function Close()
 		LuaEvents.InGameTopOptionsMenu_Close();
 	end
 
+	-- Begin ScreenReaderAccess mod change
+	-- Audible confirmation that the pause menu has closed. Without this
+	-- the user pressed "Return to Game", heard nothing, and was stuck not
+	-- knowing what state the game was in (Noel 2026-05-24 test).
+	if OutputMessageToScreenReader ~= nil then
+		OutputMessageToScreenReader("Returned to game");
+	end
+	-- End ScreenReaderAccess mod change
+
 	-- Only pop the context if what we expect is the current context.
 	if(Input.GetActiveContext() == InputContext.GameOptions) then
 		Input.PopContext();
@@ -858,6 +867,22 @@ end
 -- ===========================================================================
 function OnLoadGameViewStateDone()
 	m_isLoadingDone = true;
+	print("[CivViAccess][INFO ] InGameTopOptionsMenu: m_isLoadingDone=true via LoadGameViewStateDone");
+end
+
+-- ===========================================================================
+-- Belt-and-suspenders: Events.LoadGameViewStateDone doesn't fire on all
+-- Civ VI configurations (confirmed via Noel's 2026-05-24 Lua.log — that
+-- event never appeared despite a complete in-game session). LoadScreen
+-- Close fires reliably and signals roughly the same moment ("game is
+-- now interactive"). Setting the flag from both means Alt+F4 in-game
+-- triggers the exit-confirmation popup instead of silent exit, regardless
+-- of which event the engine actually fires.
+function OnLoadScreenCloseForReadyFlag()
+	if not m_isLoadingDone then
+		m_isLoadingDone = true;
+		print("[CivViAccess][INFO ] InGameTopOptionsMenu: m_isLoadingDone=true via LoadScreenClose (fallback)");
+	end
 end
 
 -- ===========================================================================
@@ -932,17 +957,33 @@ end
 
 -- ===========================================================================
 function OnRequestClose()
+	-- Diagnostic: Alt+F4 closes silently on Noel's machine (2026-05-24)
+	-- when this handler should be routing through OnExitGameAskAreYouSure.
+	-- Log each gate to identify which branch is causing the skip.
+	print("[CivViAccess][INFO ] OnRequestClose: fired"
+		.. " m_isEndGameOpen=" .. tostring(m_isEndGameOpen)
+		.. " m_isLoadingDone=" .. tostring(m_isLoadingDone)
+		.. " Benchmark.IsEnabled=" .. tostring(Benchmark.IsEnabled())
+		.. " PopupQueueDisabled=" .. tostring(UIManager:IsPopupQueueDisabled())
+		.. " ContextPtr:IsHidden=" .. tostring(ContextPtr:IsHidden()));
 	-- End Game Screen handles this
-	if m_isEndGameOpen then return end
+	if m_isEndGameOpen then
+		print("[CivViAccess][INFO ] OnRequestClose: m_isEndGameOpen=true, early return");
+		return;
+	end
 	if m_isLoadingDone and (Benchmark.IsEnabled()==false) then
 		-- Only handle the message if popup queuing is active (diplomacy is not up)
 		if UIManager:IsPopupQueueDisabled()==false then
 			if (ContextPtr:IsHidden() ) then
 				UIManager:QueuePopup( ContextPtr, PopupPriority.Utmost, { AlwaysVisibleInQueue = true } );
 			end
+			print("[CivViAccess][INFO ] OnRequestClose: calling OnExitGameAskAreYouSure");
 			OnExitGameAskAreYouSure();
+		else
+			print("[CivViAccess][INFO ] OnRequestClose: PopupQueueDisabled=true, skipping confirmation");
 		end
 	else
+		print("[CivViAccess][INFO ] OnRequestClose: m_isLoadingDone=false or benchmark, calling UserConfirmedClose (silent exit)");
 		Events.UserConfirmedClose();
 	end
 end
@@ -1051,7 +1092,7 @@ function Initialize()
 	-- displayName: use a literal "Pause menu" since LOC_GAME_MENU_PAUSE_MENU
 	-- isn't an established engine key. Translators will catch this when the
 	-- LOC pass happens.
-	BaseMenu.install(ContextPtr, {
+	local baseMenuHandler = BaseMenu.install(ContextPtr, {
 		name = "InGameTopOptionsMenu",
 		displayName = "Pause menu",
 		items = buildPauseMenuItems,
@@ -1059,6 +1100,43 @@ function Initialize()
 		priorInput = OnInput,
 		priorShow = OnShow,
 	});
+
+	-- Begin CivViAccess mod change: route arrow / Enter to the exit-
+	-- confirmation popup when it's open. Without this, Alt+F4 in-game
+	-- opens BOTH the pause menu AND the confirmation popup; BaseMenu's
+	-- nav captures arrows for pause-menu items so the user can't reach
+	-- the popup's Yes / No buttons. Confirmed via Noel's 2026-05-24
+	-- Lua.log — arrows walked through pause-menu list while Yes / No
+	-- were unreachable.
+	--
+	-- BaseMenu exposes a _modalHandler escape hatch (see BaseMenu.lua
+	-- line 873) that runs ahead of dispatchKey. We install one that
+	-- lazily checks m_kPopupDialog:IsOpen() — when no popup is open,
+	-- it returns false and BaseMenu's normal nav takes over.
+	if baseMenuHandler ~= nil then
+		baseMenuHandler._modalHandler = function(key, ctrlDown, altDown, shiftDown)
+			if m_kPopupDialog == nil or not m_kPopupDialog:IsOpen() then
+				return false;
+			end
+			if key == Keys.VK_LEFT or key == Keys.VK_UP then
+				accessiblePopupNav(-1);
+				return true;
+			end
+			if key == Keys.VK_RIGHT or key == Keys.VK_DOWN then
+				accessiblePopupNav(1);
+				return true;
+			end
+			if key == Keys.VK_RETURN or key == Keys.VK_SPACE then
+				if accessibleActivatePopup() then
+					return true;
+				end
+			end
+			-- Esc not handled here so BaseMenu's normal Esc path runs,
+			-- which routes through priorInput → KeyHandler, which closes
+			-- the popup via m_kPopupDialog:Close() + accessibleResetPopup.
+			return false;
+		end;
+	end
 	-- End CivViAccess mod change
 
 	Controls.ExitGameButton:RegisterCallback( Mouse.eLClick, OnExitGameAskAreYouSure );
@@ -1101,6 +1179,9 @@ function Initialize()
 	Events.MultiplayerMatchHostMigrated.Add( EventRefreshButtons );
 	Events.UserRequestClose.Add( OnRequestClose );
 	Events.LoadGameViewStateDone.Add( OnLoadGameViewStateDone );
+	if Events.LoadScreenClose ~= nil then
+		Events.LoadScreenClose.Add( OnLoadScreenCloseForReadyFlag );
+	end
 	Events.CloudGameKilled.Add(OnCloudGameKilled);
 	Events.CloudGameQuit.Add(OnCloudGameQuit);
 

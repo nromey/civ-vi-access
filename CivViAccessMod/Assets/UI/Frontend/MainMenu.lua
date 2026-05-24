@@ -876,7 +876,9 @@ function DeselectOption(index:number)
 	control.LabelAlphaAnim:SetToBeginning();
 	control.LabelAlphaAnim:Play();
 	m_currentOptions[index].isSelected = false;
-	MainMenuAccess.NotifySubMenuClosed();
+	if MainMenuAccess ~= nil and MainMenuAccess.NotifySubMenuClosed ~= nil then
+		MainMenuAccess.NotifySubMenuClosed();
+	end
 end
 
 -- ===========================================================================
@@ -1118,7 +1120,11 @@ function BuildMenu(menuOptions:table)
 				end,
 			};
 		end
-		MainMenuAccess.NotifyMainMenuBuilt(accessOptions);
+		if MainMenuAccess ~= nil and MainMenuAccess.NotifyMainMenuBuilt ~= nil then
+			MainMenuAccess.NotifyMainMenuBuilt(accessOptions);
+		else
+			print("[CivViAccess][WARN ] MainMenu.BuildMenu: MainMenuAccess unavailable — kb accessibility disabled for main menu");
+		end
 	end
 	Controls.MainMenuOptionStack:CalculateSize();
 
@@ -1199,7 +1205,9 @@ function BuildSubMenu(menuOptions:table)
 			};
 		end
 	end
-	MainMenuAccess.NotifySubMenuBuilt(accessSubOptions);
+	if MainMenuAccess ~= nil and MainMenuAccess.NotifySubMenuBuilt ~= nil then
+		MainMenuAccess.NotifySubMenuBuilt(accessSubOptions);
+	end
 
 	Controls.SubMenuOptionStack:CalculateSize();
 	local trackHeight = Controls.SubMenuOptionStack:GetSizeY() + TRACK_PADDING;
@@ -1473,6 +1481,16 @@ end
 
 -- ===========================================================================
 function Initialize()
+	-- Begin CivViAccess mod change: diagnostic. MainMenuAccess was reported
+	-- nil at line-1121 call sites on a return-from-game transition. Without
+	-- a re-run we can't confirm root cause. Log MainMenuAccess state at the
+	-- first call site so next reproduction shows whether the include()
+	-- resolved correctly for THIS load of MainMenu.lua.
+	print("[CivViAccess][INFO ] MainMenu.Initialize: starting; MainMenuAccess="
+		.. tostring(MainMenuAccess)
+		.. " MainMenuAccess.Install=" .. tostring(MainMenuAccess and MainMenuAccess.Install)
+		.. " MainMenuAccess.NotifyMainMenuBuilt=" .. tostring(MainMenuAccess and MainMenuAccess.NotifyMainMenuBuilt));
+	-- End CivViAccess mod change
 
 	UI.CheckUserSetup();
 	UIManager:DisablePopupQueue( false );	-- If coming back from a (PBC) game, it is possible this may have been left on; ensure popups work or the main menu won't show.	
@@ -1525,9 +1543,12 @@ function Initialize()
 	UpdateMotD();
 	RealizeLogoAndMovie();
 
-	MainMenuAccess.Install(ContextPtr);
-	-- Wrap engine's OnShow so the menu re-announces when control returns
-	-- here from Options / LoadGameMenu / AdvancedSetup / etc.
-	ContextPtr:SetShowHandler(MainMenuAccess.WrapShow(OnShow));
+	if MainMenuAccess ~= nil and MainMenuAccess.Install ~= nil then
+		MainMenuAccess.Install(ContextPtr);
+		ContextPtr:SetShowHandler(MainMenuAccess.WrapShow(OnShow));
+	else
+		print("[CivViAccess][WARN ] MainMenu.Initialize: MainMenuAccess unavailable — main menu kb accessibility disabled this session");
+		ContextPtr:SetShowHandler(OnShow);
+	end
 end
 Initialize();

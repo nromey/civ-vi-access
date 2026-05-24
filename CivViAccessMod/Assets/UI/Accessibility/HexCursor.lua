@@ -114,7 +114,12 @@ local function AnnouncePlot(plot)
     if city ~= nil then
         parts[#parts + 1] = StringifyCity(city);
     end
-    local units = Units.GetUnitsInPlot(x, y);
+    -- MapLayers.ANY so civilian units (Settler, Builder, Trader, etc.)
+    -- appear alongside military. GetUnitsInPlot's default layer is
+    -- military-only — confirmed via testing 2026-05-24 when cursor on
+    -- a Settler's plot announced only "grasslands, rice" and missed
+    -- the Settler entirely.
+    local units = Units.GetUnitsInPlotLayerID(x, y, MapLayers.ANY);
     if units ~= nil then
         for _, unit in ipairs(units) do
             parts[#parts + 1] = StringifyUnit(unit);
@@ -181,24 +186,23 @@ function HexCursor.init()
         Log.info("HexCursor.init: trying first-owned-unit fallback");
         local pPlayer = Players[localPlayer];
         if pPlayer ~= nil and pPlayer.GetUnits ~= nil then
-            local okUnits, units = pcall(function() return pPlayer:GetUnits(); end);
-            if okUnits and units ~= nil then
-                -- Civ VI's player units collection has :Members() returning
-                -- an iterator. Guard with pcall in case the API differs.
-                local okIter, iter = pcall(function() return units:Members(); end);
-                if okIter and iter ~= nil then
-                    local count = 0;
-                    for unit in iter do
-                        count = count + 1;
-                        target = unitPlot(unit);
-                        if target ~= nil then break; end
-                    end
-                    Log.info("HexCursor.init: iterated " .. count .. " units, target=" .. tostring(target));
-                else
-                    Log.warn("HexCursor.init: units:Members() not available or threw");
+            local units = pPlayer:GetUnits();
+            if units ~= nil and units.Members ~= nil then
+                -- Civ VI's :Members() returns Lua generic-for's
+                -- (iter_fn, container, control) triple. Wrapping the call
+                -- in pcall captures only the first return value, breaking
+                -- the binding so lMembersAux fails with "Not a valid
+                -- instance" (confirmed via Lua.log 2026-05-24 at line 315).
+                -- Use the direct engine pattern instead.
+                local count = 0;
+                for i, unit in units:Members() do
+                    count = count + 1;
+                    target = unitPlot(unit);
+                    if target ~= nil then break; end
                 end
+                Log.info("HexCursor.init: iterated " .. count .. " units, target=" .. tostring(target));
             else
-                Log.warn("HexCursor.init: pPlayer:GetUnits() returned nil or threw");
+                Log.warn("HexCursor.init: pPlayer:GetUnits() returned nil or Members missing");
             end
         end
     end
@@ -249,6 +253,19 @@ function HexCursor.move(direction)
     move(direction);
 end
 
+-- Sync cursor to (x, y) without speaking. Used by UnitMovement so the
+-- cursor follows the unit after a successful move; the move-complete
+-- announce from UnitMovement covers the speech, AnnouncePlot here would
+-- double-speak.
+function HexCursor.jumpTo(x, y)
+    if not _initialized then
+        HexCursor.init();
+    end
+    local plot = Map.GetPlot(x, y);
+    if plot == nil then return; end
+    setCursor(plot);
+end
+
 function HexCursor.speakWhereAmIAbs()
     if not _initialized then
         OutputMessageToScreenReader("Cursor not ready");
@@ -281,15 +298,24 @@ end
 -- and surfaces these alongside the commonHelpEntries (Alt+V, Ctrl+T, etc.
 -- registered by BaseMenu).
 local CURSOR_HELP_ENTRIES = {
-    { keyLabel = "Q or Numpad 7", description = "Move cursor northwest" },
-    { keyLabel = "E or Numpad 9", description = "Move cursor northeast" },
-    { keyLabel = "A or Numpad 4", description = "Move cursor west" },
-    { keyLabel = "D or Numpad 6", description = "Move cursor east" },
-    { keyLabel = "Z or Numpad 1", description = "Move cursor southwest" },
-    { keyLabel = "C or Numpad 3", description = "Move cursor southeast" },
-    { keyLabel = "Numpad 5",      description = "Speak position relative to capital" },
-    { keyLabel = "Shift+S",       description = "Speak position relative to capital" },
-    { keyLabel = "Alt+S",         description = "Speak absolute X, Y coordinates" },
+    { keyLabel = "Q",       description = "Move cursor northwest" },
+    { keyLabel = "E",       description = "Move cursor northeast" },
+    { keyLabel = "A",       description = "Move cursor west" },
+    { keyLabel = "D",       description = "Move cursor east" },
+    { keyLabel = "Z",       description = "Move cursor southwest" },
+    { keyLabel = "C",       description = "Move cursor southeast" },
+    { keyLabel = "Shift+Q", description = "Move selected unit northwest" },
+    { keyLabel = "Shift+E", description = "Move selected unit northeast" },
+    { keyLabel = "Shift+A", description = "Move selected unit west" },
+    { keyLabel = "Shift+D", description = "Move selected unit east" },
+    { keyLabel = "Shift+Z", description = "Move selected unit southwest" },
+    { keyLabel = "Shift+C", description = "Move selected unit southeast" },
+    { keyLabel = "/",       description = "Speak selected unit's stats" },
+    { keyLabel = "Ctrl+/",  description = "Recenter cursor on selected unit" },
+    { keyLabel = "Ctrl+.",  description = "Cycle to next unit (any state, including units already done)" },
+    { keyLabel = "Ctrl+,",  description = "Cycle to previous unit (any state)" },
+    { keyLabel = "Shift+S", description = "Speak position relative to capital" },
+    { keyLabel = "Alt+S",   description = "Speak absolute X, Y coordinates" },
 };
 
 -- Handler record on the HandlerStack. Bindings is empty — input dispatch

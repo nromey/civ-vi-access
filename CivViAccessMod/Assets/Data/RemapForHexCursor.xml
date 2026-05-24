@@ -24,14 +24,35 @@
   the ? help overlay), reversible (user can remap via Civ VI Options >
   Keybindings).
 
-  NVDA / numpad caveat per [[reference-screen-reader-key-conflicts]]:
-  numpad-as-alternate gestures only fire when NumLock is ON OR NVDA's
-  "Use numpad keys for object navigation" is disabled. Letters always
-  work.
+  Numpad alternates were dropped 0.5.0. Two unfixable conflicts:
+  NVDA's default "Use numpad keys for object navigation" intercepts
+  the numpad before Civ VI sees it, AND Alt+numpad on Windows is the
+  Unicode-input gesture (Alt+0233 = é etc.) which collides with the
+  Alt+QAZEDC move bindings. Civ V Access and other accessibility mods
+  converged on letter-cluster-only nav for these same reasons; we're
+  catching up. Letter keys (Q/E/A/D/Z/C) are the only nav surface.
+
+  Two-modifier letter cluster (0.5.0, revised after test failure):
+
+    Bare        Q/E/A/D/Z/C   → HexCursor move (read terrain, don't commit)
+    Shift+      Shift+QAZEDC  → Unit direct-move (commit a move)
+    Alt+letter  Alt+QAZEDC    → Engine actions (ToggleResources etc.)
+
+  Originally tried Alt+letter for Move + Ctrl+Alt+letter for the engine
+  actions, but the 3-key Update statement for the engine rebind silently
+  failed in test — Civ VI's vanilla InputConfiguration.xml never uses
+  3-key combos and the gesture parser doesn't appear to support them.
+  Result: engine actions stayed on Alt+letter (from 0.4.x), our Move
+  bindings on Alt+letter collided silently, and no movement fired. Shift+
+  letter avoids the conflict entirely AND isn't intercepted by NVDA/JAWS
+  (Shift is a typing modifier, not screen-reader-claimed).
 -->
 <GameInfo>
   <!-- ===================================================================
-       Part 1: rebind existing actions off Q/E/A/Z/C
+       Part 1: rebind engine actions off bare letters (frees Q/E/A/Z/C
+       for HexCursor cursor pan). Engine actions land on Alt+letter, same
+       as the 0.4.x state. Our Move bindings live on Shift+letter (no
+       collision).
        =================================================================== -->
   <InputActionDefaultGestures>
     <Update>
@@ -64,11 +85,11 @@
         <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_C</GestureData>
       </Set>
     </Update>
-    <!-- Round 11: free bare R and T for our briefing re-read actions.
-         T → ToggleTechTree → Alt+T
-         R → RangedAttack → Alt+R
-         (I and S are already unbound by Civ VI default, no rebind
-         needed; we just register our actions on them below.) -->
+    <!-- T and R don't collide with the move bindings; keeping them on
+         Alt+letter (set in 0.4.1) for now. Briefing re-read actions
+         (CIVVIACCESS_AbilitiesReread on T, CIVVIACCESS_PortraitDescribe
+         on I, CIVVIACCESS_DawnOfManTranscript on S, CIVVIACCESS_Repeat
+         Briefing on R) use the bare letters, registered below. -->
     <Update>
       <Where ActionId="ToggleTechTree" Index="0" GestureType="KBMouse"/>
       <Set>
@@ -123,6 +144,58 @@
          Name="LOC_CIVVIACCESS_HOTKEY_OPEN_HELP"
          Description="LOC_CIVVIACCESS_HOTKEY_OPEN_HELP_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- 0.5.0: unit direct-move bindings (Alt+QAZEDC). Phase 1 of
+         Playable Basics. directMove(direction) selects the head unit,
+         resolves the adjacent plot, and issues MoveUnitToPlot via
+         the engine's own Civ6Common helper. World-context only — the
+         actions are nonsensical outside the in-game map. -->
+    <Row ActionId="CIVVIACCESS_MoveNW"
+         Name="LOC_CIVVIACCESS_HOTKEY_MOVE_NW"
+         Description="LOC_CIVVIACCESS_HOTKEY_MOVE_NW_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_MoveNE"
+         Name="LOC_CIVVIACCESS_HOTKEY_MOVE_NE"
+         Description="LOC_CIVVIACCESS_HOTKEY_MOVE_NE_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_MoveW"
+         Name="LOC_CIVVIACCESS_HOTKEY_MOVE_W"
+         Description="LOC_CIVVIACCESS_HOTKEY_MOVE_W_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_MoveE"
+         Name="LOC_CIVVIACCESS_HOTKEY_MOVE_E"
+         Description="LOC_CIVVIACCESS_HOTKEY_MOVE_E_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_MoveSW"
+         Name="LOC_CIVVIACCESS_HOTKEY_MOVE_SW"
+         Description="LOC_CIVVIACCESS_HOTKEY_MOVE_SW_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_MoveSE"
+         Name="LOC_CIVVIACCESS_HOTKEY_MOVE_SE"
+         Description="LOC_CIVVIACCESS_HOTKEY_MOVE_SE_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- 0.5.0: unit info readout (bare /) + recenter cursor on unit
+         (Ctrl+/). Mirrors Civ V Access's CivVAccess_UnitControlSelection
+         bindings (VK_OEM_2 / Ctrl+VK_OEM_2). -->
+    <Row ActionId="CIVVIACCESS_UnitInfo"
+         Name="LOC_CIVVIACCESS_HOTKEY_UNIT_INFO"
+         Description="LOC_CIVVIACCESS_HOTKEY_UNIT_INFO_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_RecenterOnUnit"
+         Name="LOC_CIVVIACCESS_HOTKEY_RECENTER_ON_UNIT"
+         Description="LOC_CIVVIACCESS_HOTKEY_RECENTER_ON_UNIT_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- Cycle ALL units (ignores ready-to-select filter). Engine's
+         . / , skip units that already have orders; once all units have
+         moved, both go silent. Ctrl+. / Ctrl+, walk the full unit list.
+         Civ V Access parity (CivVAccess_UnitControlSelection.cycleAllUnits). -->
+    <Row ActionId="CIVVIACCESS_NextUnitAll"
+         Name="LOC_CIVVIACCESS_HOTKEY_NEXT_UNIT_ALL"
+         Description="LOC_CIVVIACCESS_HOTKEY_NEXT_UNIT_ALL_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_PrevUnitAll"
+         Name="LOC_CIVVIACCESS_HOTKEY_PREV_UNIT_ALL"
+         Description="LOC_CIVVIACCESS_HOTKEY_PREV_UNIT_ALL_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
     <!-- Round 11: briefing re-read actions. These fire in LoadScreen
          context (and in-game, harmlessly). LoadScreenAccess subscribes
          to Events.InputActionTriggered to dispatch them to the right
@@ -150,51 +223,61 @@
   </InputActions>
 
   <!-- ===================================================================
-       Part 3: default key bindings for the new actions
-       Index 0 = primary (letter), Index 1 = numpad alternate.
+       Part 3: default key bindings for the new actions.
+       Letter-only: numpad alternates dropped 0.5.0 — see top-of-file
+       comment for rationale.
        =================================================================== -->
   <InputActionDefaultGestures>
-    <!-- NW -->
     <Row ActionId="CIVVIACCESS_CursorNW" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_Q"/>
-    <Row ActionId="CIVVIACCESS_CursorNW" Index="1" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_NP_7"/>
-    <!-- NE -->
     <Row ActionId="CIVVIACCESS_CursorNE" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_E"/>
-    <Row ActionId="CIVVIACCESS_CursorNE" Index="1" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_NP_9"/>
-    <!-- W -->
     <Row ActionId="CIVVIACCESS_CursorW" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_A"/>
-    <Row ActionId="CIVVIACCESS_CursorW" Index="1" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_NP_4"/>
-    <!-- E -->
     <Row ActionId="CIVVIACCESS_CursorE" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_D"/>
-    <Row ActionId="CIVVIACCESS_CursorE" Index="1" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_NP_6"/>
-    <!-- SW -->
     <Row ActionId="CIVVIACCESS_CursorSW" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_Z"/>
-    <Row ActionId="CIVVIACCESS_CursorSW" Index="1" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_NP_1"/>
-    <!-- SE -->
     <Row ActionId="CIVVIACCESS_CursorSE" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_C"/>
-    <Row ActionId="CIVVIACCESS_CursorSE" Index="1" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_NP_3"/>
-    <!-- Where-am-I (capital-relative): Shift+S primary, Numpad 5 alternate -->
+    <!-- Where-am-I (capital-relative): Shift+S -->
     <Row ActionId="CIVVIACCESS_WhereAmI" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_S"/>
-    <Row ActionId="CIVVIACCESS_WhereAmI" Index="1" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_NP_5"/>
     <!-- Where-am-I absolute: Alt+S -->
     <Row ActionId="CIVVIACCESS_WhereAmIAbs" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_S"/>
     <!-- ? help: Shift+/ -->
     <Row ActionId="CIVVIACCESS_OpenHelp" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_SLASH"/>
+    <!-- 0.5.0: unit move bindings on Shift+letter. Mirrors the cursor's
+         bare-letter layout — same hex shape, hold Shift to move the unit
+         instead of just the cursor. Shift avoids collision with the
+         engine-action rebinds on Alt+letter (ToggleResources etc.) and
+         isn't intercepted by NVDA/JAWS the way Alt+numpad would be. -->
+    <Row ActionId="CIVVIACCESS_MoveNW" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_Q"/>
+    <Row ActionId="CIVVIACCESS_MoveNE" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_E"/>
+    <Row ActionId="CIVVIACCESS_MoveW" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_A"/>
+    <Row ActionId="CIVVIACCESS_MoveE" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_D"/>
+    <Row ActionId="CIVVIACCESS_MoveSW" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_Z"/>
+    <Row ActionId="CIVVIACCESS_MoveSE" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_C"/>
+    <!-- Unit info: bare / for the readout, Ctrl+/ for recenter on
+         selected unit. Mnemonic: / is the help/info key, matches Civ V
+         Access. Shift+/ is already taken by CIVVIACCESS_OpenHelp. -->
+    <Row ActionId="CIVVIACCESS_UnitInfo" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SLASH"/>
+    <Row ActionId="CIVVIACCESS_RecenterOnUnit" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_SLASH"/>
+    <!-- Cycle-all bindings: Ctrl+. for next, Ctrl+, for previous. -->
+    <Row ActionId="CIVVIACCESS_NextUnitAll" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_PERIOD"/>
+    <Row ActionId="CIVVIACCESS_PrevUnitAll" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_COMMA"/>
     <!-- Round 11: briefing re-read keys. R = repeat full briefing,
          T = abilities only, I = portrait description, S = Dawn of
          Man transcript. Mnemonic: R=Repeat, T=Traits, I=Image,

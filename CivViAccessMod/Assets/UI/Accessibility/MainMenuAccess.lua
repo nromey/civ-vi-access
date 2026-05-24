@@ -26,6 +26,8 @@
 
 include("ScreenReader");
 
+print("[CivViAccess][INFO ] MainMenuAccess.lua: file loading");
+
 MainMenuAccess = {};
 
 local NAV_SOUND       :string = "Main_Menu_Mouse_Over";
@@ -384,3 +386,5 @@ function MainMenuAccess.WrapShow(origShowFn)
         MainMenuAccess.NotifyShow();
     end
 end
+
+print("[CivViAccess][INFO ] MainMenuAccess.lua: file loaded, MainMenuAccess global set");

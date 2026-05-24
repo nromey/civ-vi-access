@@ -1699,12 +1699,27 @@ end
 -- ===========================================================================
 function OnLuaActivateNotification( pNotification:table )
 	if (pNotification ~= nil and pNotification:IsValidForPhase()) then
+		-- Begin ScreenReaderAccess mod change (0.5.0)
+		-- Intercept CHOOSE_CITY_PRODUCTION so the user isn't trapped in
+		-- the mouse-only production panel. The blocker stays active (the
+		-- turn can't end until production is chosen), but the modal trap
+		-- doesn't open. Production picker accessibility lands in 0.5.1.
+		-- Without this guard, pressing Enter after founding a city routed
+		-- to the panel and Alt+F4 was the only escape.
+		if pNotification:GetType() == NotificationTypes.CHOOSE_CITY_PRODUCTION then
+			OutputMessageToScreenReader(
+				"City needs production. The production picker is not yet "
+				.. "keyboard-accessible; it lands in 0.5.1. Open the pause "
+				.. "menu with Escape to save and exit cleanly.");
+			return;
+		end
+		-- End ScreenReaderAccess mod change
 		local playerID			:number = pNotification:GetPlayerID();
 		local notificationID	:number = pNotification:GetID();
-		local kNotificationEntry:NotificationType  = GetNotificationEntry( playerID, notificationID );		
+		local kNotificationEntry:NotificationType  = GetNotificationEntry( playerID, notificationID );
 
 		if (kNotificationEntry ~= nil) then
-			local handler			:NotificationHandler = kNotificationEntry.m_kHandlers;			
+			local handler			:NotificationHandler = kNotificationEntry.m_kHandlers;
 			local activatedByUser	:boolean = true;	-- Assume this request came from the user since raised by another context.
 			handler.Activate( kNotificationEntry, notificationID, activatedByUser );
 		end

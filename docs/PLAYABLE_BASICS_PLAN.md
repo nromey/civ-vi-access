@@ -341,20 +341,42 @@ Two parallel things:
 
 ## Sequencing within this arc
 
-Build in this order:
+**Reordered 2026-05-23** after shipping 0.5.0 surfaced a hard block:
+pressing Enter after founding a city routes to `ENDTURN_BLOCKING_
+PRODUCTION` → opens the production panel → mouse-only modal trap →
+Alt+F4 is the only escape (Noel confirmed in play). The original
+plan put production at 0.5.3, but turn 1 can't END without it, so
+the play loop never actually closes. Reorder pulls production
+forward to 0.5.1.
 
-1. **0.5.0 — Movement Phase 1** (Alt+QWEADZXC direct-move). Smallest,
-   immediate playability win. Ships with verbosity-toggleable coords
-   in HexCursor announces.
-2. **0.5.1 — Movement Phase 2** (target mode + path preview).
-   Multi-hex moves; the actual exploration / route-planning UX.
+1. **0.5.0 — Movement Phase 1** (Alt+QAZEDC direct-move). **DONE
+   2026-05-23.** Single-hex commit, HexCursor follow, combat
+   deferred. Ships with a defensive orientation hint warning that
+   end-of-turn isn't reachable until 0.5.1. 0.5.0 also intercepts
+   the `CHOOSE_CITY_PRODUCTION` notification routing so users
+   don't get trapped in the mouse-only panel — the blocker stays
+   active (turn can't end), but the modal evaporates with a
+   spoken explanation.
+2. **0.5.1 — City production** (basic flat-list picker). The
+   play-loop-closing release. Without this, every session strands
+   at turn 1. Scope is intentionally minimal: a single sorted list
+   of buildable units / buildings (not the categorized panel with
+   districts and wonders), Enter commits via `BuildQueue:Create
+   IncompleteBuild`. District tile-placement stays deferred to a
+   later arc. Once 0.5.1 ships, 0.5.0 + 0.5.1 together = "can play
+   turn 1 end-to-end."
 3. **0.5.2 — Research access** (tech tree + civic tree pickers).
-   Without this, the player can't advance their civilization.
-4. **0.5.3 — City production** (production picker, basic categories).
-   Without this, the player can't manage their economy.
+   Same pattern as production: BaseMenu wrap over the engine's
+   `pPlayer:GetTechs()` / `GetCulture()` data, simpler than
+   production because there's no district / placement dimension.
+4. **0.5.3 — Movement Phase 2** (target mode + path preview).
+   Multi-hex routes / pathfind preview. Pushed from 0.5.1 to last
+   because single-step movement already works for turn 1 play;
+   multi-hex is enhancement, not blocker-removal.
 
 Each version is a tag + release just like 0.4.1. Each is testable
-as a self-contained increment.
+as a self-contained increment. 0.5.0 commits as a checkpoint
+without a tagged release until 0.5.1 closes the loop.
 
 ## Open questions for resolution before each phase starts
 

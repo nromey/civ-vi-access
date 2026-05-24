@@ -310,6 +310,18 @@ local function OnNotificationAdded(playerID, notificationID)
     local ok, notification = pcall(NotificationManager.Find, playerID, notificationID);
     if not ok or notification == nil then return; end
 
+    -- Diagnostic: log notification type + summary on every Add. Lets us
+    -- grep Lua.log post-session to see which notifications fired and
+    -- correlate with whether their associated engine chimes (e.g.
+    -- Receive_Tech_Boost for TECH_BOOST notifications) were audible.
+    -- Engine chimes for boost notifications only fire on user activation
+    -- of BoostUnlockedPopup — blind users miss them unless we forward
+    -- the play. Other notifications have AddSound entries in
+    -- NotificationPanel.lua's g_notificationHandlers table.
+    local notifTypeName = "?";
+    local okType, t = pcall(function() return notification:GetTypeName(); end);
+    if okType and t ~= nil then notifTypeName = tostring(t); end
+
     local summary = "";
     local okSum, s = pcall(function() return notification:GetSummary(); end);
     if okSum and s ~= nil and s ~= "" then
@@ -321,6 +333,10 @@ local function OnNotificationAdded(playerID, notificationID)
             summary = Locale.Lookup(m);
         end
     end
+
+    print("[CivViAccess][INFO ] NotificationAdded type=" .. notifTypeName
+          .. " summary=" .. (summary ~= "" and summary or "(none)"));
+
     if summary == "" then return; end
 
     -- Queued (NOINTERRUPT) so notifications don't stomp on whatever

@@ -68,6 +68,8 @@
       <File priority="10001">Assets/UI/Accessibility/Help.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexGeom.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexCursor.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/UnitMovement.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/UnitInfo.lua</File>
       <File priority="10001">Assets/UI/Accessibility/BaseMenu.lua</File>
       <File priority="10001">Assets/UI/Accessibility/BaseMenuItems.lua</File>
       <File priority="10001">Assets/UI/Accessibility/Verbosity.lua</File>
@@ -134,6 +136,8 @@
     <File>Assets/UI/Accessibility/Help.lua</File>
     <File>Assets/UI/Accessibility/HexGeom.lua</File>
     <File>Assets/UI/Accessibility/HexCursor.lua</File>
+    <File>Assets/UI/Accessibility/UnitMovement.lua</File>
+    <File>Assets/UI/Accessibility/UnitInfo.lua</File>
     <File>Assets/UI/Accessibility/Diagnostics.lua</File>
     <File>Assets/UI/Accessibility/SuppressFirstTurnAdvisor.lua</File>
     <File>Assets/UI/Accessibility/TutorialReset.lua</File>

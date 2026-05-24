@@ -19,6 +19,8 @@ include("ScreenReaderPlotUtils");
 include("Help");
 include("HexGeom");
 include("HexCursor");
+include("UnitMovement");
+include("UnitInfo");
 
 -- Flip to true to re-enable the verbose diagnostic speech (every action
 -- firing announced via Tolk + interface-mode changes + popup show/hide
@@ -197,6 +199,22 @@ local function Initialize()
     lookupAction("CIVVIACCESS_OpenHelp",    function()
         if HexCursor.openHelp ~= nil then HexCursor.openHelp(); end
     end);
+
+    -- 0.5.0 unit direct-move. UnitMovement.directMove handles selection,
+    -- enemy check, MP gate, and the engine's own MoveUnitToPlot commit.
+    lookupAction("CIVVIACCESS_MoveNW", function() UnitMovement.directMove(DIR_NW); end);
+    lookupAction("CIVVIACCESS_MoveNE", function() UnitMovement.directMove(DIR_NE); end);
+    lookupAction("CIVVIACCESS_MoveW",  function() UnitMovement.directMove(DIR_W);  end);
+    lookupAction("CIVVIACCESS_MoveE",  function() UnitMovement.directMove(DIR_E);  end);
+    lookupAction("CIVVIACCESS_MoveSW", function() UnitMovement.directMove(DIR_SW); end);
+    lookupAction("CIVVIACCESS_MoveSE", function() UnitMovement.directMove(DIR_SE); end);
+
+    -- 0.5.0 unit info readout + cursor-on-unit recenter. Bare / and
+    -- Ctrl+/ — Civ V Access parity per CivVAccess_UnitControlSelection.
+    lookupAction("CIVVIACCESS_UnitInfo",       UnitInfo.speakInfo);
+    lookupAction("CIVVIACCESS_RecenterOnUnit", UnitInfo.recenterOnUnit);
+    lookupAction("CIVVIACCESS_NextUnitAll",    function() UnitInfo.cycleAllUnits(true);  end);
+    lookupAction("CIVVIACCESS_PrevUnitAll",    function() UnitInfo.cycleAllUnits(false); end);
 
     -- Built-in engine actions (no handlers — just announce by name when triggered)
     local engineActions = {

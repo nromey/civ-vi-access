@@ -22,6 +22,144 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.5.0 — 2026-05-24 — Unit direct-move (Playable Basics Phase 1)
+
+**Milestone**: the player can move units. Phase 1 of the 0.5.x Playable
+Basics arc (`docs/PLAYABLE_BASICS_PLAN.md`). Single-hex direct-move via
+`Shift+Q/E/A/D/Z/C`, mirroring the cursor's letter-cluster layout — hold
+Shift to commit a move instead of just panning the cursor.
+
+### `UnitMovement.lua` (new)
+
+`Assets/UI/Accessibility/UnitMovement.lua`. Pre-validates (selection,
+ownership, edge-of-map, enemy, MP, `UnitManager.CanStartOperation`),
+then hands off to the engine's own `MoveUnitToPlot` (`Civ6Common.lua`)
+which handles the war popup, attack vs. move dispatch, and air-unit
+case. Announce fires on `Events.UnitMoveComplete` with direction +
+"N moves remaining" (or "out of moves"). `HexCursor.jumpTo` syncs the
+cursor to follow the unit.
+
+Combat is explicitly deferred: stepping into an enemy plot speaks
+`"Warrior northeast. Combat coming in a future release."` rather than
+firing an attack. The Playable Basics arc is peaceful-builder-first;
+combat lands in a later arc.
+
+Civ V Access's much heavier movement layer (pending tracker across
+`SerialEventUnitMove` + engine-fork `CivVAccessMissionDispatched`,
+war-confirm popup intercept, combat preflight) is intentionally not
+ported. Civ VI has no engine fork available, the engine's own
+`MoveUnitToPlot` already covers the war popup + attack dispatch, and
+combat is deferred — most of the complexity in Civ V Access lives in
+the combat path we're not building yet.
+
+### Numpad alternates dropped
+
+`Assets/Data/RemapForHexCursor.xml`: removed all `LOC_OPTIONS_KEY_NP_*`
+secondary gestures from cursor + WhereAmI actions. Letter cluster
+(Q/E/A/D/Z/C, Shift+S, Alt+S) is now the only nav surface.
+
+Two unfixable conflicts forced this. NVDA's default "Use numpad keys
+for object navigation" intercepts the numpad before Civ VI sees it,
+and Alt+numpad on Windows is the Unicode-input gesture (Alt+0233 = é,
+etc.) which would collide with the new Alt+QAZEDC move bindings. Civ V
+Access and other accessibility mods converged on letter-cluster-only
+nav for these same reasons; we're catching up to the prior art rather
+than re-relitigating a settled design choice. `HexCursor.CURSOR_HELP_
+ENTRIES` updated to drop the "or Numpad N" suffixes and the standalone
+Numpad 5 row.
+
+### Move modifier: Shift+letter (revised after first test)
+
+The initial 0.5.0 build bound Move to Alt+letter and tried to push the
+engine actions (ToggleResources etc.) from their 0.4.x Alt+letter homes
+out to Ctrl+Alt+letter via an `<Update>` statement. In test on 2026-
+05-24, Alt+letter movement didn't fire at all. Diagnosis: Civ VI's
+vanilla `InputConfiguration.xml` never uses 3-key combos in any
+`InputActionDefaultGestures` row; the gesture parser appears not to
+support that form, so the Ctrl+Alt+letter `Update` silently failed.
+Engine actions stayed on Alt+letter (from 0.4.x), our Move actions
+also bound to Alt+letter collided, and the engine resolved the
+collision in the engine actions' favor (silent — ToggleResources
+toggles a lens, no audible cue).
+
+Fix: switch Move to **Shift+letter**. Two-tier model now:
+
+- Bare letter (Q/E/A/D/Z/C) → cursor pan
+- Shift+letter → unit direct-move
+- Alt+letter → engine actions (ToggleResources, AutoExplore, Attack,
+  Sleep, ToggleCivicsTree) — same as 0.4.x
+
+Shift isn't intercepted by NVDA/JAWS the way Alt+numpad would be
+(Shift is a typing modifier, not screen-reader-claimed), and no
+existing Civ VI default binding uses Shift+letter for the cluster
+letters.
+
+### `HexCursorAddin.lua`
+
+Six new `lookupAction` calls dispatch `CIVVIACCESS_Move*` to
+`UnitMovement.directMove(direction)`. `include("UnitMovement")` added.
+
+### Unit-info readout (`/`) and cursor recenter (`Ctrl+/`)
+
+New `Assets/UI/Accessibility/UnitInfo.lua` matching Civ V Access's
+unit-stats pattern from `CivVAccess_UnitControlSelection.lua` (bare `/`
+for `speakInfo`, `Ctrl+/` for `recenterOnUnit`). The readout speaks
+unit name + civ adjective, combat strength (if non-zero), ranged
+strength + range (if applicable), moves remaining / max moves, and HP
+fraction (only when damaged). Civ V Access's full readout also
+includes level/XP, full promotions list, upgrade availability, and
+cargo — we'll grow into that incrementally.
+
+Recenter jumps the HexCursor back to the selected unit's tile and
+announces the unit's name + civ — useful when the cursor has wandered
+during exploration.
+
+### HexCursor announce now includes civilian units
+
+`Units.GetUnitsInPlot(x, y)` returns only the combat layer by default;
+civilian units (Settler, Builder, Trader) live in a separate layer.
+Confirmed in test 2026-05-24: cursor on a Settler's plot announced
+only "grasslands, rice" and missed the Settler entirely. Fix: switch
+to `Units.GetUnitsInPlotLayerID(x, y, MapLayers.ANY)` (the same call
+`WorldInput.lua` uses).
+
+### Help overlay
+
+`HexCursor.CURSOR_HELP_ENTRIES` gains six `Alt+letter` rows for the
+unit-move bindings, alongside the existing bare-letter cursor entries.
+The `?` help overlay surfaces both groups so users can discover the
+"cursor vs unit" two-tier model from the help screen.
+
+### First-turn orientation hint corrected
+
+`LOC_CIVVIACCESS_FIRST_TURN_NAV_HINT` told users "Press Tab or Enter to
+cycle to other units." Tab is bound to nothing in Civ VI's default
+`InputConfiguration.xml` — that's why the 0.4.1 diagnostic showed
+`NextUnit` never firing on Tab presses. The actual engine defaults are
+`.` for next unit, `,` for previous (Civ V Access ships these same
+bindings; the field-converged design). Hint now reads "Press period to
+cycle to the next unit that needs orders, comma for the previous."
+
+### Known gaps (deferred to next phase)
+
+- **Multi-hex paths / target mode** ship in 0.5.1 (Phase 2).
+- **End-turn after founding a city** is blocked by Civ VI's
+  `ENDTURN_BLOCKING_PRODUCTION` until a production is selected. The
+  production panel is mouse-only and lands in 0.5.1 (production was
+  reordered ahead of Phase 2 since the play loop can't close without
+  it — see `docs/PLAYABLE_BASICS_PLAN.md`). Until
+  then: turn 1 is playable for exploration (move units, found cities,
+  read terrain, cycle units with `.` / `,`), but ending the turn isn't
+  reachable. We chose not to auto-pick a default production — sighted
+  players don't get that fallback, so faking it for screen-reader
+  players is the wrong parity move.
+- **Verbosity-toggleable coords** in the per-move announce — design
+  call from the plan, not implemented in 0.5.0. Move announce is
+  currently "Moved {direction}. {N} moves remaining."; the
+  tile-description with coords addition needs a per-move integration
+  with HexCursor's `AnnouncePlot` that we'd like to validate in play
+  first.
+
 ## 0.4.1 — 2026-05-23 — New-game flow speakable end-to-end
 
 **Milestone**: a screen-reader user can start a Vanilla, R&F, or GS game
