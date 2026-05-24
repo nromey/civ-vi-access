@@ -104,6 +104,133 @@ function TurnPointsOfInterestIntoString(iPois :table)
     return table.concat(lines, "[NEWLINE]");
 end
 
+-- First-turn orientation state. We fire the rich announce only once
+-- per game session — the FIRST own-unit selection event during the
+-- first game turn. After that, subsequent selections (even on turn 1,
+-- e.g. Tab to the Warrior) fall through to the existing terse
+-- announce per feedback_terse_announce_default.
+local _firstTurnAnnounceDone = false;
+
+-- Don't fire the first-turn orientation announce until the loading
+-- screen has actually closed. Round-5 log showed UnitSelectionChanged
+-- firing inside OnLoadGameViewStateDone (BEFORE LoadScreenClose),
+-- which kicked off the orientation announce while the briefing was
+-- still in Tolk's queue — interrupting it with position info. Subscribe
+-- to LoadScreenClose to flip this flag; defer any orientation queued
+-- before then.
+local _loadScreenClosed = false;
+local _pendingFirstTurn = nil;  -- { pUnit, hexI, hexJ } if queued
+
+-- Coarse latitude-band region descriptor based on the unit's Y
+-- coordinate relative to map height. Civ VI's start-bias system has
+-- richer region tags internally but they're not exposed in Lua;
+-- latitude bands give the player a usable orientation cue without
+-- depending on private engine APIs.
+local function coarseRegionDescriptor(hexJ)
+    if hexJ == nil or Map == nil or Map.GetGridSize == nil then
+        return nil;
+    end
+    local _, gridHeight = Map.GetGridSize();
+    if gridHeight == nil or gridHeight <= 0 then
+        return nil;
+    end
+    local latPct = hexJ / gridHeight;  -- 0=south pole, 1=north pole
+    if latPct < 0.20 or latPct > 0.80 then
+        return Locale.Lookup("LOC_CIVVIACCESS_REGION_POLAR");
+    elseif latPct < 0.35 or latPct > 0.65 then
+        return Locale.Lookup("LOC_CIVVIACCESS_REGION_TEMPERATE");
+    elseif latPct < 0.45 or latPct > 0.55 then
+        return Locale.Lookup("LOC_CIVVIACCESS_REGION_SUBTROPICAL");
+    else
+        return Locale.Lookup("LOC_CIVVIACCESS_REGION_TROPICAL");
+    end
+end
+
+-- Collect visible resources / features on hexes within 2 rings of
+-- the unit. Returns a list of "RESOURCE direction" strings ready to
+-- join with commas. Empty list when nothing notable is visible.
+local function nearbyVisibleFeatures(hexI, hexJ)
+    local items = {};
+    local seen = {};  -- dedupe by (resourceType, direction) for ring 2 overlap
+    if Map == nil or Map.GetAdjacentPlot == nil then
+        return items;
+    end
+    for direction = 0, DirectionTypes.NUM_DIRECTION_TYPES - 1 do
+        local plot = Map.GetAdjacentPlot(hexI, hexJ, direction);
+        if plot ~= nil then
+            local resource = ResourceName(plot);
+            if resource ~= "" then
+                local key = resource .. "@" .. direction;
+                if not seen[key] then
+                    seen[key] = true;
+                    table.insert(items,
+                        resource .. " " .. GetLocalizedDirectionString(direction));
+                end
+            end
+        end
+    end
+    return items;
+end
+
+-- Build the multi-line first-turn orientation announce. Returns a
+-- list of strings (one per spoken line) so the caller can queue them
+-- independently. Empty list aborts to the terse path.
+local function firstTurnOrientationLines(pUnit, hexI, hexJ)
+    if pUnit == nil then return {}; end
+
+    local lines = {};
+    local plot = Map.GetPlot(hexI, hexJ);
+    local terrain = TerrainName(plot);
+    local feature = FeatureName(plot);
+    local unitName = unitDisplayName(pUnit);
+
+    -- Line 1: unit + terrain (+ feature if any)
+    local terrainPhrase = terrain;
+    if feature ~= "" then
+        terrainPhrase = terrain .. " with " .. feature;
+    end
+    table.insert(lines,
+        Locale.Lookup("LOC_CIVVIACCESS_FIRST_TURN_UNIT_FORMAT",
+                      unitName, terrainPhrase));
+
+    -- Line 2: movement points
+    if pUnit.GetMovesRemaining ~= nil then
+        local ok, moves = pcall(function() return pUnit:GetMovesRemaining(); end);
+        if ok and moves ~= nil then
+            table.insert(lines,
+                Locale.Lookup("LOC_CIVVIACCESS_MOVES_REMAINING_FORMAT",
+                              moves));
+        end
+    end
+
+    -- Line 3: region
+    local region = coarseRegionDescriptor(hexJ);
+    if region ~= nil then
+        table.insert(lines, region .. ".");
+    end
+
+    -- Line 4: visible nearby resources (if any)
+    local features = nearbyVisibleFeatures(hexI, hexJ);
+    if #features > 0 then
+        table.insert(lines,
+            Locale.Lookup("LOC_CIVVIACCESS_FIRST_TURN_VISIBLE_NEARBY",
+                          table.concat(features, ", ")));
+    end
+
+    -- Line 5: adjacency POIs from the existing helper (units + cities)
+    local pois = GetAdjacentPointsOfInterestFrom(hexI, hexJ);
+    local poiLine = TurnPointsOfInterestIntoString(pois);
+    if poiLine ~= nil then
+        table.insert(lines, poiLine);
+    end
+
+    -- Line 6: nav hint
+    table.insert(lines,
+        Locale.Lookup("LOC_CIVVIACCESS_FIRST_TURN_NAV_HINT"));
+
+    return lines;
+end
+
 function OnUnitSelectionChanged(playerID :number, unitID :number,
                                  hexI :number, hexJ :number, hexK :number,
                                  isSelected :boolean, isEditable :boolean)
@@ -114,6 +241,29 @@ function OnUnitSelectionChanged(playerID :number, unitID :number,
     local pUnit = Players[playerID]:GetUnits():FindID(unitID);
     if pUnit == nil then
         return;
+    end
+
+    -- First-turn orientation: fire ONCE on the first own-unit
+    -- selection during the first game turn, AND only after the load
+    -- screen has closed (so the briefing finishes uninterrupted).
+    -- If selection fires before LoadScreenClose, queue it; the
+    -- LoadScreenClose handler will replay.
+    if not _firstTurnAnnounceDone
+       and Game ~= nil and GameConfiguration ~= nil
+       and Game.GetCurrentGameTurn() == GameConfiguration.GetStartTurn() then
+        if not _loadScreenClosed then
+            _pendingFirstTurn = { pUnit = pUnit, hexI = hexI, hexJ = hexJ };
+            return;  -- defer until LoadScreenClose
+        end
+        _firstTurnAnnounceDone = true;
+        local lines = firstTurnOrientationLines(pUnit, hexI, hexJ);
+        if #lines > 0 then
+            OutputMessageToScreenReader(lines[1]);
+            for i = 2, #lines do
+                OutputMessageToScreenReader(lines[i], true);
+            end
+            return;
+        end
     end
 
     OutputMessageToScreenReader(ownUnitAnnouncement(pUnit));
@@ -143,10 +293,72 @@ function OnCitySelectionChanged(owner :number, cityID :number,
     OutputMessageToScreenReader(name .. " (" .. popLabel .. " " .. population .. ")");
 end
 
+-- Announce new notifications as the engine adds them. Civ VI's
+-- notification system is how the game tells the player "you need
+-- to make a decision" — choose research, choose civic, production
+-- queue empty, etc. Most are end-turn blockers; without speaking
+-- them, a blind player has no audible cue that the game is waiting
+-- on them.
+local function OnNotificationAdded(playerID, notificationID)
+    if Game == nil or playerID ~= Game.GetLocalPlayer() then return; end
+    -- Correct Civ VI API: NotificationManager.Find(playerID, id) —
+    -- not pPlayer:GetNotifications():FindByID(id), which was a
+    -- guess that didn't match the engine's actual surface. Engine
+    -- source: Base/Assets/UI/Panels/NotificationPanel.lua uses
+    -- NotificationManager.Find everywhere.
+    if NotificationManager == nil or NotificationManager.Find == nil then return; end
+    local ok, notification = pcall(NotificationManager.Find, playerID, notificationID);
+    if not ok or notification == nil then return; end
+
+    local summary = "";
+    local okSum, s = pcall(function() return notification:GetSummary(); end);
+    if okSum and s ~= nil and s ~= "" then
+        summary = Locale.Lookup(s);
+    end
+    if summary == "" then
+        local okMsg, m = pcall(function() return notification:GetMessage(); end);
+        if okMsg and m ~= nil and m ~= "" then
+            summary = Locale.Lookup(m);
+        end
+    end
+    if summary == "" then return; end
+
+    -- Queued (NOINTERRUPT) so notifications don't stomp on whatever
+    -- the user is currently doing. They're informational, not
+    -- urgent — engine queues a turn-blocker indicator separately.
+    OutputMessageToScreenReader("Notification. " .. summary, true);
+end
+
+-- Drain any pending first-turn orientation queued by a Settler-
+-- selection event that fired during the loading screen window.
+local function OnLoadScreenClose()
+    _loadScreenClosed = true;
+    if _pendingFirstTurn ~= nil and not _firstTurnAnnounceDone then
+        local q = _pendingFirstTurn;
+        _pendingFirstTurn = nil;
+        _firstTurnAnnounceDone = true;
+        local lines = firstTurnOrientationLines(q.pUnit, q.hexI, q.hexJ);
+        if #lines > 0 then
+            OutputMessageToScreenReader(lines[1]);
+            for i = 2, #lines do
+                OutputMessageToScreenReader(lines[i], true);
+            end
+        end
+    end
+end
+
 local function Initialize()
-    print("Initializing screen reader event handlers");
+    print("[CivViAccess][INFO ] ScreenReaderEventHandlers.lua: file loaded, Initialize starting");
+    print("[CivViAccess][INFO ] ScreenReaderEventHandlers: Events="
+          .. tostring(Events) .. " Game=" .. tostring(Game)
+          .. " Players=" .. tostring(Players) .. " Map=" .. tostring(Map));
     Events.UnitSelectionChanged.Add(OnUnitSelectionChanged);
     Events.CitySelectionChanged.Add(OnCitySelectionChanged);
+    Events.LoadScreenClose.Add(OnLoadScreenClose);
+    if Events.NotificationAdded ~= nil then
+        Events.NotificationAdded.Add(OnNotificationAdded);
+    end
+    print("[CivViAccess][INFO ] ScreenReaderEventHandlers: subscriptions complete");
 end
 
 Initialize();

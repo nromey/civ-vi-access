@@ -15,8 +15,13 @@
   <FrontEndActions>
     <ImportFiles id="SRAccess_FE_UpdateFiles">
       <File priority="10001">Assets/UI/ToolTips/PlotToolTip.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/Log.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/HandlerStack.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/InputRouter.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/EngineHotkeys.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScreenReader.lua</File>
       <File priority="10001">Assets/UI/Accessibility/Verbosity.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/Help.lua</File>
       <File priority="10001">Assets/UI/Accessibility/BaseMenu.lua</File>
       <File priority="10001">Assets/UI/Accessibility/BaseMenuItems.lua</File>
       <File priority="10001">Assets/UI/Accessibility/MainMenuAccess.lua</File>
@@ -27,6 +32,7 @@
       <File priority="10001">Assets/UI/Accessibility/MultiSelectWindowAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/CityStatePickerAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/LeaderPickerAccess.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/LoadScreenAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ContextHelp.lua</File>
       <File priority="10001">Assets/UI/Panels/StatusMessagePanel.lua</File>
       <File priority="10001">Assets/UI/Panels/NotificationPanel.lua</File>
@@ -34,6 +40,7 @@
       <File priority="10001">Assets/UI/Frontend/FrontEndPopup.lua</File>
       <File priority="10001">Assets/UI/Frontend/IntroScreen.lua</File>
       <File priority="10001">Assets/UI/Frontend/LoadGameMenu.lua</File>
+      <File priority="10001">Assets/UI/Frontend/LoadScreen.lua</File>
       <File priority="10001">Assets/UI/Frontend/AdvancedSetup.lua</File>
       <File priority="10001">Assets/UI/Frontend/ScenarioSetup.lua</File>
       <File priority="10001">Assets/UI/Frontend/MultiSelectWindow.lua</File>
@@ -43,34 +50,105 @@
     </ImportFiles>
     <UpdateText id="SRAccess_FE_Text">
       <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
+      <File>Assets/Text/en_US/LeaderDescriptions.xml</File>
     </UpdateText>
+    <UpdateDatabase id="SRAccess_FE_RemapForHexCursor">
+      <File>Assets/Data/RemapForHexCursor.xml</File>
+    </UpdateDatabase>
   </FrontEndActions>
   <InGameActions>
     <ImportFiles id="SRAccess_IG_UpdateFiles">
       <File priority="10001">Assets/UI/ToolTips/PlotToolTip.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/Log.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/HandlerStack.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/InputRouter.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/EngineHotkeys.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScreenReader.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/Help.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/HexGeom.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/HexCursor.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/BaseMenu.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/BaseMenuItems.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/Verbosity.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/Diagnostics.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/SuppressFirstTurnAdvisor.lua</File>
+      <File priority="10001">Assets/UI/Additions/HexCursorAddin.lua</File>
+      <File priority="10001">Assets/UI/Menus/InGameTopOptionsMenu.lua</File>
       <File priority="10001">Assets/UI/Panels/StatusMessagePanel.lua</File>
       <File priority="10001">Assets/UI/Panels/NotificationPanel.lua</File>
       <File priority="10001">Assets/UI/Panels/ProductionPanel.lua</File>
       <File priority="10001">Assets/UI/Popups/TechCivicCompletedPopup.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
       <File priority="10001">Assets/UI/Accessibility/OptionsAccess.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/AdvisorPopupAccess.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ExpansionIntroAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ContextHelp.lua</File>
       <File priority="10001">Assets/UI/Accessibility/TutorialAccess.lua</File>
       <File priority="10001">Assets/UI/Options.lua</File>
+      <File priority="10001">Assets/UI/Popups/AdvisorPopup.lua</File>
+      <File priority="10001">Assets/UI/Additions/ExpansionIntro.lua</File>
     </ImportFiles>
     <AddGameplayScripts id="SRAccess_IG_GameplayScripts">
+      <File priority="10001">Assets/UI/Accessibility/Log.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/Diagnostics.lua</File>
+      <!-- SuppressFirstTurnAdvisor disabled 2026-05-23 so the
+           AdvisorPopupAccess wrapper can be tested. Re-enable as a
+           safety net only if AdvisorPopupAccess proves unreliable.
+           File still ships in <Files> so re-registering is one-line.
+      <File priority="10001">Assets/UI/Accessibility/SuppressFirstTurnAdvisor.lua</File>
+      -->
+      <!-- Debug-only: reset tutorial seen-flags on every game start
+           so tutorial popups (FIRST_GREETING, expansion intros,
+           post-found-city advisor) actually fire during testing.
+           Remove once tutorial flow is validated end-to-end.
+           Internally has DISABLE_RESET flag for in-file toggle. -->
+      <File priority="10001">Assets/UI/Accessibility/TutorialReset.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderEventHandlers.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/TurnAnnouncements.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/WorldInteractiveAnnounce.lua</File>
     </AddGameplayScripts>
+    <AddUserInterfaces id="SRAccess_HexCursorAddin">
+      <Properties>
+        <Context>InGame</Context>
+      </Properties>
+      <File>Assets/UI/Additions/HexCursorAddin.xml</File>
+    </AddUserInterfaces>
     <UpdateText id="SRAccess_IG_Text">
       <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
+      <File>Assets/Text/en_US/LeaderDescriptions.xml</File>
     </UpdateText>
+    <!-- RemapForHexCursor is intentionally only registered in
+         FrontEndActions. InputActionDefaultGestures lives in the
+         Configuration database; updates against the Gameplay database
+         fail with "no such table". Confirmed 2026-05-22 via Database.log.
+         The FrontEndActions UpdateDatabase above targets Configuration
+         and is the only place this XML belongs. -->
   </InGameActions>
   <Files>
+    <File>Assets/UI/Accessibility/Log.lua</File>
+    <File>Assets/UI/Accessibility/HandlerStack.lua</File>
+    <File>Assets/UI/Accessibility/InputRouter.lua</File>
+    <File>Assets/UI/Accessibility/EngineHotkeys.lua</File>
+    <File>Assets/UI/Accessibility/Help.lua</File>
+    <File>Assets/UI/Accessibility/HexGeom.lua</File>
+    <File>Assets/UI/Accessibility/HexCursor.lua</File>
+    <File>Assets/UI/Accessibility/Diagnostics.lua</File>
+    <File>Assets/UI/Accessibility/SuppressFirstTurnAdvisor.lua</File>
+    <File>Assets/UI/Accessibility/TutorialReset.lua</File>
+    <File>Assets/UI/Additions/HexCursorAddin.xml</File>
+    <File>Assets/UI/Additions/HexCursorAddin.lua</File>
+    <File>Assets/UI/Menus/InGameTopOptionsMenu.lua</File>
     <File>Assets/UI/Accessibility/ScreenReader.lua</File>
     <File>Assets/UI/Accessibility/ScreenReaderEventHandlers.lua</File>
     <File>Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
+    <File>Assets/UI/Accessibility/TurnAnnouncements.lua</File>
+    <File>Assets/UI/Accessibility/WorldInteractiveAnnounce.lua</File>
+    <File>Assets/UI/Accessibility/AdvisorPopupAccess.lua</File>
+    <File>Assets/UI/Popups/AdvisorPopup.lua</File>
+    <File>Assets/UI/Accessibility/ExpansionIntroAccess.lua</File>
+    <File>Assets/UI/Additions/ExpansionIntro.lua</File>
     <File>Assets/UI/Accessibility/Verbosity.lua</File>
     <File>Assets/UI/Accessibility/BaseMenu.lua</File>
     <File>Assets/UI/Accessibility/BaseMenuItems.lua</File>
@@ -82,6 +160,8 @@
     <File>Assets/UI/Accessibility/MultiSelectWindowAccess.lua</File>
     <File>Assets/UI/Accessibility/CityStatePickerAccess.lua</File>
     <File>Assets/UI/Accessibility/LeaderPickerAccess.lua</File>
+    <File>Assets/UI/Accessibility/LoadScreenAccess.lua</File>
+    <File>Assets/UI/Frontend/LoadScreen.lua</File>
     <File>Assets/UI/Accessibility/ContextHelp.lua</File>
     <File>Assets/UI/Accessibility/TutorialAccess.lua</File>
     <File>Assets/UI/Options.lua</File>
@@ -99,6 +179,8 @@
     <File>Assets/UI/Panels/StatusMessagePanel.lua</File>
     <File>Assets/UI/Popups/TechCivicCompletedPopup.lua</File>
     <File>Assets/UI/ToolTips/PlotToolTip.lua</File>
+    <File>Assets/Data/RemapForHexCursor.xml</File>
     <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
+    <File>Assets/Text/en_US/LeaderDescriptions.xml</File>
   </Files>
 </Mod>

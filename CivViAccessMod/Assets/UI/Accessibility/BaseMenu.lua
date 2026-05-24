@@ -60,12 +60,53 @@
 -- separate HandlerStack module — Civ VI's per-screen ContextPtr already
 -- owns input for the parent screen's lifetime.
 
+include("Log")
 include("ScreenReader")
 include("Verbosity")
+include("HandlerStack")
+include("Help")
 
 BaseMenu = {}
 
 local KEY_UP_MSG = (KeyEvents ~= nil and KeyEvents.KeyUp) or 257
+local VK_OEM_2   = (Keys ~= nil and Keys.VK_OEM_2) or 191  -- / and ?
+
+-- Standard nav bindings every BaseMenu screen exposes. Built into each
+-- handler's helpEntries so individual screens only need to author keys
+-- THEY add. keyLabel / description are LOC keys with literal fallbacks
+-- baked in (Locale.Lookup returns the key itself when unresolved, and
+-- Help's resolver substitutes the literal in that case).
+local BASEMENU_NAV_HELP_ENTRIES = {
+    { keyLabel = "Up/Down",         description = "Previous / next item" },
+    { keyLabel = "Home/End",        description = "First / last item" },
+    { keyLabel = "Enter or Space",  description = "Activate item or drill into group" },
+    { keyLabel = "Left",            description = "Back up one level" },
+    { keyLabel = "Right",           description = "Drill into group" },
+    { keyLabel = "Escape",          description = "Close sub / back up / exit screen" },
+    { keyLabel = "F1",              description = "Re-speak screen header" },
+    { keyLabel = "A-Z, 0-9",        description = "Type-ahead jump to next matching item" },
+}
+
+-- Mod-wide hotkeys registered into HandlerStack.commonHelpEntries so they
+-- appear in the ? help overlay regardless of which screen / handler is on
+-- top. The actual bindings live in BaseMenu's input handler (Alt+V,
+-- Ctrl+T) and Help.lua (? itself); this registration is documentation only.
+HandlerStack.registerCommonHelpEntry({
+    keyLabel = "Question mark",
+    description = "Open help overlay listing available bindings",
+})
+HandlerStack.registerCommonHelpEntry({
+    keyLabel = "Ctrl+T",
+    description = "Re-speak current item with full description",
+})
+HandlerStack.registerCommonHelpEntry({
+    keyLabel = "Alt+V",
+    description = "Toggle verbose / terse announce mode",
+})
+HandlerStack.registerCommonHelpEntry({
+    keyLabel = "Ctrl+F (in help)",
+    description = "Filter help entries by substring",
+})
 
 local NAV_SOUND_KEY = "Main_Menu_Mouse_Over"
 
@@ -212,6 +253,7 @@ end
 
 local function announceItem(handler, item, nointerrupt)
     if item == nil then
+        Log.info("BaseMenu.announceItem [" .. tostring(handler.name) .. "]: item is nil, skipping")
         return
     end
     -- Verbosity gate: chatty mode speaks describe() (label + value +
@@ -530,10 +572,12 @@ local function describeCurrent(handler)
 end
 
 local function onActivate(handler)
+    Log.info("BaseMenu.onActivate [" .. tostring(handler.name) .. "]: called, _initialized=" .. tostring(handler._initialized))
     if not handler._initialized then
         handler._level = 1
         handler._indices = { 1 }
         local items = currentItems(handler)
+        Log.info("BaseMenu.onActivate [" .. tostring(handler.name) .. "]: first-init, items count=" .. tostring(#items))
         local first = nextValidIndex(items, 0, 1, false) or 1
         handler._indices[1] = first
         handler._initialized = true
@@ -661,11 +705,23 @@ function BaseMenu.create(spec)
         "spec.displayName required (string or function returning string)")
     assert(spec.items ~= nil, "spec.items required (table or function)")
 
+    -- Compose helpEntries: nav defaults + screen-specific (spec.helpEntries
+    -- if provided). Authored screen entries come FIRST so a screen's unique
+    -- keys lead the help list; nav defaults follow. The ? help overlay
+    -- dedupes by keyLabel, so a screen can override a default entry by
+    -- authoring its own with the same label.
+    local helpEntries = {}
+    if type(spec.helpEntries) == "table" then
+        for _, e in ipairs(spec.helpEntries) do helpEntries[#helpEntries + 1] = e end
+    end
+    for _, e in ipairs(BASEMENU_NAV_HELP_ENTRIES) do helpEntries[#helpEntries + 1] = e end
+
     local handler = {
         name = spec.name,
         displayName = spec.displayName,
         preamble = spec.preamble,
         alwaysVerbose = spec.alwaysVerbose == true,
+        helpEntries = helpEntries,
         _itemsSpec = spec.items,
         _level = 1,
         _indices = { 1 },
@@ -722,12 +778,22 @@ function BaseMenu.install(ContextPtr, spec)
             handler._initialized = false
             handler._activeSubMenu = nil
             handler._editMode = nil
+            handler._helpMode = nil
             handler._cachedItems = nil
+            -- Pop from HandlerStack so ? help (if opened elsewhere) doesn't
+            -- list bindings from a hidden screen. reactivate=false because
+            -- we're hiding, not handing focus to a lower handler.
+            HandlerStack.removeByName(handler.name, false)
             return
         end
         if onShow ~= nil then
             pcall(onShow, handler)
         end
+        -- Push onto HandlerStack so ? collects this screen's helpEntries.
+        -- removeByName before push so a re-show is idempotent (hide handler
+        -- already removes, but defensive in case of init-show without hide).
+        HandlerStack.removeByName(handler.name, false)
+        HandlerStack.push(handler)
         onActivate(handler)
     end)
 
@@ -742,6 +808,7 @@ function BaseMenu.install(ContextPtr, spec)
         local msg, key
         local ctrlDown = false
         local altDown = false
+        local shiftDown = false
         local pInputStruct
         if type(args[1]) == "number" then
             msg = args[1]
@@ -767,6 +834,10 @@ function BaseMenu.install(ContextPtr, spec)
                 local aok, adown = pcall(function() return pInputStruct:IsAltDown() end)
                 if aok then altDown = adown == true end
             end
+            if type(pInputStruct.IsShiftDown) == "function" then
+                local sok, sdown = pcall(function() return pInputStruct:IsShiftDown() end)
+                if sok then shiftDown = sdown == true end
+            end
         end
 
         if msg ~= KEY_UP_MSG then
@@ -776,12 +847,40 @@ function BaseMenu.install(ContextPtr, spec)
             return false
         end
 
+        -- Help mode interception. While the ? help overlay is open, all
+        -- keys route to Help.handleKey which manages nav / filter / exit.
+        -- Host nav is paused for the duration.
+        if Help.isOpen(handler) then
+            return Help.handleKey(handler, key, ctrlDown, altDown, shiftDown)
+        end
+
+        -- ? opens help. Shift+/ produces VK_OEM_2 with shiftDown=true; the
+        -- shift gate keeps a plain / press from triggering help in case a
+        -- future binding uses bare /.
+        if shiftDown and key == VK_OEM_2 then
+            Help.enter(handler)
+            return true
+        end
+
         -- Edit-mode interception. While a NumberInput / Slider is in
         -- edit mode, digits / Backspace / Enter / Esc go to the edit
         -- handler; everything else is swallowed so the user can type
         -- without nav side effects.
         if handler._editMode ~= nil then
             return handleEditMode(handler, key)
+        end
+
+        -- Modal sub-handler escape hatch. A screen can install
+        -- handler._modalHandler = fn(key, ctrlDown, altDown, shiftDown)
+        -- that gets first crack at keys ahead of dispatchKey. Used by
+        -- the in-game pause menu's confirmation popups (Yes/No nav)
+        -- and any future transient sub-UI that needs to steal input
+        -- without re-entering BaseMenu's nav. Return true to consume,
+        -- false to let BaseMenu's normal dispatch continue.
+        if handler._modalHandler ~= nil then
+            if handler._modalHandler(key, ctrlDown, altDown, shiftDown) then
+                return true
+            end
         end
 
         if key == Keys.VK_ESCAPE then

@@ -30,5 +30,5 @@ Return JSON with EXACTLY this structure, no preamble, no markdown:
 
 {
   "short": "One sentence, under 25 words. The most distinctive visual element first — face / pose / clothing or background.",
-  "long": "One paragraph, 60 to 110 words. Face and expression, then clothing and ornaments, then pose and background. Color palette where notable."
+  "long": "A rich paragraph that fully describes the portrait. No word limit — describe everything visually present that would help a blind player picture the figure, then their clothing and ornaments, then their pose and prop, then the background scenery, then color palette and lighting. Be concrete and specific throughout; the prior style rules still apply (no evaluative language, no speculation about civilization or character). If the portrait shows the figure composited over architectural or natural scenery, describe both the figure and the scene around them as a unified painting."
 }

@@ -218,5 +218,158 @@
             <Text>Setup has an unresolved error. Start is disabled.</Text>
         </Row>
 
+        <!-- In-game turn announcements (waypoint 09). -->
+        <Row Tag="LOC_CIVVIACCESS_TURN_BEGIN_FORMAT">
+            <Text>Turn {1_Num}.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_TURN_NOTIFICATIONS_PENDING">
+            <Text>{1_Num} notifications pending.</Text>
+        </Row>
+
+        <!-- World-interactive announce (waypoint 10), fired once on
+             the first turn after all blocking popups dismiss. -->
+        <Row Tag="LOC_CIVVIACCESS_WORLD_INTERACTIVE">
+            <Text>World interactive. Press question mark for help.</Text>
+        </Row>
+
+        <!-- First-turn unit orientation (waypoint 08), fired once on
+             the first own-unit selection during the first turn. -->
+        <Row Tag="LOC_CIVVIACCESS_FIRST_TURN_UNIT_FORMAT">
+            <Text>{1_Unit} on {2_Terrain}.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_MOVES_REMAINING_FORMAT">
+            <Text>{1_Num} moves remaining.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_REGION_POLAR">
+            <Text>Polar region</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_REGION_TEMPERATE">
+            <Text>Temperate region</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_REGION_SUBTROPICAL">
+            <Text>Subtropical region</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_REGION_TROPICAL">
+            <Text>Tropical region</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_FIRST_TURN_VISIBLE_NEARBY">
+            <Text>Visible nearby: {1_List}.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_FIRST_TURN_NAV_HINT">
+            <Text>Press B to found a city here with the Settler. Press Tab or Enter to cycle to other units that need orders. When every unit has an order, pressing Enter ends the turn.</Text>
+        </Row>
+
+        <!-- Advisor popup (waypoint 06). Two-button choice support via
+             arrow-key nav lives in AdvisorPopupAccess.lua. -->
+        <Row Tag="LOC_CIVVIACCESS_ADVISOR_TITLE">
+            <Text>Tutorial advisor.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_NOTIFICATION_TITLE">
+            <Text>Notification.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ADVISOR_CHOICE_FORMAT">
+            <Text>Choose: option {1_N} of {2_M}, {3_Text}. Use Left or Right to switch options, Enter to confirm.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ADVISOR_FOCUS_FORMAT">
+            <Text>Option {1_N} of {2_M}: {3_Text}.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ADVISOR_CHOICE_REQUIRED">
+            <Text>This choice is required. Press Left or Right to switch options, Enter to confirm.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ADVISOR_SINGLE_BUTTON_FORMAT">
+            <Text>Press Enter to {1_Text}.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ADVISOR_DISMISS_HINT">
+            <Text>Press Enter or Escape to dismiss.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ADVISOR_PORTRAIT_AND_REREAD_HINT">
+            <Text>Press Control plus I for advisor description. Press Control plus T to re-read.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ADVISOR_REREAD_HINT">
+            <Text>Press Control plus T to re-read.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ADVISOR_PORTRAIT_PLACEHOLDER">
+            <Text>Advisor portrait description not yet available.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ADVISOR_NO_PORTRAIT">
+            <Text>No portrait shown.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_ADVISOR_ACTIVATED_FORMAT">
+            <Text>{1_Choice} chosen.</Text>
+        </Row>
+
+        <!-- Expansion intro popup (waypoint 05). R&F + GS welcome
+             slideshow nav + announce lives in
+             ExpansionIntroAccess.lua. -->
+        <Row Tag="LOC_CIVVIACCESS_EXPANSION_INTRO_WELCOME_RF">
+            <Text>Welcome to Rise and Fall.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_EXPANSION_INTRO_WELCOME_GS">
+            <Text>Welcome to Gathering Storm.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_EXPANSION_INTRO_PAGE_FORMAT">
+            <Text>Page {1_N} of {2_M}.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_EXPANSION_INTRO_LAST_PAGE_HINT">
+            <Text>Last page. Press Enter to continue to the game.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_EXPANSION_INTRO_NAV_HINT">
+            <Text>Press Right or N for next page, Left or P for previous, T to toggle "Do not show again", Control plus I for illustration description, Control plus T to re-read, Enter or Escape to close.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_EXPANSION_INTRO_ILLUSTRATION_PLACEHOLDER">
+            <Text>Illustration description not yet available.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_DONT_SHOW_AGAIN_ON">
+            <Text>Do not show again, on.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_DONT_SHOW_AGAIN_OFF">
+            <Text>Do not show again, off.</Text>
+        </Row>
+
+        <!-- Loading screen briefing (waypoint 04). Dawn of Man civ
+             intro briefing + Ctrl+T/I/S hotkeys. -->
+        <Row Tag="LOC_CIVVIACCESS_LOAD_BRIEFING_HEADER">
+            <Text>{1_Civ}. Join the world stage.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_ERA_FORMAT">
+            <!-- Just the era name. Civ VI's era Name LOC already
+                 includes the word "Era" ("Ancient Era", "Classical
+                 Era", etc.) — appending " Era." here makes it
+                 "Ancient Era Era." which is jarring. -->
+            <Text>{1_Era}.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_LEADER_INTRO">
+            <!-- No trailing period — describer SHORT lines already
+                 end with a period. Adding one made "world map.." -->
+            <Text>{1_LeaderName}. {2_PortraitBrief}</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_FEATURES_HEADER">
+            <Text>Unique abilities and features.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_HOTKEY_HINT">
+            <Text>Press R to repeat the briefing. T re-reads abilities. I for leader description. S for Dawn of Man transcript.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_BRIEFING_DECISION_SEAN">
+            <Text>Press Enter to start the Dawn of Man speech, or Escape to skip to the game.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_POST_SEAN_PROMPT">
+            <Text>Dawn of Man speech playing. Press Enter when you are ready to begin the game.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_BRIEFING_DECISION_NOSEAN">
+            <Text>Press Enter or Escape when ready to begin the game.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_STARTING">
+            <Text>Creating game.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_COMPLETE_READY">
+            <Text>Loading complete. Press Enter or Escape to begin the game.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_PORTRAIT_PLACEHOLDER">
+            <Text>Leader portrait description not yet available.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_TRANSCRIPT_MISSING">
+            <Text>Dawn of Man transcript not available for this leader.</Text>
+        </Row>
+
     </BaseGameText>
 </GameData>

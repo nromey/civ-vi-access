@@ -22,6 +22,347 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.4.1 — 2026-05-23 — New-game flow speakable end-to-end
+
+**Milestone**: a screen-reader user can start a Vanilla, R&F, or GS game
+and reach world-interactive turn 1 with audible everything — loading-
+screen briefing, advisor popup choice, expansion intro slideshow, first-
+turn unit orientation, notifications, and HexCursor map exploration.
+14 rounds of test-and-fix in one session.
+
+### LoadScreen briefing (waypoint 04)
+
+New `Assets/UI/Accessibility/LoadScreenAccess.lua` + shadow of
+`Base/Assets/UI/FrontEnd/LoadScreen.lua`. The "Dawn of Man" loading
+screen now speaks the on-screen text Civ VI shows sighted players.
+
+- **"Creating game."** announces the moment the load screen opens
+  (before briefing data is resolved).
+- **Briefing reads**: civilization name → era name → leader name →
+  leader portrait short brief (from the describer batch — see
+  LeaderDescriptions below) → unique abilities/units/buildings → hotkey
+  hint → decision prompt.
+- **Sean Bean opt-in**: voice-over suppressed by default; user presses
+  Enter to start the Dawn of Man speech, OR Escape to skip straight to
+  the game. Round-8 design after testing several alternatives. Toggle
+  setting (`PLAY_SEAN_BEAN`) lets future users opt-out entirely so the
+  briefing reads the leader paragraph instead.
+- **Re-read hotkeys** active throughout the LoadScreen window:
+  - `R` → repeat the full briefing
+  - `T` → re-read abilities only
+  - `I` → speak the full LONG leader portrait description (from
+    LeaderDescriptions.xml)
+  - `S` → speak the leader paragraph (Sean Bean's transcript stand-in)
+- **Clipboard**: full briefing (markdown) copied to clipboard via
+  `UI.SetClipboardString` for later review / paste into Notepad.
+
+### Advisor popup (waypoint 06)
+
+New `Assets/UI/Accessibility/AdvisorPopupAccess.lua` + shadow of
+`Base/Assets/UI/Popups/AdvisorPopup.lua`. FIRST_GREETING and every other
+tutorial-system popup now speaks and accepts keyboard input.
+
+- **Announce on raise**: "Tutorial advisor. [message]. Choose: option N
+  of M, [button1]. Use Left or Right to switch options, Enter to confirm."
+- **Arrow-key nav** between buttons (engine only supported clicking
+  Option 1 via hotkey before — Option 2 was effectively unreachable for
+  blind players).
+- **Activation feedback**: "[choice] chosen." when Enter activates.
+- **Esc override** for 2-button popups: "This choice is required."
+  instead of opening the pause menu.
+- **Dedupe**: engine raises FIRST_GREETING twice in rapid succession;
+  we speak it only once (2-second signature window).
+- **Ctrl+T / bare T** re-read message body. **Ctrl+I / bare I** speak
+  portrait description (placeholder until describer batch covers
+  advisor portraits).
+
+### Expansion intro slideshow (waypoint 05)
+
+New `Assets/UI/Accessibility/ExpansionIntroAccess.lua` + shadow of
+`DLC/Expansion1/UI/Additions/ExpansionIntro.lua` + Expansion2 equivalent.
+Single shadow handles both R&F (9 pages) and GS (12 pages) via runtime
+ruleset detection + global sentinel preventing double-show.
+
+- Right/N → next page. Left/P → previous page. T → toggle "do not show
+  again". Ctrl+T → re-read current page. Ctrl+I → illustration
+  description (placeholder until the diagram describer batch runs).
+- Announce: "Welcome to Rise and Fall / Gathering Storm. Page N of M.
+  [description]." Final page: "Last page. Press Enter to continue."
+
+### First-turn unit orientation (waypoint 08)
+
+Extended `Assets/UI/Accessibility/ScreenReaderEventHandlers.lua`. The
+first own-unit selection during turn 1 fires a richer announce:
+
+- "Settler on Plains (Hills) with Woods."
+- "2 moves remaining."
+- "Subtropical region." (coarse latitude band)
+- "Visible nearby: Truffles East, Dyes West."
+- Adjacent units / cities by 6-direction.
+- "Press B to found a city here with the Settler. Press Tab or Enter to
+  cycle to other units that need orders. When every unit has an order,
+  pressing Enter ends the turn."
+
+Deferred until LoadScreenClose so the briefing finishes without
+interruption — engine fires UnitSelectionChanged earlier than expected.
+
+### Turn-begin + world-interactive (waypoints 09, 10)
+
+- New `Assets/UI/Accessibility/TurnAnnouncements.lua` — "Turn N." on
+  every `LocalPlayerTurnBegin`. Plus a notification count.
+- New `Assets/UI/Accessibility/WorldInteractiveAnnounce.lua` —
+  "World interactive. Press question mark for help." once on first turn
+  after blocking popups dismiss.
+
+### Notification announce
+
+`Events.NotificationAdded` subscribed in ScreenReaderEventHandlers.
+Notifications speak as "Notification. [summary]." (NOINTERRUPT). Covers
+"Move a unit", "Production completed", "Choose new technology", etc.
+
+### In-game action audible confirmations
+
+`Assets/UI/Additions/HexCursorAddin.lua` always speaks a curated set of
+engine actions when fired, so users get audible confirmation that the
+engine received the keypress: `NextUnit` → "Next unit", `EndTurn` →
+"End turn", `FoundCity` → "Found city", `Sleep` → "Sleep",
+`Fortify` → "Fortify", `Attack` → "Attack", and several more.
+
+### HexCursor — confirmed working
+
+The HexCursor framework (0.4.0 work) is play-tested working in this
+release. Q/W/E/A/D/Z/X/C move the cursor in 6 directions, terrain +
+features + adjacent units/cities announce on every move, ? opens the
+help overlay.
+
+### Leader portrait descriptions (LeaderDescriptions.xml)
+
+`Assets/Text/en_US/LeaderDescriptions.xml` — 70 entries (SHORT + LONG
+per leader) generated via the `tools/wonder-describer/describe.py`
+pipeline with prompt `prompts/leaders.txt` and Gemini 2.5 Pro. SHORT
+plays as part of the briefing; LONG is on-demand via `I` in the
+LoadScreen window. Added to `<Files>` manifest in 0.4.1 — was registered
+in `<UpdateText>` but missing from `<Files>` and wasn't actually being
+loaded.
+
+### CAMM fix consumed (v0.5.6+1)
+
+CAMM submodule bumped to include a critical log-tail bug fix
+(`Camm/Speech/LogTailSpeaker.cs`). The prior tail read Lua.log in
+1024-byte chunks and split each chunk independently — lines spanning
+the chunk boundary got truncated, with the first half emitted as a
+"complete" line (often still matching the screen-reader marker, so Tolk
+spoke half) and the second half silently dropped for missing marker.
+Latent during single-line in-game speech; reliably hit any burst write
+like the loading-screen briefing (12 lines / ~1.6 KB in one game frame
+arriving 200ms later as one chunk). Fix: persistent StringBuilder of
+pending decoded text across iterations; only emit complete lines
+(terminated by `\n`); UTF-8 decoder (was ASCII, which mangled ellipses
+and smart quotes in localized text).
+
+### Engine InputAction context (R/T/I/S)
+
+`Assets/Data/RemapForHexCursor.xml` adds four new actions for briefing
+re-read (`CIVVIACCESS_RepeatBriefing`, `_AbilitiesReread`,
+`_PortraitDescribe`, `_DawnOfManTranscript`) bound to R/T/I/S. Engine
+defaults rebound to free those keys: `ToggleTechTree` → Alt+T,
+`RangedAttack` → Alt+R. Actions registered with `ContextId="Universal"`
+so they fire during `InputContext.Loading` (LoadScreen window) AND
+in-game — letter-key dispatch to ContextPtr handlers doesn't work
+during loading, but InputActions do.
+
+### Debug aids (will trim later)
+
+- `Assets/UI/Accessibility/Diagnostics.lua` — Events firehose; logs
+  every engine event we care about during game-start. Helped triage
+  most of the round-1-to-14 bugs.
+- `Assets/UI/Accessibility/TutorialReset.lua` — resets tutorial
+  user-options flags on game start so FIRST_GREETING + expansion intros
+  re-fire across tests. Per-tutorial-item "Completed" state lives
+  somewhere we can't reach from Lua; user-options reset is the best
+  we can do for now.
+- `HexCursorAddin.DIAGNOSTIC_SPEECH` toggle (defaults false) for the
+  earlier "speak every action firing" diagnostic that helped trace
+  HexCursor binding issues.
+
+### Known issues (not blockers for this release)
+
+- **City panel mouse-only**: pressing Enter on a city opens the
+  production screen; no keyboard accessibility yet. Multi-session
+  feature; queued.
+- **Tab key not firing `NextUnit`** on Noel's machine: action is
+  registered (id 39), binding is correct, but the keypress doesn't
+  reach Civ VI's action dispatch. Possibly NVDA Tab interception or
+  Civ VI window focus issue. Needs targeted diagnostic.
+- **Per-item tutorial "Completed" state persists** across games —
+  TutorialReset only clears user-options flags. Post-found-city
+  advisor popup etc. won't re-fire even after reset. Engine doesn't
+  expose a Lua API to clear per-item state.
+
+## 0.4.0 — 2026-05-20 — In-game foundation: HexCursor + HandlerStack + Help
+
+**Milestone: in-game accessibility work begins.** Game setup arc closed
+in 0.3.9; 0.4.0 ships the foundation every future in-game screen will
+depend on, plus HexCursor (the first user of the framework).
+
+### Foundation modules (`Assets/UI/Accessibility/`)
+
+- **`Log.lua`** — `Log.info / warn / error / debug / tryCall`. Replaces
+  scattered `print()` calls; tags every line with `[CivViAccess][LEVEL]`
+  for Lua.log grepping. Engine-agnostic.
+- **`HandlerStack.lua`** — LIFO of input handlers with lifecycle
+  callbacks (`onActivate / onSuspend / onDeactivate`). Each handler
+  carries `bindings = [{key, mods, fn, description}]` + authored
+  `helpEntries`. Provides `push / pop / replace / removeByName /
+  popAbove`, `commonHelpEntries` registry, and `collectHelpEntries`
+  (top-down dedupe walk used by the help overlay).
+- **`InputRouter.lua`** — modifier-mask constants (`MOD_NONE / SHIFT /
+  CTRL / ALT / CTRL_SHIFT / ALT_SHIFT / CTRL_ALT / ALL`),
+  `modifierMaskFromInputStruct`, stack-walking `dispatch(key, mods)`,
+  and `installOnContextPtr` helper that wires a `SetInputHandler`
+  wrapper.
+- **`Help.lua`** — `?` opens a transient help overlay (sub-mode of the
+  host handler, same pattern BaseMenu uses for sub-menus). Up/Down nav,
+  Home/End jump, type-ahead (A-Z first-letter match), `Ctrl+F` opens a
+  substring filter mode (Enter applies, Escape clears). Renders snapshot
+  of `HandlerStack.collectHelpEntries()` at open time so a stack mutation
+  while help is up doesn't shift entries underneath the user.
+
+All four modules are engine-agnostic where possible — only the
+`pInputStruct` / `KeyEvents` / `ContextPtr` references in InputRouter and
+the help-mode key handler touch Civ VI specifics. Ported from
+Civ V Access's `CivVAccess_HandlerStack` / `_InputRouter` / `_Help`,
+trimmed of Civ-V-only concerns (proxy-shared globals, env-probe dead-
+context handling, beacons-transparency flag). Designed for portability
+to Civ VII / Civ IV per [[project-cross-game-foundation]].
+
+### `?` help discoverability on every BaseMenu screen
+
+`BaseMenu.create` now composes each handler's `helpEntries` from
+screen-specific entries (passed via `spec.helpEntries`) plus a default
+nav template (Up/Down, Home/End, Enter/Space, Left/Right, Escape, F1,
+A-Z type-ahead). `BaseMenu.install`'s show/hide handler pushes/removes
+the handler from `HandlerStack`, so `?` collects the current screen's
+bindings.
+
+`Alt+V`, `Ctrl+T`, `?`, and `Ctrl+F` (in help) are registered into
+`HandlerStack.commonHelpEntries` so they appear in the overlay
+regardless of which screen is on top. The actual bindings still live
+where they did before (BaseMenu's input handler for Alt+V / Ctrl+T;
+Help.lua for ? / Ctrl+F) — the registration is documentation-only.
+
+### `HexCursor` — free-roam tile cursor (in-game)
+
+New `Assets/UI/Accessibility/HexCursor.lua`. Holds module-local
+`(_x, _y)` cursor state; re-resolves the plot via `Map.GetPlot` on every
+operation (never caches the userdata, since plot handles can outlive
+their freshness across engine ticks).
+
+- Key layout (ported from Civ V Access — the hex-shaped left-keyboard
+  cluster, laptop-friendly, no numpad):
+  - `Q` = NW, `E` = NE
+  - `A` = W,  `D` = E
+  - `Z` = SW, `C` = SE
+  - Maps spatially to the hex shape on the keyboard.
+- **Where-am-I keys:**
+  - `Alt+S` speaks absolute X, Y coordinates ("X 47, Y 23").
+  - `Shift+S` speaks position relative to the player's original capital,
+    direction-decomposed ("5 east, 3 southeast of capital"). Mnemonic:
+    Shift+S = "capital S" → relative to capital. Falls back to absolute
+    with a "no capital yet" suffix when the player hasn't founded their
+    first city.
+  - Hex math (cube-coord conversion, decomposition, map-wrap folding)
+    lives in new `Assets/UI/Accessibility/HexGeom.lua`, ported from
+    Civ V Access's CivVAccess_HexGeom.lua. Civ VI doesn't expose a
+    public `Map.IsWrapX()` so we default to wrap-X=true (standard for
+    most map shapes); wrong-side seam reads on non-wrap maps are the
+    only failure mode and are recoverable.
+- Camera follows cursor every step via `UI.LookAtPlot(x, y)` (the
+  Civ VI analog of Civ V Access's `UI.LookAt(plot, 0)`). The cursor IS
+  the camera; no separate logical-vs-visual position to confuse users.
+- Lean announce: terrain + feature + resource + city + units, joined by
+  ". ". Skips yields / appeal / continent / defense / movement cost —
+  those live behind future Ctrl+T verbose path per
+  [[feedback-terse-announce-default]]. Terrain name resolution mirrors
+  Firaxis's PlotToolTip View() (Lake / Coast get LOC_TOOLTIP_* keys;
+  other terrains use the terrain's own Name field). Resource visibility
+  gated by `playerResources:IsResourceVisible` so unrevealed strategics
+  don't leak.
+- `HexCursor.init()` places the cursor on `UI.GetHeadSelectedUnit()`,
+  falling back to the player's first owned unit, falling back to the
+  capital city. Wired to `Events.LoadScreenClose` so it fires once the
+  loading screen finishes. Lazy first-move init as a safety net for
+  hotloads where LoadScreenClose has already fired.
+- Pushes itself onto `HandlerStack` and installs its own input wrapper
+  (a richer variant of `InputRouter.installOnContextPtr` that
+  intercepts Help mode for the `?` overlay).
+
+### Civ VI vs Civ V hex cursor — design notes
+
+Civ VI has no native keyboard hex cursor. `WorldInput.lua` binds the
+arrow keys to `CameraPanUp / Down / Left / Right` action IDs (camera
+pan, not logical focus); every `UI.GetCursorPlotID()` call in the base
+UI resolves the *mouse* cursor's plot. Owning `(_x, _y)` ourselves end-
+to-end is the only viable architecture. The full pre-implementation
+investigation is in the `project_04_engine_investigation` memory.
+
+### In-game pause menu + exit confirmations + Alt+F4
+
+Without this, the player couldn't gracefully exit a session with a screen
+reader. Shadowing `Base/Assets/UI/Menus/InGameTopOptionsMenu.lua` (the Esc
+menu) and patching it inline:
+
+- **`BaseMenu` nav** over the pause-menu buttons (Return, QuickSave, Save,
+  Load, Options, Restart, Retire, Main Menu, Exit Game, plus PlayByCloud
+  variants when applicable). Up/Down + Enter + Esc + type-ahead. Labels
+  are read live from each engine button's `:GetText()` so we always speak
+  exactly what sighted users see, with no LOC-key guesses that could drift
+  if Firaxis renames one.
+- **Speech on every confirmation popup.** Each `OnExitGameAskAreYouSure /
+  OnRetireGame / OnRestartGame / OnMainMenu / OnPBCDeleteButton /
+  OnPBCQuitButton` opens a Yes/No `PopupDialog`; the engine's popup
+  primitive has no keyboard handling at all. Inline patches at each call
+  site announce the warning text + first button, and `KeyHandler` now
+  intercepts Left/Right/Up/Down (move between Yes/No, announces the new
+  focus) and Enter (activate focused button) while a popup is open.
+- **Alt+F4 works.** The engine already routes Alt+F4 through
+  `Events.UserRequestClose` → `OnRequestClose` → `OnExitGameAskAreYouSure`.
+  Wrapping `OnExitGameAskAreYouSure` with speech automatically covers both
+  the Exit-Game-button path AND the Alt+F4 path — same function, two
+  entry points.
+- **Quicksave gets an audible "Quicksave" confirmation.** The engine
+  plays a positive earcon (`Confirm_Bed_Positive`) but a screen-reader
+  user has no other signal that the save fired.
+
+The shadow file is a verbatim copy of the engine's 770-LOC original with
+~120 LOC of inline accessibility patches marked "Begin/End CivViAccess
+mod change". Maintenance burden: when Firaxis patches Civ VI, re-merge
+this file. Same model we already use for `PlotToolTip.lua`,
+`AdvancedSetup.lua`, etc.
+
+### Deferred (will land in 0.4.1+)
+
+- **MainMenu / Options / LoadGameMenu help retrofit.** These three
+  screens have their own custom input handlers (not `BaseMenu.install`),
+  so they don't auto-pick up `?` help. Each needs its own `push` /
+  `removeByName` plus `?` interception. Out of scope for 0.4.0 — the
+  framework is in place for them.
+- **Universal `PopupDialog` accessibility.** Today only the
+  `InGameTopOptionsMenu` confirmation popups (exit / retire / restart /
+  main menu / PBC delete / PBC quit) are accessible. Other game popups
+  using `PopupDialog` (end-turn warnings, notifications, tutorial popups,
+  error dialogs across `DiplomacyActionView`, `EndGameMenu`, etc.) remain
+  unspoken. Shadowing `Base/Assets/UI/Popups/PopupDialog.lua` would
+  accessible-fy all of them with one change. Tracked separately.
+- **Ctrl+T verbose plot announce** in HexCursor. Today HexCursor speaks
+  the lean form on every step; Ctrl+T should pull yields / appeal /
+  continent / defense / movement cost on demand. Trivial to add once
+  the lean form is validated in play.
+- **Alt+V verbosity toggle wired to in-game.** Currently Alt+V is bound
+  in BaseMenu (front-end only). HexCursor doesn't yet vary speech with
+  `Verbosity.isOn()`, so binding Alt+V in-game would have no visible
+  effect until the chatty path lands alongside Ctrl+T.
+
 ## 0.3.9 — 2026-05-19 — Scenarios + edit-line cursor + per-value chatty (game setup complete)
 
 **Milestone: the full game-setup arc is end-to-end accessible.**

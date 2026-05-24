@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Two-part XML driving CivViAccess's input layer:
+
+  1. Move existing Civ VI engine actions OFF Q/E/A/Z/C to Alt+letter. Frees
+     the bare letters for HexCursor. Sighted muscle memory preserved — same
+     letter, hold Alt.
+
+       Q  ToggleResources    -> Alt+Q
+       E  AutoExplore        -> Alt+E
+       A  Attack             -> Alt+A
+       Z  Sleep              -> Alt+Z
+       C  ToggleCivicsTree   -> Alt+C
+
+  2. Register NEW engine actions (CIVVIACCESS_Cursor*) for HexCursor and
+     coord keys. Bind each to its primary key + numpad alternate where
+     applicable. Pressing one fires Events.InputActionTriggered with that
+     action's ID; HexCursorAddin.lua subscribes and dispatches. This is
+     the route used by the engine itself for ALL hotkeys; AddUserInterfaces
+     Contexts don't get raw keyboard (confirmed empirically).
+
+  Why this is acceptable per [[feedback-runtime-toggle-over-install-choice]]:
+  the rebind is consistent (same letter + Alt modifier), discoverable (in
+  the ? help overlay), reversible (user can remap via Civ VI Options >
+  Keybindings).
+
+  NVDA / numpad caveat per [[reference-screen-reader-key-conflicts]]:
+  numpad-as-alternate gestures only fire when NumLock is ON OR NVDA's
+  "Use numpad keys for object navigation" is disabled. Letters always
+  work.
+-->
+<GameInfo>
+  <!-- ===================================================================
+       Part 1: rebind existing actions off Q/E/A/Z/C
+       =================================================================== -->
+  <InputActionDefaultGestures>
+    <Update>
+      <Where ActionId="ToggleResources" Index="0" GestureType="KBMouse"/>
+      <Set>
+        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_Q</GestureData>
+      </Set>
+    </Update>
+    <Update>
+      <Where ActionId="AutoExplore" Index="0" GestureType="KBMouse"/>
+      <Set>
+        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_E</GestureData>
+      </Set>
+    </Update>
+    <Update>
+      <Where ActionId="Attack" Index="0" GestureType="KBMouse"/>
+      <Set>
+        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_A</GestureData>
+      </Set>
+    </Update>
+    <Update>
+      <Where ActionId="Sleep" Index="0" GestureType="KBMouse"/>
+      <Set>
+        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_Z</GestureData>
+      </Set>
+    </Update>
+    <Update>
+      <Where ActionId="ToggleCivicsTree" Index="0" GestureType="KBMouse"/>
+      <Set>
+        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_C</GestureData>
+      </Set>
+    </Update>
+    <!-- Round 11: free bare R and T for our briefing re-read actions.
+         T → ToggleTechTree → Alt+T
+         R → RangedAttack → Alt+R
+         (I and S are already unbound by Civ VI default, no rebind
+         needed; we just register our actions on them below.) -->
+    <Update>
+      <Where ActionId="ToggleTechTree" Index="0" GestureType="KBMouse"/>
+      <Set>
+        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_T</GestureData>
+      </Set>
+    </Update>
+    <Update>
+      <Where ActionId="RangedAttack" Index="0" GestureType="KBMouse"/>
+      <Set>
+        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_R</GestureData>
+      </Set>
+    </Update>
+  </InputActionDefaultGestures>
+
+  <!-- ===================================================================
+       Part 2: register new CivViAccess engine actions
+       =================================================================== -->
+  <InputActions>
+    <Row ActionId="CIVVIACCESS_CursorNW"
+         Name="LOC_CIVVIACCESS_HOTKEY_CURSOR_NW"
+         Description="LOC_CIVVIACCESS_HOTKEY_CURSOR_NW_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_CursorNE"
+         Name="LOC_CIVVIACCESS_HOTKEY_CURSOR_NE"
+         Description="LOC_CIVVIACCESS_HOTKEY_CURSOR_NE_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_CursorW"
+         Name="LOC_CIVVIACCESS_HOTKEY_CURSOR_W"
+         Description="LOC_CIVVIACCESS_HOTKEY_CURSOR_W_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_CursorE"
+         Name="LOC_CIVVIACCESS_HOTKEY_CURSOR_E"
+         Description="LOC_CIVVIACCESS_HOTKEY_CURSOR_E_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_CursorSW"
+         Name="LOC_CIVVIACCESS_HOTKEY_CURSOR_SW"
+         Description="LOC_CIVVIACCESS_HOTKEY_CURSOR_SW_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_CursorSE"
+         Name="LOC_CIVVIACCESS_HOTKEY_CURSOR_SE"
+         Description="LOC_CIVVIACCESS_HOTKEY_CURSOR_SE_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_WhereAmI"
+         Name="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I"
+         Description="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_WhereAmIAbs"
+         Name="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I_ABS"
+         Description="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I_ABS_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_OpenHelp"
+         Name="LOC_CIVVIACCESS_HOTKEY_OPEN_HELP"
+         Description="LOC_CIVVIACCESS_HOTKEY_OPEN_HELP_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- Round 11: briefing re-read actions. These fire in LoadScreen
+         context (and in-game, harmlessly). LoadScreenAccess subscribes
+         to Events.InputActionTriggered to dispatch them to the right
+         speak* function. -->
+    <!-- ContextId="Universal" so these fire in ALL contexts
+         including Loading (LoadScreen window) and Shell (main
+         menu). Round-13 found World-context-bound actions don't
+         dispatch during InputContext.Loading; Universal does. -->
+    <Row ActionId="CIVVIACCESS_RepeatBriefing"
+         Name="LOC_CIVVIACCESS_HOTKEY_REPEAT_BRIEFING"
+         Description="LOC_CIVVIACCESS_HOTKEY_REPEAT_BRIEFING_HELP"
+         CategoryId="GLOBAL" ContextId="Universal" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_AbilitiesReread"
+         Name="LOC_CIVVIACCESS_HOTKEY_ABILITIES_REREAD"
+         Description="LOC_CIVVIACCESS_HOTKEY_ABILITIES_REREAD_HELP"
+         CategoryId="GLOBAL" ContextId="Universal" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_PortraitDescribe"
+         Name="LOC_CIVVIACCESS_HOTKEY_PORTRAIT_DESCRIBE"
+         Description="LOC_CIVVIACCESS_HOTKEY_PORTRAIT_DESCRIBE_HELP"
+         CategoryId="GLOBAL" ContextId="Universal" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_DawnOfManTranscript"
+         Name="LOC_CIVVIACCESS_HOTKEY_DAWN_OF_MAN_TRANSCRIPT"
+         Description="LOC_CIVVIACCESS_HOTKEY_DAWN_OF_MAN_TRANSCRIPT_HELP"
+         CategoryId="GLOBAL" ContextId="Universal" LayoutType="PC"/>
+  </InputActions>
+
+  <!-- ===================================================================
+       Part 3: default key bindings for the new actions
+       Index 0 = primary (letter), Index 1 = numpad alternate.
+       =================================================================== -->
+  <InputActionDefaultGestures>
+    <!-- NW -->
+    <Row ActionId="CIVVIACCESS_CursorNW" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_Q"/>
+    <Row ActionId="CIVVIACCESS_CursorNW" Index="1" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_NP_7"/>
+    <!-- NE -->
+    <Row ActionId="CIVVIACCESS_CursorNE" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_E"/>
+    <Row ActionId="CIVVIACCESS_CursorNE" Index="1" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_NP_9"/>
+    <!-- W -->
+    <Row ActionId="CIVVIACCESS_CursorW" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_A"/>
+    <Row ActionId="CIVVIACCESS_CursorW" Index="1" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_NP_4"/>
+    <!-- E -->
+    <Row ActionId="CIVVIACCESS_CursorE" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_D"/>
+    <Row ActionId="CIVVIACCESS_CursorE" Index="1" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_NP_6"/>
+    <!-- SW -->
+    <Row ActionId="CIVVIACCESS_CursorSW" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_Z"/>
+    <Row ActionId="CIVVIACCESS_CursorSW" Index="1" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_NP_1"/>
+    <!-- SE -->
+    <Row ActionId="CIVVIACCESS_CursorSE" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_C"/>
+    <Row ActionId="CIVVIACCESS_CursorSE" Index="1" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_NP_3"/>
+    <!-- Where-am-I (capital-relative): Shift+S primary, Numpad 5 alternate -->
+    <Row ActionId="CIVVIACCESS_WhereAmI" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_S"/>
+    <Row ActionId="CIVVIACCESS_WhereAmI" Index="1" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_NP_5"/>
+    <!-- Where-am-I absolute: Alt+S -->
+    <Row ActionId="CIVVIACCESS_WhereAmIAbs" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_S"/>
+    <!-- ? help: Shift+/ -->
+    <Row ActionId="CIVVIACCESS_OpenHelp" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_SLASH"/>
+    <!-- Round 11: briefing re-read keys. R = repeat full briefing,
+         T = abilities only, I = portrait description, S = Dawn of
+         Man transcript. Mnemonic: R=Repeat, T=Traits, I=Image,
+         S=Sean. -->
+    <Row ActionId="CIVVIACCESS_RepeatBriefing" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_R"/>
+    <Row ActionId="CIVVIACCESS_AbilitiesReread" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_T"/>
+    <Row ActionId="CIVVIACCESS_PortraitDescribe" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_I"/>
+    <Row ActionId="CIVVIACCESS_DawnOfManTranscript" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_S"/>
+  </InputActionDefaultGestures>
+</GameInfo>

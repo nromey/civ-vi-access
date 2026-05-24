@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HexCursor bootstrap UI Context. Registered via <AddUserInterfaces
+  context="InGame"> in CivViAccessMod.modinfo. Civ VI's engine InGame.lua
+  iterates Modding.GetUserInterfaces("InGame") and calls LoadNewContext on
+  each — that loads this XML and (by convention) the same-named
+  HexCursorAddin.lua alongside it, giving us our own ContextPtr that
+  receives keyboard input.
+
+  Cannot shadow InGame.lua directly ("MODs / Expansions cannot use partial
+  replacement as this context is directly added to the UI Control Tree via
+  engine"). Cannot use PlotToolTip's context for input — it's mouse-only.
+  AddUserInterfaces is the engine-blessed extension point.
+
+  No UI controls defined here on purpose — HexCursor is an invisible
+  cursor + input handler. The Context exists solely to host the Lua side.
+-->
+<Context>
+</Context>

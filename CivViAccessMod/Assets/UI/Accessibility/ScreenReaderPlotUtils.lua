@@ -145,3 +145,40 @@ function StringifyCity(city)
     end
     return decorateWithRelationship(base, ownerId);
 end
+
+-- Terrain / feature / resource stringification for plot inspection.
+-- Mirrors HexCursor.lua's local helpers, lifted to ScreenReaderPlotUtils
+-- so both UI and gameplay-script contexts can use the same canonical
+-- naming. HexCursor's locals will eventually fold into these.
+
+function TerrainName(plot)
+    if plot == nil then return ""; end
+    if plot:IsLake() then
+        return Locale.Lookup("LOC_TOOLTIP_LAKE");
+    end
+    local terrainIdx = plot:GetTerrainType();
+    local terrainRow = GameInfo.Terrains[terrainIdx];
+    if terrainRow == nil then return ""; end
+    if terrainRow.TerrainType == "TERRAIN_COAST" then
+        return Locale.Lookup("LOC_TOOLTIP_COAST");
+    end
+    return Locale.Lookup(terrainRow.Name);
+end
+
+function FeatureName(plot)
+    if plot == nil then return ""; end
+    local featureIdx = plot:GetFeatureType();
+    if featureIdx == -1 then return ""; end
+    local featureRow = GameInfo.Features[featureIdx];
+    if featureRow == nil then return ""; end
+    return Locale.Lookup(featureRow.Name);
+end
+
+function ResourceName(plot)
+    if plot == nil then return ""; end
+    local resourceIdx = plot:GetResourceType();
+    if resourceIdx == -1 then return ""; end
+    local resourceRow = GameInfo.Resources[resourceIdx];
+    if resourceRow == nil then return ""; end
+    return Locale.Lookup(resourceRow.Name);
+end
