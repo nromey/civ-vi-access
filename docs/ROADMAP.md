@@ -93,6 +93,14 @@ actually reference what we built.
   approach.
 - **0.7.2** Goal tracker + advisor recommendations accessibility.
   "Your settler should found a city" → speakable nag list.
+- **0.7.3** Civ V-style advisor ↔ civilopedia integration. Civ V's
+  advisor fires frequently and opens civilopedia to the relevant
+  topic when teaching ("You founded a city" → opens "Cities" page).
+  Civ VI's advisor fires less often and never opens civilopedia.
+  Our wrapper: on advisor-popup events, offer "Press Enter for more
+  detail" → opens accessible civilopedia to the matching topic.
+  Gives blind players the same teaching depth Civ V gives sighted
+  players. Depends on 0.6.0 (civilopedia kb nav) shipping first.
 
 **Expansion notes**: No expansion-specific tutorials worth tackling
 yet.
