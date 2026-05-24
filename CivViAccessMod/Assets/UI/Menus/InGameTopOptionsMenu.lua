@@ -365,6 +365,16 @@ function OnCancelExit()
 			OutputMessageToScreenReader("Exit cancelled. Back to game.");
 		end
 		CloseImmediately();
+		-- CloseImmediately dequeues the popup but doesn't pop the input
+		-- context — the user reported being "not in the game" after NO
+		-- because Input.GetActiveContext() was still GameOptions and
+		-- world keys (hex move, period cycle) didn't reach the world
+		-- handler. Pop it manually so input flows back to InGame.
+		if Input ~= nil and Input.GetActiveContext ~= nil
+		   and Input.GetActiveContext() == InputContext.GameOptions then
+			Log.info("OnCancelExit: popping GameOptions input context");
+			Input.PopContext();
+		end
 	end
 	-- End CivViAccess mod change
 end
@@ -1141,6 +1151,13 @@ function Initialize()
 		helpEntries = PAUSE_MENU_HELP_ENTRIES,
 		priorInput = OnInput,
 		priorShow = OnShow,
+		-- When Alt+F4 raises the pause menu purely to host the exit
+		-- confirmation popup, suppress the "Pause menu. Return to game."
+		-- announce — otherwise user hears that chatter just before
+		-- "Do you wish to exit?" and it's confusing (Noel 2026-05-24).
+		suppressInitialAnnounce = function()
+			return m_isRaisedForExitConfirm == true;
+		end,
 	});
 
 	-- Begin CivViAccess mod change: route arrow / Enter to the exit-

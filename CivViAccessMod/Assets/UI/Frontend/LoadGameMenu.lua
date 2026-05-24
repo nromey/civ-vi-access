@@ -141,6 +141,20 @@ do
                              tostring(m_navIndex) .. ")");
                     SetSelected(m_navIndex);
                 end
+                -- Force-enable ActionButton if disabled. Bug #22 second
+                -- round 2026-05-24: log showed actionDisabled=true even
+                -- with a valid focused save — most likely a soft
+                -- mod-requirements warning that the engine silently
+                -- gates on. The user explicitly pressed Enter, so honor
+                -- the intent and bypass the soft gate. If the load
+                -- genuinely fails downstream, Network.LoadGame surfaces
+                -- the error.
+                if Controls and Controls.ActionButton
+                   and Controls.ActionButton.IsDisabled
+                   and Controls.ActionButton:IsDisabled() then
+                    Log.info("LoadGameMenuAccess: force-enabling ActionButton");
+                    Controls.ActionButton:SetDisabled(false);
+                end
                 if OnActionButton ~= nil then
                     Log.info("LoadGameMenuAccess: dispatching OnActionButton");
                     OnActionButton();

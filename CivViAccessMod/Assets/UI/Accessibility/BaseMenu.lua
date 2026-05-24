@@ -598,6 +598,20 @@ local function onActivate(handler)
             return
         end
         handler._lastOpenAnnounceAt = now
+        -- Per-screen escape hatch: when the screen knows the activation
+        -- is for hosting a modal popup (rather than user-driven open),
+        -- it can set spec.suppressInitialAnnounce → fn returning true,
+        -- and BaseMenu will keep cursor state but skip the displayName +
+        -- first-item announce. Used by InGameTopOptionsMenu when
+        -- Alt+F4 queues the pause menu solely to host the exit
+        -- confirmation popup — without this, user hears "Pause menu.
+        -- Return to game. Do you wish to exit?" which is confusing.
+        if handler.suppressInitialAnnounce ~= nil
+           and handler.suppressInitialAnnounce() then
+            Log.info("BaseMenu.onActivate [" .. tostring(handler.name)
+                     .. "]: suppressInitialAnnounce → skipping speech")
+            return
+        end
         readHeader(handler)
         announceItem(handler, items[first], true)
         return
@@ -722,6 +736,12 @@ function BaseMenu.create(spec)
         preamble = spec.preamble,
         alwaysVerbose = spec.alwaysVerbose == true,
         helpEntries = helpEntries,
+        -- Per-screen escape hatch consulted in onActivate. Returning
+        -- true skips the displayName + first-item announce while
+        -- keeping cursor state initialized. Used by screens that get
+        -- raised purely to host a modal popup (e.g. InGameTopOptionsMenu
+        -- on Alt+F4). Optional.
+        suppressInitialAnnounce = spec.suppressInitialAnnounce,
         _itemsSpec = spec.items,
         _level = 1,
         _indices = { 1 },
