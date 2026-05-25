@@ -240,6 +240,11 @@ local function Initialize()
         lookupAction("CIVVIACCESS_NotificationReminderToggle",  Notifications.toggleReminder);
     end
 
+    -- 0.5.2 diagnostic: slurp on Alt+Z. Confirms whether Alt+Z fires
+    -- engine actions at all (Sleep silent in Noel Lua.log 2026-05-25).
+    -- Remove after diagnosis. See [[reference-slurp-burp-test]].
+    lookupAction("CIVVIACCESS_TestAltZ", function() OutputMessageToScreenReader("alt z fires"); end);
+
 
     -- Built-in engine actions (no handlers — just announce by name when triggered)
     local engineActions = {
