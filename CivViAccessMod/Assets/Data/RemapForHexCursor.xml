@@ -104,25 +104,17 @@
     </Update>
   </InputActionDefaultGestures>
 
-  <!-- Bug #25b round 5 2026-05-24: <Update> in round 4 did NOT actually
-       replace the engine's Civilopedia Ctrl+./, gestures — log showed
-       BOTH id=13/14 (CivilopediaBack/Forward) AND id=98/99 (our cycle)
-       firing on the same Ctrl+./, presses. The dual dispatch left
-       speech silent (Civilopedia actions may fire focus-change events
-       that NVDA interprets as silence-speech, eating our cycle
-       announce). Switching to <Delete> to actually remove the engine
-       Civilopedia bindings. F9 still opens civilopedia; in-screen
-       history nav (the only thing Ctrl+./, did) loses its shortcut
-       — acceptable, our 0.6.0 civilopedia kb-nav pass will own that
-       keyboard model entirely. -->
-  <InputActionDefaultGestures>
-    <Delete>
-      <Row ActionId="CivilopediaBack" Index="0"/>
-    </Delete>
-    <Delete>
-      <Row ActionId="CivilopediaForward" Index="0"/>
-    </Delete>
-  </InputActionDefaultGestures>
+  <!-- Bug #25b round 6 2026-05-24: Reverted the Delete approach from
+       round 5 — Database.log showed "ERROR executing the delete
+       statement" which also prevented our cycle gesture rows from
+       registering (id=98/99 stopped firing entirely). Confirmed via
+       Noel JAWS+NVDA test: dual-screen-reader silence means the audio
+       loss isn't a screen-reader-specific quirk. It's something
+       deeper in our CAMM / Tolk pipeline. Need to debug downstream
+       rather than keep fighting bindings. For now: cycle stays bound
+       to Ctrl+./, sharing the gesture with engine Civilopedia. Both
+       fire; cycle speech reaches Lua.log (verified) but doesn't
+       reach the user's audio. CAMM-side instrumentation is next. -->
 
   <!-- ===================================================================
        Part 2: register new CivViAccess engine actions
