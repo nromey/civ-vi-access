@@ -63,9 +63,21 @@ jobs:
         run: |
           tag="${GITHUB_REF#refs/tags/}"
           version="${tag#v}"
+          # Pre-release detection by semver hyphen convention:
+          # v0.5.0       → stable release
+          # v0.5.0-rc1   → pre-release
+          # v0.5.0-beta1 → pre-release
+          # Users on UpdateChannel=Latest get both; UpdateChannel=Stable
+          # (default) skips pre-releases per GitHubReleasesClient.cs.
+          if [[ "$version" == *-* ]]; then
+            prerelease="true"
+          else
+            prerelease="false"
+          fi
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Tag: $tag, version: $version"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          echo "Tag: $tag, version: $version, prerelease: $prerelease"
 
       - name: Setup .NET 10
         uses: actions/setup-dotnet@v4
@@ -181,7 +193,7 @@ jobs:
           tag_name: ${{ steps.version.outputs.tag }}
           name: ${{ steps.version.outputs.tag }}
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.version.outputs.prerelease }}
           generate_release_notes: true
           files: |
             CivViAccess-${{ steps.version.outputs.version }}.exe
