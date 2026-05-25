@@ -171,23 +171,14 @@ function UnitInfo.cycleAllUnits(forward)
     if UI ~= nil and UI.SelectUnit ~= nil then
         UI.SelectUnit(nextUnit);
     end
-    -- Audible cycle cue so users get the same "I just cycled" signal
-    -- bare . / , give via the engine NextUnit chime. UI.SelectUnit
-    -- doesn't trigger the engine's cycle sound effect because we
-    -- bypass the engine's NextUnit pipeline.
-    if UI ~= nil and UI.PlaySound ~= nil then
-        pcall(UI.PlaySound, "UI_Notification_Bar_Notch");
-    end
-    -- Direct cycle-confirmation speech with distinct text ("Cycled. X"
-    -- vs SREH's bare "X") to defeat CAMM v0.5.6's dedupe — bug #25b
-    -- root cause was the SREH line getting deduped against a recently
-    -- emitted identical name from an engine auto-cycle. SREH's line
-    -- will also fire but if it gets deduped, our prefixed line still
-    -- reaches Tolk. See [[project_25b_root_cause_camm_dedupe]].
-    local label = StringifyUnit(nextUnit);
-    if label ~= nil and label ~= "" then
-        OutputMessageToScreenReader("Cycled. " .. label);
-    end
+    -- Speech rides on Events.UnitSelectionChanged → SREH.ownUnitAnnouncement
+    -- same as bare . / , — matching the audible bare-period pattern
+    -- exactly. Previously injected a "Cycled. <name>" direct line
+    -- here, but CAMM log analysis 2026-05-24 showed bare period
+    -- (audible) and Ctrl+. (silent) hit Tolk with the SAME 3-call
+    -- pattern except for that first injected line. Removing it makes
+    -- the patterns identical so any remaining audibility difference
+    -- points to something deeper than our Lua-side speech.
 end
 
 -- Recenter HexCursor on the selected unit. Useful when the cursor has

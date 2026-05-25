@@ -94,6 +94,14 @@ end
 local ALWAYS_ANNOUNCE_ACTIONS = {
     NextUnit  = "Next unit",
     PrevUnit  = "Previous unit",
+    -- Cycle-all variants get the same header speech as bare period so
+    -- Ctrl+./, produces the IDENTICAL 3-line pattern bare period does
+    -- ("Next unit" + unit name + POI). Bug #25b diagnosis 2026-05-24:
+    -- CAMM log showed bare period audible, Ctrl+. silent despite same
+    -- speech pipeline. Matching the pattern exactly to isolate any
+    -- remaining audibility difference to deeper than Lua speech.
+    CIVVIACCESS_NextUnitAll = "Next unit",
+    CIVVIACCESS_PrevUnitAll = "Previous unit",
     EndTurn   = "End turn",
     SkipTurn  = "Skip turn",
     FoundCity = "Found city",
