@@ -102,6 +102,28 @@
         <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_R</GestureData>
       </Set>
     </Update>
+    <!-- Bug #25b round 4 2026-05-24: vanilla Civ VI binds Ctrl+, and
+         Ctrl+. to CivilopediaBack/Forward (InputConfiguration.xml lines
+         158-159). When we ALSO bound CIVVIACCESS_PrevUnitAll/NextUnitAll
+         to the same gestures, the engine's collision-resolution dropped
+         BOTH bindings to silence — neither fired in Lua.log even though
+         both were registered. Fix: move Civilopedia history nav off
+         Ctrl+./, to Alt+./, so our cycle wins the Ctrl+./, gesture.
+         Civilopedia history is a low-stakes binding; F9 still opens
+         the screen and our 0.6.0 kb-nav pass will own the keyboard
+         model for civilopedia entirely. -->
+    <Update>
+      <Where ActionId="CivilopediaBack" Index="0" GestureType="KBMouse"/>
+      <Set>
+        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_COMMA</GestureData>
+      </Set>
+    </Update>
+    <Update>
+      <Where ActionId="CivilopediaForward" Index="0" GestureType="KBMouse"/>
+      <Set>
+        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_PERIOD</GestureData>
+      </Set>
+    </Update>
   </InputActionDefaultGestures>
 
   <!-- ===================================================================
