@@ -99,6 +99,13 @@ local function accessibleResetPopup()
     m_popupButtons = {};
     m_popupIndex   = 0;
     m_popupText    = "";
+    -- Clear the exit-confirm-raise flag here so it's reset on every
+    -- popup dismiss path (NO callback, Esc dismiss, YES exit, etc.) —
+    -- otherwise the flag leaks across attempts and a normal Esc-pause-
+    -- menu open might get its initial announce suppressed (Noel's
+    -- 2026-05-24 log showed second Alt+F4 suppressed because flag
+    -- leaked from prior Esc-dismissed attempt).
+    m_isRaisedForExitConfirm = false;
     -- Detach modal handler so BaseMenu's normal pause-menu nav resumes.
     -- HandlerStack.active() resolves to whatever handler is on top right
     -- now — typically our pause-menu BaseMenu handler.
@@ -1022,11 +1029,17 @@ function OnRequestClose()
 		-- Only handle the message if popup queuing is active (diplomacy is not up)
 		if UIManager:IsPopupQueueDisabled()==false then
 			if (ContextPtr:IsHidden() ) then
-				UIManager:QueuePopup( ContextPtr, PopupPriority.Utmost, { AlwaysVisibleInQueue = true } );
-				-- Begin CivViAccess mod change: remember we raised the pause
-				-- menu purely to host the exit prompt, so OnCancelExit can
-				-- dismiss it again if the user picks NO (bug #26b).
+				-- Begin CivViAccess mod change: SET FLAG BEFORE QueuePopup.
+				-- QueuePopup synchronously fires OnShow → BaseMenu.onActivate
+				-- → suppressInitialAnnounce check. If we set the flag AFTER
+				-- QueuePopup, the suppress check sees flag=false and speaks
+				-- "Pause menu. Return to game." before the popup arrives.
+				-- Confirmed via log lines 242-262 (no suppress) vs 280-298
+				-- (suppress worked because flag leaked from prior attempt
+				-- where Esc-dismiss bypassed OnCancelExit's reset). Bug #26b
+				-- round 2 2026-05-24.
 				m_isRaisedForExitConfirm = true;
+				UIManager:QueuePopup( ContextPtr, PopupPriority.Utmost, { AlwaysVisibleInQueue = true } );
 				-- End CivViAccess mod change
 			end
 			print("[CivViAccess][INFO ] OnRequestClose: calling OnExitGameAskAreYouSure");
