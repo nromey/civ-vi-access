@@ -24,6 +24,21 @@ public sealed class CivViGameInstance : IGameInstance
     public string GetLogFilePath() =>
         Path.Join(GameUserDir, "Logs", "Lua.log");
 
+    // Archive these on every launch so we can post-mortem the prior
+    // session. Civ VI truncates each on its own startup, so the only
+    // way to keep historical content is to copy-and-compress before
+    // the new session begins. Lua.log is the speech / game-event log;
+    // Database.log catches XML / DB errors (UpdateDatabase failures
+    // are silent without it — see the round-5 #25b Delete that
+    // errored only here); Modding.log catches mod-load issues.
+    public IEnumerable<string> GetArchivableLogPaths()
+    {
+        var logsDir = Path.Join(GameUserDir, "Logs");
+        yield return Path.Join(logsDir, "Lua.log");
+        yield return Path.Join(logsDir, "Database.log");
+        yield return Path.Join(logsDir, "Modding.log");
+    }
+
     public string GetLaunchAnnouncement()
     {
         if (HasEulaBeenAccepted())
