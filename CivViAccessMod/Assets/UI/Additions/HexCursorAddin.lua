@@ -21,6 +21,7 @@ include("HexGeom");
 include("HexCursor");
 include("UnitMovement");
 include("UnitInfo");
+include("CityProduction");
 
 -- Flip to true to re-enable the verbose diagnostic speech (every action
 -- firing announced via Tolk + interface-mode changes + popup show/hide
@@ -223,6 +224,11 @@ local function Initialize()
     lookupAction("CIVVIACCESS_RecenterOnUnit", UnitInfo.recenterOnUnit);
     lookupAction("CIVVIACCESS_NextUnitAll",    function() UnitInfo.cycleAllUnits(true);  end);
     lookupAction("CIVVIACCESS_PrevUnitAll",    function() UnitInfo.cycleAllUnits(false); end);
+
+    -- 0.5.2 city production unblock (Alt+P). Workaround for
+    -- ENDTURN_BLOCKING_PRODUCTION until the full picker lands. Queues
+    -- Monument / Warrior / cheapest-available into every blocked city.
+    lookupAction("CIVVIACCESS_UnblockProduction", CityProduction.unblockAll);
 
     -- Built-in engine actions (no handlers — just announce by name when triggered)
     local engineActions = {

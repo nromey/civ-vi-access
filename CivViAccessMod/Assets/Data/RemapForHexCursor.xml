@@ -208,6 +208,15 @@
          Name="LOC_CIVVIACCESS_HOTKEY_PREV_UNIT_ALL"
          Description="LOC_CIVVIACCESS_HOTKEY_PREV_UNIT_ALL_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- 0.5.2: city production unblock (Alt+P). Workaround until the
+         full accessible production picker lands. Queues Monument /
+         Warrior / cheapest-available into every local-player city with
+         an empty production queue. Bare P = engine OnlinePause; Alt+P
+         is free. -->
+    <Row ActionId="CIVVIACCESS_UnblockProduction"
+         Name="LOC_CIVVIACCESS_HOTKEY_UNBLOCK_PRODUCTION"
+         Description="LOC_CIVVIACCESS_HOTKEY_UNBLOCK_PRODUCTION_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
     <!-- Round 11: briefing re-read actions. These fire in LoadScreen
          context (and in-game, harmlessly). LoadScreenAccess subscribes
          to Events.InputActionTriggered to dispatch them to the right
@@ -301,6 +310,10 @@
          GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_PERIOD"/>
     <Row ActionId="CIVVIACCESS_PrevUnitAll" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_COMMA"/>
+    <!-- 0.5.2: unblock production hotkey on Alt+P. P (OnlinePause) is
+         bound bare; Alt+P is free. -->
+    <Row ActionId="CIVVIACCESS_UnblockProduction" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_P"/>
     <!-- Round 11: briefing re-read keys. R = repeat full briefing,
          T = abilities only, I = portrait description, S = Dawn of
          Man transcript. Mnemonic: R=Repeat, T=Traits, I=Image,
