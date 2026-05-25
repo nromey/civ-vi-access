@@ -120,6 +120,15 @@ Notifications._state = Notifications._state or {
     lastUserActivity     = 0,
     lastReminderAt       = 0,
     currentBackoffSeconds = IDLE_THRESHOLD_INITIAL,
+    -- textKeys[playerID]["typeName::summary"] = canonical notification ID.
+    -- Engine fires fresh IDs for the same logical reminder ("Move a
+    -- unit..." each turn) — without text-keyed dedup, cache fills with
+    -- N duplicate entries and speech fires N times. We keep the FIRST
+    -- ID's entry in cache; subsequent same-text arrivals refresh its
+    -- timestamp but don't add new entries or trigger new speech.
+    -- Confirmed via Lua.log 2026-05-25: six NOTIFICATION_COMMAND_UNITS
+    -- arrivals with IDs 0/1/2/5/7/8 all summary="Move a unit...".
+    textKeys             = {},
 };
 local S = Notifications._state;
 
@@ -191,11 +200,21 @@ end
 local function cacheRemove(playerID, notificationID)
     local bucket = S.cache[playerID];
     if bucket == nil or bucket.entries[notificationID] == nil then return; end
+    local entry = bucket.entries[notificationID];
     bucket.entries[notificationID] = nil;
     for i, id in ipairs(bucket.order) do
         if id == notificationID then
             table.remove(bucket.order, i);
             break;
+        end
+    end
+    -- Free the text-key claim if this entry was the canonical for
+    -- its (typeName, summary). A future same-text arrival can then
+    -- establish a new canonical instead of getting silently absorbed.
+    if entry ~= nil and S.textKeys[playerID] ~= nil then
+        local textKey = entry.typeName .. "::" .. entry.summary;
+        if S.textKeys[playerID][textKey] == notificationID then
+            S.textKeys[playerID][textKey] = nil;
         end
     end
     S.navIndex = 0;
@@ -291,6 +310,21 @@ local function onNotificationAdded(playerID, notificationID)
              .. " summary=" .. (summary ~= "" and summary or "(none)"));
 
     if summary == "" then return; end
+
+    -- Text-key dedup. Engine fires fresh IDs for the same logical
+    -- reminder (NOTIFICATION_COMMAND_UNITS every turn, etc.). If we've
+    -- already cached an entry with the same (typeName, summary), refresh
+    -- its timestamp but don't speak and don't add a duplicate cache entry.
+    local textKey = typeName .. "::" .. summary;
+    if S.textKeys[playerID] == nil then S.textKeys[playerID] = {}; end
+    local canonicalID = S.textKeys[playerID][textKey];
+    if canonicalID ~= nil
+       and S.cache[playerID] ~= nil
+       and S.cache[playerID].entries[canonicalID] ~= nil then
+        S.cache[playerID].entries[canonicalID].addedAt = timeNow();
+        return;
+    end
+    S.textKeys[playerID][textKey] = notificationID;
 
     -- Layer 1: queue for inline speech.
     S.pending[#S.pending + 1] = {

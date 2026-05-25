@@ -116,7 +116,19 @@
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
       <File priority="10001">Assets/UI/Accessibility/TurnAnnouncements.lua</File>
       <File priority="10001">Assets/UI/Accessibility/WorldInteractiveAnnounce.lua</File>
-      <File priority="10001">Assets/UI/Accessibility/Notifications.lua</File>
+      <!-- Notifications.lua deliberately NOT in AddGameplayScripts.
+           Civ VI's gameplay + UI contexts are SEPARATE Lua VMs (each
+           has its own globals table, its own Events subscriptions,
+           and its own Notifications._initialized guard). Loading
+           Notifications.lua in both VMs (via AddGameplayScripts AND
+           via the addin's include) caused dual handler registration:
+           the engine fired NotificationAdded once and BOTH VMs'
+           handlers ran, each populating their own cache. Confirmed
+           via Lua.log inspection 2026-05-25: same notification logged
+           twice, once with "Notifications:" prefix (gameplay VM) and
+           once with "HexCursorAddin:" prefix (UI VM). The UI VM is
+           the one the cycle hotkey reads from, so we keep loading
+           there via the addin's include() and skip AddGameplayScripts. -->
     </AddGameplayScripts>
     <AddUserInterfaces id="SRAccess_HexCursorAddin">
       <Properties>
