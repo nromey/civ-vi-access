@@ -102,6 +102,23 @@
         <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_R</GestureData>
       </Set>
     </Update>
+    <!-- 0.5.2 patch: rebind PrevCity / NextCity off bare [ / ] so the
+         notifications-center cycle (CIVVIACCESS_NotificationPrev /
+         _Next, bound bare below) doesn't collide with engine actions.
+         City prev/next stays accessible on Alt+[ / Alt+]. Same
+         steal-and-rebind pattern as ToggleResources etc. on Alt+Q. -->
+    <Update>
+      <Where ActionId="PrevCity" Index="0" GestureType="KBMouse"/>
+      <Set>
+        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_LBRACKET</GestureData>
+      </Set>
+    </Update>
+    <Update>
+      <Where ActionId="NextCity" Index="0" GestureType="KBMouse"/>
+      <Set>
+        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_RBRACKET</GestureData>
+      </Set>
+    </Update>
   </InputActionDefaultGestures>
 
   <!-- Bug #25b round 6 2026-05-24: Reverted the Delete approach from
@@ -331,13 +348,19 @@
          bound bare; Alt+P is free. -->
     <Row ActionId="CIVVIACCESS_UnblockProduction" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_P"/>
-    <!-- 0.5.2: notifications center cycle on Ctrl+[ / Ctrl+]. Bare
-         [/] = engine PrevCity/NextCity, kept. Reminder toggle on
+    <!-- 0.5.2: notifications center cycle on bare [ / ]. Civ V Access
+         parity (CivVAccess_MessageBuffer uses bare [/]). Initial 0.5.2
+         shipped Ctrl+[/] but Civ VI's gesture parser silently strips
+         the Ctrl modifier on bracket keys (confirmed Noel test
+         2026-05-25 — Ctrl+[/] inert, bare [/] cycled). Owning the
+         bare binding explicitly + rebinding PrevCity / NextCity to
+         Alt+[/]+ in Part 1 above. Same steal-and-rebind pattern as
+         Q/E/A/Z/C → Alt+letter for HexCursor. Reminder toggle on
          Alt+N (N is unbound in engine). -->
     <Row ActionId="CIVVIACCESS_NotificationPrev" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_LBRACKET"/>
+         GestureData="LOC_OPTIONS_KEY_LBRACKET"/>
     <Row ActionId="CIVVIACCESS_NotificationNext" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_RBRACKET"/>
+         GestureData="LOC_OPTIONS_KEY_RBRACKET"/>
     <Row ActionId="CIVVIACCESS_NotificationReminderToggle" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_N"/>
     <!-- Round 11: briefing re-read keys. R = repeat full briefing,
