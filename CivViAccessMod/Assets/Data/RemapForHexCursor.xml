@@ -217,6 +217,23 @@
          Name="LOC_CIVVIACCESS_HOTKEY_UNBLOCK_PRODUCTION"
          Description="LOC_CIVVIACCESS_HOTKEY_UNBLOCK_PRODUCTION_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- 0.5.2: notifications center cycle + reminder toggle. Ctrl+[ /
+         Ctrl+] walk prev/next pending notification, sorted by priority
+         (blockers first). Alt+N toggles the idle reminder ("N things
+         to do" after 20s idle). Bare [ / ] = engine PrevCity/NextCity
+         and we deliberately do not steal them — Ctrl+[/] is free. -->
+    <Row ActionId="CIVVIACCESS_NotificationPrev"
+         Name="LOC_CIVVIACCESS_HOTKEY_NOTIFICATION_PREV"
+         Description="LOC_CIVVIACCESS_HOTKEY_NOTIFICATION_PREV_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_NotificationNext"
+         Name="LOC_CIVVIACCESS_HOTKEY_NOTIFICATION_NEXT"
+         Description="LOC_CIVVIACCESS_HOTKEY_NOTIFICATION_NEXT_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <Row ActionId="CIVVIACCESS_NotificationReminderToggle"
+         Name="LOC_CIVVIACCESS_HOTKEY_NOTIFICATION_REMINDER_TOGGLE"
+         Description="LOC_CIVVIACCESS_HOTKEY_NOTIFICATION_REMINDER_TOGGLE_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
     <!-- Round 11: briefing re-read actions. These fire in LoadScreen
          context (and in-game, harmlessly). LoadScreenAccess subscribes
          to Events.InputActionTriggered to dispatch them to the right
@@ -314,6 +331,15 @@
          bound bare; Alt+P is free. -->
     <Row ActionId="CIVVIACCESS_UnblockProduction" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_P"/>
+    <!-- 0.5.2: notifications center cycle on Ctrl+[ / Ctrl+]. Bare
+         [/] = engine PrevCity/NextCity, kept. Reminder toggle on
+         Alt+N (N is unbound in engine). -->
+    <Row ActionId="CIVVIACCESS_NotificationPrev" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_LBRACKET"/>
+    <Row ActionId="CIVVIACCESS_NotificationNext" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_RBRACKET"/>
+    <Row ActionId="CIVVIACCESS_NotificationReminderToggle" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_N"/>
     <!-- Round 11: briefing re-read keys. R = repeat full briefing,
          T = abilities only, I = portrait description, S = Dawn of
          Man transcript. Mnemonic: R=Repeat, T=Traits, I=Image,

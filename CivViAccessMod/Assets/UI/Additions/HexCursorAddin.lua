@@ -22,6 +22,7 @@ include("HexCursor");
 include("UnitMovement");
 include("UnitInfo");
 include("CityProduction");
+include("Notifications");
 
 -- Flip to true to re-enable the verbose diagnostic speech (every action
 -- firing announced via Tolk + interface-mode changes + popup show/hide
@@ -229,6 +230,15 @@ local function Initialize()
     -- ENDTURN_BLOCKING_PRODUCTION until the full picker lands. Queues
     -- Monument / Warrior / cheapest-available into every blocked city.
     lookupAction("CIVVIACCESS_UnblockProduction", CityProduction.unblockAll);
+
+    -- 0.5.2 notifications center: Ctrl+[ / Ctrl+] walk pending,
+    -- Alt+N toggles the idle reminder. Notifications module is loaded
+    -- via AddGameplayScripts and exposes the global Notifications.* API.
+    if Notifications ~= nil then
+        lookupAction("CIVVIACCESS_NotificationPrev",            Notifications.cyclePrev);
+        lookupAction("CIVVIACCESS_NotificationNext",            Notifications.cycleNext);
+        lookupAction("CIVVIACCESS_NotificationReminderToggle",  Notifications.toggleReminder);
+    end
 
     -- Built-in engine actions (no handlers — just announce by name when triggered)
     local engineActions = {

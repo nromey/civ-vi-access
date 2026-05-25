@@ -22,6 +22,84 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.5.2 — 2026-05-25 — Notifications center + production unblock
+
+Two pieces shipped together because both unblock end-turn-blocker
+testing for blind players:
+
+### `CityProduction.lua` (new, Alt+P) — production unblock workaround
+
+The engine's `ENDTURN_BLOCKING_PRODUCTION` blocker refuses end-turn
+when any city has an empty production queue. The mouse-only
+ProductionPanel chooser is the canonical fix; until the full
+accessible picker lands (task #9), Alt+P queues a sensible default
+into every blocked city:
+
+1. **Monument** (always-available, no prereqs, 60 prod) — canonical
+   first-turn build.
+2. **Warrior** — fallback for late-game / captured cities where
+   Monument is already built.
+3. **Cheapest available building or unit** — last-resort fallback.
+
+Per-city announce ("Queued Monument in Cape Town"), total roll-up
+("Queued 3 cities"). New `CIVVIACCESS_UnblockProduction` InputAction
+bound to Alt+P. Hotkey stays as a quick-default convenience even
+after the full picker ships.
+
+### `Notifications.lua` (extended) — notifications center (Stage 2)
+
+The arrival-speech layer from 0.5.1 catches notifications as they
+fire, but a burst can overrun the speech queue or land while the
+user is away from the keyboard. The center adds a "task list"
+persistence layer:
+
+- **Cache** mirrors the engine's pending list (Civ VI exposes no
+  global enumeration). Populated from `NotificationAdded`, drained
+  from `NotificationDismissed`, marked-read from
+  `NotificationActivated`.
+- **Per-entry metadata**: blocker flag (`GetEndTurnBlocking ~=
+  NO_ENDTURN_BLOCKING`), dismissable flag (`CanUserDismiss`),
+  insertion timestamp.
+- **`Ctrl+[` / `Ctrl+]`** walk prev/next pending. Sort priority:
+  blockers first, then non-dismissable, then oldest-first. Speech
+  is "Notification 2 of 3, blocker. Choose research." Mark-read
+  on speak. Falls back to read entries if no unread remain.
+- **Idle reminder**. After 20s of no user input AND pending > 0,
+  plays a reminder earcon + speaks "N things to do". Exponential
+  backoff (20s → 40s → 80s → cap at 5 min) so deliberately
+  ignoring a notification doesn't get you yelled at. Backoff
+  resets when a fresh notification arrives or any user hotkey
+  fires (engagement signals).
+- **`Alt+N`** toggles the reminder on/off, speaks new state. The
+  per-feature toggle cluster (earcon on/off, chime-only vs
+  chime+speech) is deferred to the options screen.
+
+`Notifications.Initialize` is guarded against double-init (load
+model can run the file from both AddGameplayScripts and addin
+include, which would have caused double-speech).
+
+Bare `[` / `]` (engine PrevCity / NextCity) deliberately NOT
+stolen — `Ctrl+[/]` is free.
+
+### `RemapForHexCursor.xml`
+
+New InputActions + gestures:
+- `CIVVIACCESS_UnblockProduction` → Alt+P
+- `CIVVIACCESS_NotificationPrev` → Ctrl+[
+- `CIVVIACCESS_NotificationNext` → Ctrl+]
+- `CIVVIACCESS_NotificationReminderToggle` → Alt+N
+
+### `HexCursorAddin.lua`
+
+`include("CityProduction")` + `include("Notifications")`. Four new
+`lookupAction` dispatches wired in the addin's action setup.
+
+### `CivViAccessMod.modinfo`
+
+Registered `CityProduction.lua` + `Notifications.lua` in both
+`<ImportFiles>` (for `include()` resolution) and `<Files>`.
+Notifications stays in `<AddGameplayScripts>` as it was in 0.5.1.
+
 ## 0.5.1 — 2026-05-25 — Notification polish (Stage 1)
 
 **Stage 1 of the notifications work** — bug-fix layer ahead of Stage 2's

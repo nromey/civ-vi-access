@@ -75,6 +75,7 @@
       <File priority="10001">Assets/UI/Accessibility/UnitMovement.lua</File>
       <File priority="10001">Assets/UI/Accessibility/UnitInfo.lua</File>
       <File priority="10001">Assets/UI/Accessibility/CityProduction.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/Notifications.lua</File>
       <File priority="10001">Assets/UI/Accessibility/BaseMenu.lua</File>
       <File priority="10001">Assets/UI/Accessibility/BaseMenuItems.lua</File>
       <File priority="10001">Assets/UI/Accessibility/Verbosity.lua</File>
