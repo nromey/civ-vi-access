@@ -140,51 +140,97 @@ cycle to other units." Tab is bound to nothing in Civ VI's default
 bindings; the field-converged design). Hint now reads "Press period to
 cycle to the next unit that needs orders, comma for the previous."
 
-### Bug sweep (post-checkpoint, 2026-05-24)
+### Bug sweep (multi-round, 2026-05-24)
 
-After the 0.5.0 checkpoint a marathon test session surfaced several
-follow-up bugs. Fixes landed on top before tag:
+Multiple test rounds after the initial Movement Phase 1 checkpoint
+surfaced bugs and yielded root-cause findings worth documenting.
 
-- **MainMenuAccess include cache (#24)**. Civ VI's `include()` returns
-  from a process-wide cache on the second MainMenu context load (e.g.
-  after exit-to-main-menu), so `MainMenuAccess` was set on first load
-  but nil on every subsequent load — main-menu kb access silently died
-  mid-session. Inlined MainMenuAccess.lua into MainMenu.lua's own
-  top-level scope (which DOES re-run per context) and removed the
-  separate file from disk + modinfo. Diagnostic confirmed via Lua.log
-  line 5 vs 479 in the test session.
-- **Alt+F4 NO leaves pause menu open (#26b)**. When Alt+F4 fires
-  in-game with no pause menu raised, `OnRequestClose` queues the
-  pause-menu context to host the exit-confirmation popup. Picking NO
-  closed the popup but left the pause menu visible. Added an
-  `m_isRaisedForExitConfirm` flag — set when OnRequestClose queues the
-  context, consumed by OnCancelExit which now also dismisses the pause
-  menu in that case.
-- **Ctrl+./Ctrl+, cycle silent (#25b)**. Ctrl+./ Ctrl+, dispatched
-  fine and the SREH chain emitted `#SCREENREADER - Settler/Warrior`
-  lines to Lua.log, but Noel heard nothing. Likely a downstream
-  cascade: rapid identical-class lines hit CAMM's dedupe + Tolk's
-  interrupt-cascade and got eaten before any could speak. Made
-  `UnitInfo.cycleAllUnits` own the speech directly (single line per
-  press, distinctive from the SREH path) and added a time-window
-  suppression flag so SREH skips its own announce when cycle just
-  spoke. Ported from Civ V Access's
-  `markUserInitiatedSelection` / `consumeUserInitiatedSelection`
-  pattern.
-- **LoadGame Enter doesn't activate saves (#22)**. The path through
-  LoadGameMenu's KeyHandler → OnActionButton looked correct on paper
-  but Enter was a no-op in test. LoadGameMenuAccess now handles VK_RETURN
-  directly: re-syncs `g_iSelectedFileEntry` to our `m_navIndex` (in
-  case some other code path cleared it between focus and Enter) and
-  dispatches OnActionButton itself. Diagnostic logging on the path so
-  future regressions are debuggable from Lua.log alone.
-- **Generic notification chime on add (#23)**. Per-type AddSound is
-  only wired for ~30 of Civ VI's notification types — the rest added
-  silently, leaving blind players with no audio cue alongside the
-  speech announce. NotificationPanel shadow now falls back to
-  `UI_Notification_Bar_Notch` (the engine's own "a notification
-  appeared on the rail" sound from OnStackSizeChanged) when no
-  per-type AddSound is set.
+- **MainMenuAccess + LoadGameMenuAccess include() cache (#22, #24)**.
+  Civ VI's `include()` returns from a process-wide cache without
+  re-executing the file in a fresh Lua context. Both companion files
+  were set on first load but nil on subsequent context entries
+  (exit-to-main-menu, LoadGameMenu from pause). Lua.log: `attempt to
+  index a nil value` at every call site. Fix: inline both companions
+  into their respective Firaxis forks (MainMenu.lua, LoadGameMenu.lua)
+  where the table construction re-runs per context. Deleted the
+  separate `MainMenuAccess.lua` / `LoadGameMenuAccess.lua` files +
+  modinfo entries. Plus for LoadGameMenu Enter: ActionButton sometimes
+  disabled by soft mod-requirements warning; we force-enable before
+  dispatching OnActionButton so the user's explicit Enter takes effect.
+- **Alt+F4 NO leaves pause menu open + chatter on first attempt (#26b)**.
+  Two issues: (a) when Alt+F4 fires with the pause menu hidden,
+  `OnRequestClose` queues the pause-menu context to host the popup,
+  but `CloseImmediately` after NO didn't pop the input context so the
+  user was stuck in GameOptions input mode. (b) BaseMenu's onActivate
+  spoke "Pause menu. Return to game." right before the popup spoke
+  "Do you wish to exit?" — confusing chatter. Fixes: set
+  `m_isRaisedForExitConfirm` BEFORE QueuePopup (it synchronously fires
+  OnShow → onActivate, race condition); add `suppressInitialAnnounce`
+  hook to BaseMenu and consult the flag; pop input context after
+  CloseImmediately; reset flag in `accessibleResetPopup` so it doesn't
+  leak across attempts. Also: preset `m_isLoadingDone = true` in
+  Initialize so Alt+F4 always routes through exit-confirm regardless
+  of whether the LoadScreenClose subscription registered in time.
+  Also: speak "Exit cancelled. Back to game." on NO so the user knows
+  the cancel registered.
+- **Cycle-all Ctrl+./, silent — engine action dual-dispatch (#25b)**.
+  Multi-round diagnosis (Ctrl-modifier-silences-Tolk theory wrong,
+  CAMM-dedupe theory wrong). Real root cause: vanilla Civ VI binds
+  Ctrl+./, to `CivilopediaForward`/`Back` (`InputConfiguration.xml`
+  lines 158-159). Our `CIVVIACCESS_*UnitAll` actions registered on
+  the same gestures, so both fired per press. Engine's C++ side
+  handling for Civilopedia actions corrupts audio state even when
+  the screen isn't visible — silencing both engine cycle sound AND
+  our Tolk speech (CAMM forwarded the lines per launcher.log; audio
+  never reached user). Bare period / N work fine because no engine
+  binding shares the gesture. Final fix: rebind to **Shift+./,** —
+  both gestures unbound in vanilla, no dual-dispatch. Mnemonic: bare
+  ./, cycle units NEEDING ORDERS (engine NextUnit/PrevUnit), Shift+./,
+  cycle ALL units (override the orders-gate). New memory:
+  `reference_engine_action_dual_dispatch_breaks_audio` documents
+  the rule: always grep `InputConfiguration.xml` before binding a
+  gesture.
+- **Notification chime fallback (#23)**. Only ~30 of Civ VI's
+  notification types have per-type AddSound entries; the rest added
+  silently. NotificationPanel shadow now falls back to a generic
+  chime when no per-type AddSound is set. Trialled
+  UI_Notification_Bar_Notch (subtle), ALERT_NEUTRAL (subtle), shipped
+  with NOTIFICATION_MISC_POSITIVE (relic-created chime — distinct
+  and audible).
+- **Fog of war respect**. `HexCursor.AnnouncePlot` was exposing
+  terrain, features, resources, cities, AND units regardless of
+  player exploration. Real cheating bug — screen-reader users could
+  pan into deep ocean and learn details a sighted player couldn't.
+  Now gates on `PlayersVisibility[localPlayer]:IsRevealed/IsVisible`:
+  unrevealed → "Unexplored"; revealed-but-foggy → terrain+features+
+  resources + "Fog of war" suffix; visible → everything as before.
+- **Exit-to-main transition speech**. Noel reported the silent
+  multi-second exit-to-main transition was confusing. OnYes now
+  speaks "Returning to main menu." / "Exiting game." before the
+  engine transition fires.
+- **CAMM LogArchiver — gzip + auto-prune Lua/Database/Modding.log**.
+  Each launcher startup, copies the prior session's game logs to
+  `%LocalAppData%\CivViAccess\logs-archive\` as gzipped timestamped
+  files, prunes anything older than 7 days. Solves the
+  "interesting log got wiped before I could check it" problem
+  Noel hit multiple times during the bug-sweep rounds. Opt-in via
+  `IGameInstance.GetArchivableLogPaths()` so installer-only adopters
+  don't break.
+
+### Documentation
+
+- `docs/ROADMAP.md` — multi-arc plan from 0.5.x through post-1.0.
+  Each arc has version targets, expansion-gating notes, rationale.
+- `docs/EXPANSION_BACKLOG.md` — R&F / GS / GS-game-mode feature
+  ledger so expansion content isn't forgotten when the foundation
+  work ships.
+
+### Release workflow
+
+- `release.yml` now detects pre-release tags via semver hyphen
+  convention. `v0.5.0` ships as stable; `v0.5.0-rc1` as pre-release.
+  Wires into existing `LauncherSettings.UpdateChannel` (Stable
+  default skips pre-releases; Latest gets them).
 
 ### Known gaps (deferred to next phase)
 
