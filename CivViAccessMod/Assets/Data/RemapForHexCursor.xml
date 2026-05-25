@@ -285,20 +285,22 @@
          GestureData="LOC_OPTIONS_KEY_SLASH"/>
     <Row ActionId="CIVVIACCESS_RecenterOnUnit" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_SLASH"/>
-    <!-- Cycle-all bindings: bare N for next, bare K for previous.
-         Round 7 2026-05-24: Ctrl+./, was the Civ V Access convention
-         but in Civ VI it collided with CivilopediaForward/Back, and
-         our attempts to <Delete> or <Update> those engine bindings
-         either errored or silently added a second binding without
-         removing the first. Speech reached Tolk (CAMM log verified)
-         but stayed silent in audio. Switched to bare letters which
-         are unbound singletons in Civ VI's InputConfiguration.xml
-         (no engine collision, no dual-dispatch). N=Next, K=preK
-         alphabetically near N. -->
+    <!-- Cycle-all bindings: Shift+. for next-all, Shift+, for prev-all.
+         Round 8 mnemonic 2026-05-24: paired with the engine's bare
+         period/comma (NextUnit/PrevUnit). Bare = "next unit needing
+         orders" (engine's ready-to-select gate). Shift = "include
+         all units regardless of orders state" (our cycle-all
+         override). Same key family, direction matches engine's
+         (period=forward, comma=back). Both Shift+./, are unbound in
+         vanilla InputConfiguration.xml — no engine collision.
+         Previously bare N / Shift+N (round 7); changed once the
+         Shift+./, free-gesture check confirmed the better mnemonic.
+         See [[reference_engine_action_dual_dispatch_breaks_audio]]
+         for why we avoided Ctrl+./,. -->
     <Row ActionId="CIVVIACCESS_NextUnitAll" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_N"/>
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_PERIOD"/>
     <Row ActionId="CIVVIACCESS_PrevUnitAll" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_K"/>
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_COMMA"/>
     <!-- Round 11: briefing re-read keys. R = repeat full briefing,
          T = abilities only, I = portrait description, S = Dawn of
          Man transcript. Mnemonic: R=Repeat, T=Traits, I=Image,
