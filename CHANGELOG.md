@@ -22,6 +22,49 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.5.1 — 2026-05-25 — Notification polish (Stage 1)
+
+**Stage 1 of the notifications work** — bug-fix layer ahead of Stage 2's
+notifications center. See conversation 2026-05-25 for the full two-stage
+design (cache + read/unread + idle reminder + toggles land in 0.5.2+).
+
+### `Notifications.lua` (new)
+
+`Assets/UI/Accessibility/Notifications.lua`. Owns the
+`Events.NotificationAdded` subscription that previously lived bare in
+`ScreenReaderEventHandlers.lua` (moved here so Stage 2's center can
+share the same cache).
+
+- **Dedup by `(playerID, notificationID)`** — the engine rebroadcasts
+  undismissed notifications on load and around turn-end blockers; the
+  bare handler would re-speak each one every rebroadcast wave.
+- **200ms debounce** — bursts (war declared by N civs, multi-city
+  events) collapse into one drain pass so the speech queue doesn't get
+  flooded with N back-to-back lines that truncate each other.
+- **500ms turn-start hold** — `LocalPlayerTurnBegin` arms a hold; drain
+  blocks until expiry so the engine's popup storm (research/civic
+  choice, advisors) speaks first. Lifted from Civ V Access's
+  `CivVAccess_NotificationAnnounce` (same constants).
+- **Arrival earcon** — `UI.PlaySound("NOTIFICATION_MISC_POSITIVE")`
+  paired with the spoken line, per the earcon+speech design from the
+  2026-05-25 conversation. Engine placeholder; will be replaced with a
+  custom ElevenLabs earcon when those land.
+
+Tick pump is `Events.GameCoreEventPublishComplete` (fires per Lua frame
+in-game; engine source confirms via `CivicsChooser` / `ResearchChooser`
+/ `MinimapPanel` / `WorldTracker`). When pending notifications exist
+and the debounce + hold gates open, the next PublishComplete drains.
+
+### `ScreenReaderEventHandlers.lua`
+
+Removed `OnNotificationAdded` and the `Events.NotificationAdded`
+subscription — now lives in `Notifications.lua`.
+
+### `CivViAccessMod.modinfo`
+
+Registered `Notifications.lua` under `<AddGameplayScripts>` and `<Files>`
+(in-game context only; no notifications in the frontend).
+
 ## 0.5.0 — 2026-05-24 — Unit direct-move (Playable Basics Phase 1)
 
 **Milestone**: the player can move units. Phase 1 of the 0.5.x Playable

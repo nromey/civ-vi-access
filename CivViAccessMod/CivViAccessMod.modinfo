@@ -114,6 +114,7 @@
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
       <File priority="10001">Assets/UI/Accessibility/TurnAnnouncements.lua</File>
       <File priority="10001">Assets/UI/Accessibility/WorldInteractiveAnnounce.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/Notifications.lua</File>
     </AddGameplayScripts>
     <AddUserInterfaces id="SRAccess_HexCursorAddin">
       <Properties>
@@ -153,6 +154,7 @@
     <File>Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
     <File>Assets/UI/Accessibility/TurnAnnouncements.lua</File>
     <File>Assets/UI/Accessibility/WorldInteractiveAnnounce.lua</File>
+    <File>Assets/UI/Accessibility/Notifications.lua</File>
     <File>Assets/UI/Accessibility/AdvisorPopupAccess.lua</File>
     <File>Assets/UI/Popups/AdvisorPopup.lua</File>
     <File>Assets/UI/Accessibility/ExpansionIntroAccess.lua</File>

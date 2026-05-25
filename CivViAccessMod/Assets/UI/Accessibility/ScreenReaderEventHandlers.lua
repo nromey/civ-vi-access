@@ -293,57 +293,10 @@ function OnCitySelectionChanged(owner :number, cityID :number,
     OutputMessageToScreenReader(name .. " (" .. popLabel .. " " .. population .. ")");
 end
 
--- Announce new notifications as the engine adds them. Civ VI's
--- notification system is how the game tells the player "you need
--- to make a decision" — choose research, choose civic, production
--- queue empty, etc. Most are end-turn blockers; without speaking
--- them, a blind player has no audible cue that the game is waiting
--- on them.
-local function OnNotificationAdded(playerID, notificationID)
-    if Game == nil or playerID ~= Game.GetLocalPlayer() then return; end
-    -- Correct Civ VI API: NotificationManager.Find(playerID, id) —
-    -- not pPlayer:GetNotifications():FindByID(id), which was a
-    -- guess that didn't match the engine's actual surface. Engine
-    -- source: Base/Assets/UI/Panels/NotificationPanel.lua uses
-    -- NotificationManager.Find everywhere.
-    if NotificationManager == nil or NotificationManager.Find == nil then return; end
-    local ok, notification = pcall(NotificationManager.Find, playerID, notificationID);
-    if not ok or notification == nil then return; end
-
-    -- Diagnostic: log notification type + summary on every Add. Lets us
-    -- grep Lua.log post-session to see which notifications fired and
-    -- correlate with whether their associated engine chimes (e.g.
-    -- Receive_Tech_Boost for TECH_BOOST notifications) were audible.
-    -- Engine chimes for boost notifications only fire on user activation
-    -- of BoostUnlockedPopup — blind users miss them unless we forward
-    -- the play. Other notifications have AddSound entries in
-    -- NotificationPanel.lua's g_notificationHandlers table.
-    local notifTypeName = "?";
-    local okType, t = pcall(function() return notification:GetTypeName(); end);
-    if okType and t ~= nil then notifTypeName = tostring(t); end
-
-    local summary = "";
-    local okSum, s = pcall(function() return notification:GetSummary(); end);
-    if okSum and s ~= nil and s ~= "" then
-        summary = Locale.Lookup(s);
-    end
-    if summary == "" then
-        local okMsg, m = pcall(function() return notification:GetMessage(); end);
-        if okMsg and m ~= nil and m ~= "" then
-            summary = Locale.Lookup(m);
-        end
-    end
-
-    print("[CivViAccess][INFO ] NotificationAdded type=" .. notifTypeName
-          .. " summary=" .. (summary ~= "" and summary or "(none)"));
-
-    if summary == "" then return; end
-
-    -- Queued (NOINTERRUPT) so notifications don't stomp on whatever
-    -- the user is currently doing. They're informational, not
-    -- urgent — engine queues a turn-blocker indicator separately.
-    OutputMessageToScreenReader("Notification. " .. summary, true);
-end
+-- Notification announcement moved to Notifications.lua (0.5.1) —
+-- it grew dedup, debounce, turn-start hold, and an arrival earcon,
+-- which warranted its own module ahead of Stage 2's notifications
+-- center.
 
 -- Drain any pending first-turn orientation queued by a Settler-
 -- selection event that fired during the loading screen window.
@@ -371,9 +324,6 @@ local function Initialize()
     Events.UnitSelectionChanged.Add(OnUnitSelectionChanged);
     Events.CitySelectionChanged.Add(OnCitySelectionChanged);
     Events.LoadScreenClose.Add(OnLoadScreenClose);
-    if Events.NotificationAdded ~= nil then
-        Events.NotificationAdded.Add(OnNotificationAdded);
-    end
     print("[CivViAccess][INFO ] ScreenReaderEventHandlers: subscriptions complete");
 end
 
