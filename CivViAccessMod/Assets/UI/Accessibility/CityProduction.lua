@@ -1,30 +1,45 @@
--- City production unblock workaround (0.5.2). Until the full accessible
--- production picker lands, blind players hit a hard stop on the
--- ENDTURN_BLOCKING_PRODUCTION blocker — the engine refuses to end-turn
--- when any city has an empty production queue, and the
--- ProductionPanel chooser UI isn't arrow-key navigable.
+-- End-turn blocker unblock workaround (0.5.2). Civ VI gates end-turn
+-- on several "you need to make a decision" popups, and none of the
+-- chooser UIs (ProductionPanel, ResearchChooser, CivicsChooser) are
+-- arrow-key navigable. Without programmatic defaults, a blind player
+-- cannot proceed past turn 1 — production blocker, then tech blocker,
+-- then civic blocker, then production again next turn.
 --
--- CityProduction.unblockAll() iterates the local player's cities and
--- queues a sensible default into any city with no current production:
+-- CityProduction.unblockAll() — single hotkey (Alt+P) that handles all
+-- three blocker types in one pass:
 --
---   1. Monument (building, no prereqs, 60 prod) — canonical first-turn
---      build, available in every fresh city.
---   2. Warrior (unit, 40 prod) — fallback if Monument is unavailable
---      (already built, late-game captured city, etc).
---   3. Cheapest available building or unit — last-resort fallback for
---      mid/late-game cities where neither default qualifies.
+--   PRODUCTION (per city with empty queue):
+--     1. Monument (building, no prereqs, 60 prod) — canonical first-
+--        turn build, available in every fresh city.
+--     2. Warrior (unit, 40 prod) — fallback if Monument unavailable.
+--     3. Cheapest available building or unit — last-resort fallback
+--        for mid/late-game cities.
 --
--- Announces queued items per city, then the total ("Queued 3 cities").
+--   RESEARCH (when player has no current tech):
+--     Cheapest available technology (lowest Cost, CanResearch=true).
+--     On turn 1 that's typically Pottery / Animal Husbandry / Mining
+--     / Sailing depending on map. API: UI.RequestPlayerOperation
+--     with PlayerOperations.RESEARCH.
+--
+--   CIVIC (when player has no current civic):
+--     Cheapest available civic. Turn 1 = Code of Laws (the only
+--     option, prereq for everything else). API:
+--     UI.RequestPlayerOperation with PlayerOperations.PROGRESS_CIVIC.
+--
+-- Per-item announce ("Queued Monument in Cape Town. Researching
+-- Pottery. Studying Code of Laws.").
+--
 -- Hotkey is Alt+P (wired in HexCursorAddin via CIVVIACCESS_UnblockProduction).
+-- Name is a holdover from when this only handled production; kept for
+-- continuity with the original 0.5.2 ship.
 --
--- This is a TEMPORARY workaround. The full picker (arrow-nav through
--- units / buildings / wonders / districts / projects with cost + benefit
--- announcement) is task #9 in the Playable Basics arc and will replace
--- this once it ships. The hotkey stays as a quick-default convenience
--- even after the picker exists.
+-- This is a TEMPORARY workaround. The full accessible pickers (arrow-
+-- nav through items with cost + benefit announcement) are tasks #9
+-- (production), and will follow for tech and civic. The Alt+P unblock
+-- stays as a quick-default convenience even after the pickers exist.
 --
 -- Civ V Access analogue: CivVAccess_ChooseProductionPopupAccess.lua
--- (full picker, no quick-default workaround).
+-- (full pickers, no quick-default workaround).
 
 include("Log");
 include("ScreenReader");
@@ -173,6 +188,100 @@ local function queueDefault(pCity)
     return nil;
 end
 
+-- =======================================================================
+-- Research + Civic auto-pick (the other two end-turn blockers)
+-- =======================================================================
+
+-- True if the local player needs to choose a research right now.
+-- pPlayerTechs:GetResearchingTech() returns -1 (or nil in some
+-- engine revs) when nothing is queued.
+local function needsResearch(pPlayer)
+    local pTechs = pPlayer:GetTechs();
+    if pTechs == nil then return false; end
+    local ok, current = pcall(function() return pTechs:GetResearchingTech(); end);
+    if not ok then return false; end
+    return current == nil or current < 0;
+end
+
+local function needsCivic(pPlayer)
+    local pCulture = pPlayer:GetCulture();
+    if pCulture == nil then return false; end
+    local ok, current = pcall(function() return pCulture:GetProgressingCivic(); end);
+    if not ok then return false; end
+    return current == nil or current < 0;
+end
+
+-- Iterate GameInfo.Technologies, return (hash, name) of the cheapest
+-- tech the player can research right now. Cost-sorted so we don't
+-- accidentally commit a multi-era boost target.
+local function cheapestResearch(pPlayer)
+    local pTechs = pPlayer:GetTechs();
+    if pTechs == nil then return nil, nil; end
+    local bestHash, bestName, bestCost = nil, nil, nil;
+    for row in GameInfo.Technologies() do
+        local can = false;
+        local okC, result = pcall(function() return pTechs:CanResearch(row.Index); end);
+        if okC and result then can = true; end
+        if can then
+            local cost = row.Cost or 99999;
+            if bestCost == nil or cost < bestCost then
+                bestHash = row.Hash;
+                bestName = Locale.Lookup(row.Name);
+                bestCost = cost;
+            end
+        end
+    end
+    return bestHash, bestName;
+end
+
+local function cheapestCivic(pPlayer)
+    local pCulture = pPlayer:GetCulture();
+    if pCulture == nil then return nil, nil; end
+    local bestHash, bestName, bestCost = nil, nil, nil;
+    for row in GameInfo.Civics() do
+        local can = false;
+        local okC, result = pcall(function() return pCulture:CanProgress(row.Index); end);
+        if okC and result then can = true; end
+        if can then
+            local cost = row.Cost or 99999;
+            if bestCost == nil or cost < bestCost then
+                bestHash = row.Hash;
+                bestName = Locale.Lookup(row.Name);
+                bestCost = cost;
+            end
+        end
+    end
+    return bestHash, bestName;
+end
+
+-- Commit research selection. Mirrors ResearchChooser.lua:252
+-- OnChooseResearch — UI.RequestPlayerOperation with the RESEARCH
+-- operation. Returns the localized name on success, nil on failure.
+local function setResearch(pid, techHash, displayName)
+    if techHash == nil then return nil; end
+    local tParameters = {};
+    tParameters[PlayerOperations.PARAM_TECH_TYPE] = techHash;
+    tParameters[PlayerOperations.PARAM_INSERT_MODE] = PlayerOperations.VALUE_EXCLUSIVE;
+    local ok = pcall(UI.RequestPlayerOperation, pid, PlayerOperations.RESEARCH, tParameters);
+    if not ok then return nil; end
+    return displayName;
+end
+
+-- Mirrors CivicsChooser.lua:239 OnChooseCivic.
+local function setCivic(pid, civicHash, displayName)
+    if civicHash == nil then return nil; end
+    local tParameters = {};
+    tParameters[PlayerOperations.PARAM_CIVIC_TYPE] = civicHash;
+    tParameters[PlayerOperations.PARAM_INSERT_MODE] = PlayerOperations.VALUE_EXCLUSIVE;
+    local ok = pcall(UI.RequestPlayerOperation, pid, PlayerOperations.PROGRESS_CIVIC, tParameters);
+    if not ok then return nil; end
+    return displayName;
+end
+
+-- =======================================================================
+-- Top-level: clear every end-turn blocker we know how to default
+-- =======================================================================
+
 function CityProduction.unblockAll()
     local pid = localPlayerID();
     if pid < 0 then
@@ -190,6 +299,8 @@ function CityProduction.unblockAll()
         return;
     end
 
+    -- Pass 1: production. Iterate cities, queue defaults into any
+    -- city with an empty production queue.
     local queued = {};
     local skipped = 0;
     for _, pCity in pCities:Members() do
@@ -208,20 +319,62 @@ function CityProduction.unblockAll()
         end
     end
 
-    if #queued == 0 and skipped == 0 then
-        OutputMessageToScreenReader("All cities have production");
-        return;
+    -- Pass 2: research. If no current tech, pick the cheapest
+    -- available and commit it.
+    local researchPicked = nil;
+    if needsResearch(pPlayer) then
+        local tHash, tName = cheapestResearch(pPlayer);
+        if tHash ~= nil then
+            researchPicked = setResearch(pid, tHash, tName);
+            if researchPicked ~= nil then
+                Log.info("CityProduction.unblockAll: researching " .. researchPicked);
+            end
+        end
     end
+
+    -- Pass 3: civic.
+    local civicPicked = nil;
+    if needsCivic(pPlayer) then
+        local cHash, cName = cheapestCivic(pPlayer);
+        if cHash ~= nil then
+            civicPicked = setCivic(pid, cHash, cName);
+            if civicPicked ~= nil then
+                Log.info("CityProduction.unblockAll: studying " .. civicPicked);
+            end
+        end
+    end
+
+    -- Announce. Order: production first (per-city + total), then
+    -- research, then civic, then skip count. Each spoken-line queued
+    -- (NOINTERRUPT after the first) so the burst doesn't truncate.
+    local spoke = false;
 
     if #queued == 1 then
         OutputMessageToScreenReader("Queued " .. queued[1]);
+        spoke = true;
     elseif #queued > 1 then
         OutputMessageToScreenReader("Queued " .. tostring(#queued) .. " cities. "
                                     .. table.concat(queued, ", "));
+        spoke = true;
     end
+
+    if researchPicked ~= nil then
+        OutputMessageToScreenReader("Researching " .. researchPicked, spoke);
+        spoke = true;
+    end
+    if civicPicked ~= nil then
+        OutputMessageToScreenReader("Studying " .. civicPicked, spoke);
+        spoke = true;
+    end
+
     if skipped > 0 then
         OutputMessageToScreenReader(tostring(skipped) .. " cities had nothing to queue",
-                                    true);
+                                    spoke);
+        spoke = true;
+    end
+
+    if not spoke then
+        OutputMessageToScreenReader("No blockers to clear");
     end
 end
 

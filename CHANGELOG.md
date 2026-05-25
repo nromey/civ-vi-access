@@ -27,24 +27,32 @@ Firaxis mod-system version, not ours — leave it alone.
 Two pieces shipped together because both unblock end-turn-blocker
 testing for blind players:
 
-### `CityProduction.lua` (new, Alt+P) — production unblock workaround
+### `CityProduction.lua` (new, Alt+P) — end-turn blocker unblock
 
-The engine's `ENDTURN_BLOCKING_PRODUCTION` blocker refuses end-turn
-when any city has an empty production queue. The mouse-only
-ProductionPanel chooser is the canonical fix; until the full
-accessible picker lands (task #9), Alt+P queues a sensible default
-into every blocked city:
+Civ VI gates end-turn on three mouse-only choosers
+(`ProductionPanel`, `ResearchChooser`, `CivicsChooser`) — none
+arrow-key navigable. Alt+P clears all three in one pass:
 
+**Production** (per city with empty queue):
 1. **Monument** (always-available, no prereqs, 60 prod) — canonical
    first-turn build.
 2. **Warrior** — fallback for late-game / captured cities where
    Monument is already built.
 3. **Cheapest available building or unit** — last-resort fallback.
 
-Per-city announce ("Queued Monument in Cape Town"), total roll-up
-("Queued 3 cities"). New `CIVVIACCESS_UnblockProduction` InputAction
-bound to Alt+P. Hotkey stays as a quick-default convenience even
-after the full picker ships.
+**Research** (when player has no current tech): cheapest available
+technology. Mirrors `ResearchChooser.lua:252` `OnChooseResearch`
+(UI.RequestPlayerOperation, `PlayerOperations.RESEARCH`).
+
+**Civic** (when player has no current civic): cheapest available
+civic. Turn 1 = Code of Laws. Mirrors `CivicsChooser.lua:239`
+`OnChooseCivic` (`PlayerOperations.PROGRESS_CIVIC`).
+
+Per-item announce ("Queued Monument in Cape Town. Researching
+Pottery. Studying Code of Laws."). `CIVVIACCESS_UnblockProduction`
+InputAction bound to Alt+P (name is a holdover from when this
+only handled production; kept for continuity). Hotkey stays as a
+quick-default convenience even after the full pickers ship.
 
 ### `Notifications.lua` (extended) — notifications center (Stage 2)
 
