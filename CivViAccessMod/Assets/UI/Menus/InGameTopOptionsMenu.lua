@@ -1146,6 +1146,19 @@ local PAUSE_MENU_HELP_ENTRIES = {
 function Initialize()
 	Log.info("InGameTopOptionsMenu.Initialize: starting");
 
+	-- Begin CivViAccess mod change: assume in-game by the time Initialize
+	-- runs. On Noel's machine (2026-05-24) LoadScreenClose fired BEFORE
+	-- InGameTopOptionsMenu.lua loaded, so our LoadScreenClose subscription
+	-- registered too late and m_isLoadingDone stayed false — Alt+F4 then
+	-- took the silent-exit path. By the time the in-game Lua context is
+	-- loaded enough to run this Initialize, the loading screen is past
+	-- (the InGame context only starts after LoadScreen ends). Setting
+	-- the flag here makes Alt+F4 always route through exit-confirm
+	-- regardless of which event-subscription race won.
+	m_isLoadingDone = true;
+	Log.info("InGameTopOptionsMenu.Initialize: m_isLoadingDone=true (preset)");
+	-- End CivViAccess mod change
+
 	ContextPtr:SetInitHandler( OnInit );
 
 	-- Begin CivViAccess mod change: route input + show through BaseMenu.install

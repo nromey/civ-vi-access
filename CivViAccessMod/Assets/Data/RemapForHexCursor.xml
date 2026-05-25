@@ -285,16 +285,20 @@
          GestureData="LOC_OPTIONS_KEY_SLASH"/>
     <Row ActionId="CIVVIACCESS_RecenterOnUnit" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_SLASH"/>
-    <!-- Cycle-all bindings: Ctrl+. for next, Ctrl+, for previous.
-         Civ V Access parity (CivVAccess_UnitControlSelection lines
-         226-230). Ctrl+chord is fine with Tolk — only bare Ctrl tap
-         silences screen-reader speech. Civ V Access ships many Ctrl
-         combos (Ctrl+I/C/T/L/R/E in BaselineHandler, Ctrl+./,/[/]/F
-         elsewhere) that work for blind users; we follow that lead. -->
+    <!-- Cycle-all bindings: bare N for next, bare K for previous.
+         Round 7 2026-05-24: Ctrl+./, was the Civ V Access convention
+         but in Civ VI it collided with CivilopediaForward/Back, and
+         our attempts to <Delete> or <Update> those engine bindings
+         either errored or silently added a second binding without
+         removing the first. Speech reached Tolk (CAMM log verified)
+         but stayed silent in audio. Switched to bare letters which
+         are unbound singletons in Civ VI's InputConfiguration.xml
+         (no engine collision, no dual-dispatch). N=Next, K=preK
+         alphabetically near N. -->
     <Row ActionId="CIVVIACCESS_NextUnitAll" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_PERIOD"/>
+         GestureData="LOC_OPTIONS_KEY_N"/>
     <Row ActionId="CIVVIACCESS_PrevUnitAll" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_COMMA"/>
+         GestureData="LOC_OPTIONS_KEY_K"/>
     <!-- Round 11: briefing re-read keys. R = repeat full briefing,
          T = abilities only, I = portrait description, S = Dawn of
          Man transcript. Mnemonic: R=Repeat, T=Traits, I=Image,
