@@ -102,28 +102,26 @@
         <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_R</GestureData>
       </Set>
     </Update>
-    <!-- Bug #25b round 4 2026-05-24: vanilla Civ VI binds Ctrl+, and
-         Ctrl+. to CivilopediaBack/Forward (InputConfiguration.xml lines
-         158-159). When we ALSO bound CIVVIACCESS_PrevUnitAll/NextUnitAll
-         to the same gestures, the engine's collision-resolution dropped
-         BOTH bindings to silence — neither fired in Lua.log even though
-         both were registered. Fix: move Civilopedia history nav off
-         Ctrl+./, to Alt+./, so our cycle wins the Ctrl+./, gesture.
-         Civilopedia history is a low-stakes binding; F9 still opens
-         the screen and our 0.6.0 kb-nav pass will own the keyboard
-         model for civilopedia entirely. -->
-    <Update>
-      <Where ActionId="CivilopediaBack" Index="0" GestureType="KBMouse"/>
-      <Set>
-        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_COMMA</GestureData>
-      </Set>
-    </Update>
-    <Update>
-      <Where ActionId="CivilopediaForward" Index="0" GestureType="KBMouse"/>
-      <Set>
-        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_PERIOD</GestureData>
-      </Set>
-    </Update>
+  </InputActionDefaultGestures>
+
+  <!-- Bug #25b round 5 2026-05-24: <Update> in round 4 did NOT actually
+       replace the engine's Civilopedia Ctrl+./, gestures — log showed
+       BOTH id=13/14 (CivilopediaBack/Forward) AND id=98/99 (our cycle)
+       firing on the same Ctrl+./, presses. The dual dispatch left
+       speech silent (Civilopedia actions may fire focus-change events
+       that NVDA interprets as silence-speech, eating our cycle
+       announce). Switching to <Delete> to actually remove the engine
+       Civilopedia bindings. F9 still opens civilopedia; in-screen
+       history nav (the only thing Ctrl+./, did) loses its shortcut
+       — acceptable, our 0.6.0 civilopedia kb-nav pass will own that
+       keyboard model entirely. -->
+  <InputActionDefaultGestures>
+    <Delete>
+      <Row ActionId="CivilopediaBack" Index="0"/>
+    </Delete>
+    <Delete>
+      <Row ActionId="CivilopediaForward" Index="0"/>
+    </Delete>
   </InputActionDefaultGestures>
 
   <!-- ===================================================================
