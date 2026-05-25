@@ -231,14 +231,22 @@ local function Initialize()
     -- Monument / Warrior / cheapest-available into every blocked city.
     lookupAction("CIVVIACCESS_UnblockProduction", CityProduction.unblockAll);
 
-    -- 0.5.2 notifications center: Ctrl+[ / Ctrl+] walk pending,
-    -- Alt+N toggles the idle reminder. Notifications module is loaded
-    -- via AddGameplayScripts and exposes the global Notifications.* API.
+    -- 0.5.2 notifications center: bare [ / ] walk pending, Alt+N
+    -- toggles the idle reminder. Notifications module is loaded via
+    -- AddGameplayScripts and exposes the global Notifications.* API.
     if Notifications ~= nil then
         lookupAction("CIVVIACCESS_NotificationPrev",            Notifications.cyclePrev);
         lookupAction("CIVVIACCESS_NotificationNext",            Notifications.cycleNext);
         lookupAction("CIVVIACCESS_NotificationReminderToggle",  Notifications.toggleReminder);
     end
+
+    -- 0.5.2 diagnostic: slurp/burp hotkey test on Shift+[ / Shift+].
+    -- Confirms Civ VI's gesture parser doesn't strip Shift on bracket
+    -- keys the way it strips Ctrl. If both fire, we move PrevCity /
+    -- NextCity from Alt+[/] to Shift+[/] (Noel's preferred UX) and
+    -- delete this diagnostic. See [[reference-slurp-burp-test]].
+    lookupAction("CIVVIACCESS_TestSlurp", function() OutputMessageToScreenReader("slurp"); end);
+    lookupAction("CIVVIACCESS_TestBurp", function() OutputMessageToScreenReader("burp"); end);
 
     -- Built-in engine actions (no handlers — just announce by name when triggered)
     local engineActions = {
