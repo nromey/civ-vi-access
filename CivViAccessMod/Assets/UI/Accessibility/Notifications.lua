@@ -89,42 +89,39 @@ local REMINDER_SOUND_KEY       = "NOTIFICATION_MISC_NEUTRAL";
 -- =======================================================================
 -- State
 -- =======================================================================
+--
+-- ALL shared state lives on Notifications._state (a table attached to
+-- the shared Notifications global). The `or` preserves state across
+-- repeated chunk loads — see the double-init note in Initialize().
+-- Chunk-local `local S = Notifications._state` is just a shorthand
+-- pointer to the SAME table; mutations through S.foo affect the
+-- shared store.
+--
+-- _state layout:
+--   seenIds[playerID][notificationID] = true    -- dedup
+--   pending = { ... }                           -- arrival speech queue
+--   batchStartAt, holdUntil, drainScheduled     -- timing for drain
+--   cache[playerID] = { order = {ids...}, entries = {[id]=entry} }
+--     entry = { id, playerID, summary, typeName, addedAt, read,
+--               blocker, dismissable }
+--   navIndex                                    -- cycle position
+--   reminderEnabled, lastUserActivity,
+--   lastReminderAt, currentBackoffSeconds       -- idle reminder
 
--- Layer 1: pending speech queue + dedup + timing.
-local _seenIds         = {};   -- _seenIds[playerID][notificationID] = true
-local _pending         = {};   -- queue of pending-speech entries
-local _batchStartAt    = 0;
-local _holdUntil       = 0;
-local _drainScheduled  = false;
-
--- Layer 2: cache of currently-pending notifications, by player.
--- _cache[pid] = {
---     order = { notificationID, ... },                 -- insertion order
---     entries = {
---         [notificationID] = {
---             id              = notificationID,
---             playerID        = pid,
---             summary         = "...",
---             typeName        = "...",
---             addedAt         = timestamp,
---             read            = false,
---             blocker         = bool,    -- end-turn-blocking
---             dismissable     = bool,    -- CanUserDismiss
---         }
---     },
--- }
-local _cache = {};
-
--- Cycle nav: index into the most-recently-snapshotted sorted-pending
--- list. Reset on dismiss / add / sort change so we don't dereference a
--- stale index.
-local _navIndex = 0;
-
--- Idle-reminder state.
-local _reminderEnabled        = true;
-local _lastUserActivity       = 0;
-local _lastReminderAt         = 0;
-local _currentBackoffSeconds  = IDLE_THRESHOLD_INITIAL;
+Notifications._state = Notifications._state or {
+    seenIds              = {},
+    pending              = {},
+    batchStartAt         = 0,
+    holdUntil            = 0,
+    drainScheduled       = false,
+    cache                = {},
+    navIndex             = 0,
+    reminderEnabled      = true,
+    lastUserActivity     = 0,
+    lastReminderAt       = 0,
+    currentBackoffSeconds = IDLE_THRESHOLD_INITIAL,
+};
+local S = Notifications._state;
 
 -- =======================================================================
 -- Helpers
@@ -146,9 +143,9 @@ local function localPlayerID()
 end
 
 local function markSeen(playerID, notificationID)
-    if _seenIds[playerID] == nil then _seenIds[playerID] = {}; end
-    if _seenIds[playerID][notificationID] then return false; end
-    _seenIds[playerID][notificationID] = true;
+    if S.seenIds[playerID] == nil then S.seenIds[playerID] = {}; end
+    if S.seenIds[playerID][notificationID] then return false; end
+    S.seenIds[playerID][notificationID] = true;
     return true;
 end
 
@@ -165,11 +162,11 @@ local function playReminderEarcon()
 end
 
 local function recordUserActivity()
-    _lastUserActivity = timeNow();
+    S.lastUserActivity = timeNow();
     -- Engagement signal: shrink backoff back to the initial threshold so
     -- a notification arriving five minutes from now starts the reminder
     -- clock from 20s, not 300s.
-    _currentBackoffSeconds = IDLE_THRESHOLD_INITIAL;
+    S.currentBackoffSeconds = IDLE_THRESHOLD_INITIAL;
 end
 
 -- =======================================================================
@@ -177,10 +174,10 @@ end
 -- =======================================================================
 
 local function ensureCacheFor(playerID)
-    if _cache[playerID] == nil then
-        _cache[playerID] = { order = {}, entries = {} };
+    if S.cache[playerID] == nil then
+        S.cache[playerID] = { order = {}, entries = {} };
     end
-    return _cache[playerID];
+    return S.cache[playerID];
 end
 
 local function cacheAdd(playerID, entry)
@@ -188,11 +185,11 @@ local function cacheAdd(playerID, entry)
     if bucket.entries[entry.id] ~= nil then return; end
     bucket.entries[entry.id] = entry;
     table.insert(bucket.order, entry.id);
-    _navIndex = 0;
+    S.navIndex = 0;
 end
 
 local function cacheRemove(playerID, notificationID)
-    local bucket = _cache[playerID];
+    local bucket = S.cache[playerID];
     if bucket == nil or bucket.entries[notificationID] == nil then return; end
     bucket.entries[notificationID] = nil;
     for i, id in ipairs(bucket.order) do
@@ -201,11 +198,11 @@ local function cacheRemove(playerID, notificationID)
             break;
         end
     end
-    _navIndex = 0;
+    S.navIndex = 0;
 end
 
 local function cacheMarkRead(playerID, notificationID)
-    local bucket = _cache[playerID];
+    local bucket = S.cache[playerID];
     if bucket == nil or bucket.entries[notificationID] == nil then return; end
     bucket.entries[notificationID].read = true;
 end
@@ -215,7 +212,7 @@ end
 -- (blocker desc, dismissable asc, addedAt asc).
 local function sortedListFor(playerID, includeRead)
     local list = {};
-    local bucket = _cache[playerID];
+    local bucket = S.cache[playerID];
     if bucket == nil then return list; end
     for _, id in ipairs(bucket.order) do
         local entry = bucket.entries[id];
@@ -236,16 +233,16 @@ end
 -- =======================================================================
 
 local function drain()
-    _drainScheduled = false;
-    if #_pending == 0 then return; end
+    S.drainScheduled = false;
+    if #S.pending == 0 then return; end
     local now = timeNow();
-    if now - _batchStartAt < DEBOUNCE_SECONDS or now < _holdUntil then
+    if now - S.batchStartAt < DEBOUNCE_SECONDS or now < S.holdUntil then
         -- Still cooling. Re-arm so the next PublishComplete reattempts.
-        _drainScheduled = true;
+        S.drainScheduled = true;
         return;
     end
-    local queue = _pending;
-    _pending = {};
+    local queue = S.pending;
+    S.pending = {};
     for _, e in ipairs(queue) do
         playArrivalEarcon();
         OutputMessageToScreenReader("Notification. " .. e.summary, true);
@@ -296,14 +293,14 @@ local function onNotificationAdded(playerID, notificationID)
     if summary == "" then return; end
 
     -- Layer 1: queue for inline speech.
-    _pending[#_pending + 1] = {
+    S.pending[#S.pending + 1] = {
         playerID = playerID,
         notificationID = notificationID,
         summary = summary,
         typeName = typeName,
     };
-    _batchStartAt = timeNow();
-    _drainScheduled = true;
+    S.batchStartAt = timeNow();
+    S.drainScheduled = true;
 
     -- Layer 2: cache for the center.
     cacheAdd(playerID, {
@@ -320,7 +317,7 @@ local function onNotificationAdded(playerID, notificationID)
     -- A fresh notification resets the idle-reminder backoff: the moment
     -- a new task arrives, the user should hear about it 20s later if
     -- they're idle, not 300s later.
-    _currentBackoffSeconds = IDLE_THRESHOLD_INITIAL;
+    S.currentBackoffSeconds = IDLE_THRESHOLD_INITIAL;
 end
 
 -- =======================================================================
@@ -352,12 +349,12 @@ function Notifications.cycleNext()
             return;
         end
     end
-    if _navIndex < 1 or _navIndex > #list then
-        _navIndex = 1;
+    if S.navIndex < 1 or S.navIndex > #list then
+        S.navIndex = 1;
     else
-        _navIndex = (_navIndex % #list) + 1;
+        S.navIndex = (S.navIndex % #list) + 1;
     end
-    speakEntry(list[_navIndex], _navIndex, #list);
+    speakEntry(list[S.navIndex], S.navIndex, #list);
 end
 
 function Notifications.cyclePrev()
@@ -371,19 +368,19 @@ function Notifications.cyclePrev()
             return;
         end
     end
-    if _navIndex < 1 or _navIndex > #list then
-        _navIndex = #list;
+    if S.navIndex < 1 or S.navIndex > #list then
+        S.navIndex = #list;
     else
-        _navIndex = _navIndex - 1;
-        if _navIndex < 1 then _navIndex = #list; end
+        S.navIndex = S.navIndex - 1;
+        if S.navIndex < 1 then S.navIndex = #list; end
     end
-    speakEntry(list[_navIndex], _navIndex, #list);
+    speakEntry(list[S.navIndex], S.navIndex, #list);
 end
 
 function Notifications.toggleReminder()
     recordUserActivity();
-    _reminderEnabled = not _reminderEnabled;
-    if _reminderEnabled then
+    S.reminderEnabled = not S.reminderEnabled;
+    if S.reminderEnabled then
         OutputMessageToScreenReader("Notification reminders on");
     else
         OutputMessageToScreenReader("Notification reminders off");
@@ -398,22 +395,22 @@ end
 -- they're deliberately ignoring. User activity (any hotkey, any
 -- notification cycle) resets the backoff window to the initial value.
 local function maybeFireReminder()
-    if not _reminderEnabled then return; end
+    if not S.reminderEnabled then return; end
     local pid = localPlayerID();
     if pid < 0 then return; end
     local list = sortedListFor(pid, false);
     if #list == 0 then return; end
     local now = timeNow();
-    if now - _lastUserActivity < _currentBackoffSeconds then return; end
-    if now - _lastReminderAt < _currentBackoffSeconds then return; end
+    if now - S.lastUserActivity < S.currentBackoffSeconds then return; end
+    if now - S.lastReminderAt < S.currentBackoffSeconds then return; end
 
     playReminderEarcon();
     local count = #list;
     local text = (count == 1) and "1 thing to do"
                               or (tostring(count) .. " things to do");
     OutputMessageToScreenReader(text, true);
-    _lastReminderAt = now;
-    _currentBackoffSeconds = math.min(_currentBackoffSeconds * 2, IDLE_THRESHOLD_MAX);
+    S.lastReminderAt = now;
+    S.currentBackoffSeconds = math.min(S.currentBackoffSeconds * 2, IDLE_THRESHOLD_MAX);
 end
 
 -- =======================================================================
@@ -429,33 +426,37 @@ local function onNotificationActivated(playerID, notificationID, _activatedByUse
 end
 
 local function onPublishComplete()
-    if _drainScheduled then drain(); end
+    if S.drainScheduled then drain(); end
     maybeFireReminder();
 end
 
 local function onLocalPlayerTurnBegin()
-    _holdUntil = timeNow() + TURN_START_HOLD_SECONDS;
+    S.holdUntil = timeNow() + TURN_START_HOLD_SECONDS;
     -- New turn = fresh task list. Reset backoff so the user hears about
     -- existing blockers within the standard window after turn-start
     -- speech finishes.
-    _currentBackoffSeconds = IDLE_THRESHOLD_INITIAL;
+    S.currentBackoffSeconds = IDLE_THRESHOLD_INITIAL;
 end
 
 -- Treat any hotkey press as activity. Cheap to track and reliable —
 -- engine input event fires before our handlers run.
 local function onInputActionTriggered(_actionID)
-    _lastUserActivity = timeNow();
+    S.lastUserActivity = timeNow();
 end
 
--- Guard against double-init. Civ VI's load model can run this file
--- from both AddGameplayScripts AND via include() from an addin; without
--- the guard, Events.NotificationAdded would get the handler twice and
--- every notification would speak twice + the reminder would fire twice.
-local _initialized = false;
-
+-- Guard against double-init. Civ VI's load model runs this file from
+-- both AddGameplayScripts AND via include() from the addin. The guard
+-- MUST live on the Notifications table (shared global namespace) and
+-- NOT as a file-local, because each load gets its own chunk-local
+-- scope — a `local _initialized` would be false in both loads, both
+-- Initialize() calls would proceed, both would register handlers, and
+-- every notification would speak twice + the reminder would count
+-- duplicates. Bug shipped in initial 0.5.2 and surfaced on Noel test
+-- 2026-05-25 ("repeated the founding, just literally read the two
+-- notifications twice").
 local function Initialize()
-    if _initialized then return; end
-    _initialized = true;
+    if Notifications._initialized then return; end
+    Notifications._initialized = true;
     if Events == nil then
         Log.error("Notifications: Events table not available");
         return;
@@ -482,7 +483,7 @@ local function Initialize()
     if Events.InputActionTriggered ~= nil then
         Events.InputActionTriggered.Add(onInputActionTriggered);
     end
-    _lastUserActivity = timeNow();
+    S.lastUserActivity = timeNow();
     Log.info("Notifications: subscriptions complete");
 end
 
