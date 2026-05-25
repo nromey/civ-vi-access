@@ -67,6 +67,11 @@ demand.
   needs expansion.
 - **0.6.3** World Tracker accessibility — yields per turn, current
   research/civic with ETA, era progress, score. Hotkey to open.
+- **0.6.4** Message buffer — cycle through recent notifications via
+  `[` / `]` (Civ V Access parity). `Ctrl+[`/`]` for first/last.
+  `Shift+[`/`]` for filter cycle. Persistent across the session so
+  user can re-read missed announces. Mirrors
+  `CivVAccess_MessageBuffer.lua` from Civ V Access.
 
 **Expansion notes**: 0.6.2 plot inspection needs expansion-aware
 fields when those rulesets are active: loyalty pressure (R&F),
@@ -121,6 +126,14 @@ Combat was explicitly deferred from 0.5.x. Time to add it.
   most complex; will need its own multi-version sub-arc.
 - **0.8.2** Battle planner / scanner — Civ V Access port for
   "what's around me," "what can attack me," "what can I attack."
+  Bindings (per Civ V Access parity): PageUp/PageDown for item
+  cycling, Ctrl+PgUp/PgDn for primary categories, Shift+PgUp/PgDn
+  for subcategories, Alt+PgUp/PgDn for instances, Home jumps cursor
+  to entry, End speaks distance, Ctrl+F opens search. Surveyor
+  port collides with our Shift+QEADZC unit-move — pick a different
+  surveyor activation gesture (likely Alt+modifier prefix) so
+  Civ V Access muscle memory still maps cleanly to scanner +
+  surveyor activation without trampling our move bindings.
 - **0.8.3** Declaration popup arrow nav — war/peace confirmations.
 
 **Expansion notes**: 0.8.1 diplomacy + 0.8.3 popups are
