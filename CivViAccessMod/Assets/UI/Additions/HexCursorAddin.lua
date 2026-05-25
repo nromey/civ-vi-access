@@ -240,13 +240,6 @@ local function Initialize()
         lookupAction("CIVVIACCESS_NotificationReminderToggle",  Notifications.toggleReminder);
     end
 
-    -- 0.5.2 diagnostic: slurp/burp hotkey test on Shift+[ / Shift+].
-    -- Confirms Civ VI's gesture parser doesn't strip Shift on bracket
-    -- keys the way it strips Ctrl. If both fire, we move PrevCity /
-    -- NextCity from Alt+[/] to Shift+[/] (Noel's preferred UX) and
-    -- delete this diagnostic. See [[reference-slurp-burp-test]].
-    lookupAction("CIVVIACCESS_TestSlurp", function() OutputMessageToScreenReader("slurp"); end);
-    lookupAction("CIVVIACCESS_TestBurp", function() OutputMessageToScreenReader("burp"); end);
 
     -- Built-in engine actions (no handlers — just announce by name when triggered)
     local engineActions = {

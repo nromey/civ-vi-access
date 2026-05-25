@@ -102,24 +102,23 @@
         <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_R</GestureData>
       </Set>
     </Update>
-    <!-- 0.5.2 patch: rebind PrevCity / NextCity off bare [ / ] so the
-         notifications-center cycle (bare [/]) doesn't collide with
-         engine actions. City prev/next on Alt+[ / Alt+]. Stays on
-         Alt+ until the Shift+[/] diagnostic below confirms Shift+ on
-         brackets fires reliably; once confirmed we can switch
-         PrevCity/NextCity from Alt+[/] to Shift+[/] (Noel's preferred
-         UX — bare for high-frequency action, Shift+ for
-         low-frequency). -->
+    <!-- 0.5.2 patch: rebind PrevCity / NextCity off bare [ / ] to
+         Shift+[ / Shift+] so the notifications-center cycle (bare
+         [/], high-frequency) gets the more ergonomic binding and city
+         jump (low-frequency) gets the Shift modifier. Same
+         steal-and-rebind pattern as Q/E/A/Z/C → Alt+letter. Shift+ on
+         brackets was confirmed firing via the slurp/burp test
+         (commit ceede88, Noel test 2026-05-25). -->
     <Update>
       <Where ActionId="PrevCity" Index="0" GestureType="KBMouse"/>
       <Set>
-        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_LBRACKET</GestureData>
+        <GestureData>LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_LBRACKET</GestureData>
       </Set>
     </Update>
     <Update>
       <Where ActionId="NextCity" Index="0" GestureType="KBMouse"/>
       <Set>
-        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_RBRACKET</GestureData>
+        <GestureData>LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_RBRACKET</GestureData>
       </Set>
     </Update>
   </InputActionDefaultGestures>
@@ -254,19 +253,6 @@
          Name="LOC_CIVVIACCESS_HOTKEY_NOTIFICATION_REMINDER_TOGGLE"
          Description="LOC_CIVVIACCESS_HOTKEY_NOTIFICATION_REMINDER_TOGGLE_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
-    <!-- 0.5.2 diagnostic-only: Shift+[ / Shift+] speak "slurp" / "burp"
-         to confirm the parser doesn't strip Shift the way it strips
-         Ctrl on bracket keys. Once confirmed firing, the real plan is
-         to move PrevCity/NextCity from Alt+[/] to Shift+[/] and
-         delete these two actions. Remove diagnostic before 0.6.0. -->
-    <Row ActionId="CIVVIACCESS_TestSlurp"
-         Name="LOC_CIVVIACCESS_HOTKEY_TEST_SLURP"
-         Description="LOC_CIVVIACCESS_HOTKEY_TEST_SLURP_HELP"
-         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
-    <Row ActionId="CIVVIACCESS_TestBurp"
-         Name="LOC_CIVVIACCESS_HOTKEY_TEST_BURP"
-         Description="LOC_CIVVIACCESS_HOTKEY_TEST_BURP_HELP"
-         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
     <!-- Round 11: briefing re-read actions. These fire in LoadScreen
          context (and in-game, harmlessly). LoadScreenAccess subscribes
          to Events.InputActionTriggered to dispatch them to the right
@@ -379,13 +365,6 @@
          GestureData="LOC_OPTIONS_KEY_RBRACKET"/>
     <Row ActionId="CIVVIACCESS_NotificationReminderToggle" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_N"/>
-    <!-- 0.5.2 diagnostic: slurp/burp hotkey test (see
-         [[reference-slurp-burp-test]]). Confirms Shift+[/] fires
-         before we move PrevCity/NextCity there. Remove before 0.6.0. -->
-    <Row ActionId="CIVVIACCESS_TestSlurp" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_LBRACKET"/>
-    <Row ActionId="CIVVIACCESS_TestBurp" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_RBRACKET"/>
     <!-- Round 11: briefing re-read keys. R = repeat full briefing,
          T = abilities only, I = portrait description, S = Dawn of
          Man transcript. Mnemonic: R=Repeat, T=Traits, I=Image,
