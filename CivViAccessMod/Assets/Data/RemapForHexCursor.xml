@@ -73,31 +73,17 @@
         <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_A</GestureData>
       </Set>
     </Update>
-    <!-- 0.5.2 diagnostic: Sleep rebind temporarily REMOVED so the
-         slurp/burp test can claim Alt+Z. Per Lua.log 2026-05-25,
-         pressing Alt+Z fires zero Sleep events (action id 53). Unknown
-         whether the Alt+ modifier is being stripped by the parser
-         (Sleep ends up on bare Z, losing to CursorSE) or Alt+Z fires
-         nothing at all. Slurp on Alt+Z tells us:
-           - slurp speaks → Alt+Z fires actions; Sleep rebind itself
-             was the problem (probably parser-stripped, lost to CursorSE)
-           - silent → Alt+Z combination is dead at the engine input
-             layer (screen reader intercept, OS-level swallow, etc.)
-         Sleep falls back to its engine default (bare Z), which loses
-         to CursorSE — so Sleep is effectively unbound for this test
-         session. That's fine; we're testing whether Alt+Z fires
-         anything, not testing Sleep. Sleep gets a permanent home
-         based on result. -->
-    <!-- Sleep rebind removed for diagnostic; restore after slurp/burp test. -->
-    <!--
+    <!-- Sleep on Alt+Z. Slurp/burp diagnostic 2026-05-25 confirmed
+         Alt+Z fires actions ("alt z fires" heard). Earlier Sleep
+         silence was likely a unit-not-selected case (Sleep has
+         CategoryId="UNIT" in engine XML, only fires with a unit
+         actively selected). Test with a unit selected to confirm. -->
     <Update>
       <Where ActionId="Sleep" Index="0" GestureType="KBMouse"/>
       <Set>
         <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_Z</GestureData>
       </Set>
     </Update>
-    -->
-
     <Update>
       <Where ActionId="ToggleCivicsTree" Index="0" GestureType="KBMouse"/>
       <Set>
@@ -272,13 +258,6 @@
          Name="LOC_CIVVIACCESS_HOTKEY_NOTIFICATION_REMINDER_TOGGLE"
          Description="LOC_CIVVIACCESS_HOTKEY_NOTIFICATION_REMINDER_TOGGLE_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
-    <!-- 0.5.2 diagnostic: slurp on Alt+Z (see
-         [[reference-slurp-burp-test]]). Confirms whether Alt+Z fires
-         actions at all. Remove after diagnosis. -->
-    <Row ActionId="CIVVIACCESS_TestAltZ"
-         Name="LOC_CIVVIACCESS_HOTKEY_TEST_ALT_Z"
-         Description="LOC_CIVVIACCESS_HOTKEY_TEST_ALT_Z_HELP"
-         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
     <!-- Round 11: briefing re-read actions. These fire in LoadScreen
          context (and in-game, harmlessly). LoadScreenAccess subscribes
          to Events.InputActionTriggered to dispatch them to the right
@@ -391,9 +370,6 @@
          GestureData="LOC_OPTIONS_KEY_RBRACKET"/>
     <Row ActionId="CIVVIACCESS_NotificationReminderToggle" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_N"/>
-    <!-- 0.5.2 diagnostic: slurp on Alt+Z. Remove after diagnosis. -->
-    <Row ActionId="CIVVIACCESS_TestAltZ" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_Z"/>
     <!-- Round 11: briefing re-read keys. R = repeat full briefing,
          T = abilities only, I = portrait description, S = Dawn of
          Man transcript. Mnemonic: R=Repeat, T=Traits, I=Image,

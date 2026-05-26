@@ -65,6 +65,23 @@ local function announceTurnBegin()
     end
 end
 
+-- Announce when end-turn becomes available (all blockers cleared).
+-- Civ VI gates end-turn on EndTurnBlockingTypes (production, research,
+-- civic, units-need-orders, etc.). Engine fires
+-- Events.EndTurnBlockingChanged(prevType, newType) on each transition.
+-- We announce only on transitions TO NO_ENDTURN_BLOCKING — going FROM
+-- "no blocker" to "new blocker" is already handled by the notification
+-- speech that arrives with the new blocker. Per Noel 2026-05-25, the
+-- gap this fills is "I went through 4 turns and didn't know when I
+-- could end turn" — explicit audible "you're ready" beats silent
+-- "the green button activated."
+local function announceEndTurnBlockingChanged(prevType, newType)
+    if EndTurnBlockingTypes == nil then return; end
+    if newType ~= EndTurnBlockingTypes.NO_ENDTURN_BLOCKING then return; end
+    if prevType == EndTurnBlockingTypes.NO_ENDTURN_BLOCKING then return; end
+    OutputMessageToScreenReader("Ready to end turn");
+end
+
 local function Initialize()
     if Events == nil or Events.LocalPlayerTurnBegin == nil then
         Log.warn("TurnAnnouncements: Events.LocalPlayerTurnBegin not available");
@@ -72,6 +89,10 @@ local function Initialize()
     end
     Events.LocalPlayerTurnBegin.Add(announceTurnBegin);
     Log.info("TurnAnnouncements: subscribed to LocalPlayerTurnBegin");
+    if Events.EndTurnBlockingChanged ~= nil then
+        Events.EndTurnBlockingChanged.Add(announceEndTurnBlockingChanged);
+        Log.info("TurnAnnouncements: subscribed to EndTurnBlockingChanged");
+    end
 end
 
 Initialize();

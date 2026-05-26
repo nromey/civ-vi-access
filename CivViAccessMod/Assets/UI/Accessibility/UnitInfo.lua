@@ -45,6 +45,18 @@ local function onUnitSelectionChanged(playerId, unitId, hexI, hexJ, hexK,
     if isSelected then
         _selectedPlayerId = playerId;
         _selectedUnitId = unitId;
+        -- HexCursor auto-follow. Sighted Civ VI auto-centers the camera
+        -- on selection; the blind equivalent is the HexCursor. Without
+        -- this, Shift+./, cycles units but the cursor stays where it
+        -- was — Noel hit this 2026-05-25 ("cursor stuck in unexplored
+        -- territory after Shift+. to warrior, expected Ctrl+/ would
+        -- recenter but selection alone should suffice"). The
+        -- "explore independently, then command unit to remote spot"
+        -- workflow is handled by the planned bookmarks/pins feature
+        -- ([[project-map-pins-feature]]), not by cursor decoupling.
+        if HexCursor ~= nil and HexCursor.jumpTo ~= nil then
+            pcall(HexCursor.jumpTo, hexI, hexJ);
+        end
     elseif _selectedPlayerId == playerId and _selectedUnitId == unitId then
         -- Our cached unit was deselected. Clear so the next speakInfo
         -- falls back to GetHeadSelectedUnit (which may have a new
