@@ -22,6 +22,132 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.5.3 — 2026-05-27 — Speech scheduler + cross-VM shield + production picker
+
+Sea-change release. Three pieces shipped together because they
+all converge on the same problem: speech that fires but doesn't
+reach the user because something clobbered it.
+
+### `Speech.emit(msg, kind)` — kind-classified speech gateway
+
+Replaces `OutputMessageToScreenReader(msg, nointerrupt)`'s
+boolean interrupt with a kind-classified gateway in
+`Assets/UI/Accessibility/ScreenReader.lua`. Eight kinds with
+per-kind priority, shield window (ms), and coalesce flag:
+
+```
+critical    pri 10  shield 2000ms  turn begin, city founded, victory
+event       pri  8  shield 1500ms  Fortify, Building Monument, Quicksave
+move_result pri  7  shield 1200ms  Moved west. 1 move remaining
+picker      pri  6  shield  600ms  picker preamble, item nav
+selection   pri  5  shield  400ms  unit / city selection
+nav         pri  4  shield  200ms  cursor tile description
+meta        pri  3  shield  100ms  keypress feedback, notification arrival
+status      pri  2  no shield      query results, multi-line continuation
+```
+
+Decision per emit: if any other kind at >= my priority fired
+within its shield, downgrade to NOINTERRUPT. Else if same kind
+within own shield, interrupt iff `coalesce=true` (replace prior
+in-flight); else queue. Else interrupt.
+
+168 emit sites across 33 files migrated to `Speech.emit`. The
+legacy `OutputMessageToScreenReader` stays as a back-compat shim
+routing through `_legacy_interrupt` / `_legacy_queue` so any
+unmigrated path still works.
+
+### `CivViSpeechShield` — cross-VM shield in the launcher
+
+Civ VI runs separate Lua VMs per Context (gameplay scripts vs
+each UI addin). Each VM has its own `Speech._emitTime` table; a
+critical-tier emit in the gameplay VM can't shield a selection-
+tier emit in the addin VM, so back-to-back emits from different
+VMs landed in Tolk as interrupts and clobbered. Confirmed in
+Lua.log 2026-05-26: `World interactive. Press question mark for
+help.` (gameplay VM, critical) → `Settler on Grassland (Hills).`
+(gameplay VM, selection) → `Notification. Move a unit...`
+(HexCursorAddin VM, meta) — three interrupt-tier lines back-to-
+back; only the last was heard.
+
+The launcher tails Lua.log, sees every `#SCREENREADER` line from
+every VM, and re-runs the shield decision globally in C#. Each
+log line now carries `kind=X` in the bracket; the protocol
+parses it, asks `CivViSpeechShield`, and downgrades interrupt to
+NOINTERRUPT before reaching Tolk if a higher-priority kind fired
+in any VM. Within-VM gateway stays (defense in depth — launcher
+may briefly lag reading the log).
+
+Pinned CAMM bump to **v0.5.7** for the
+`DisableStickyNoInterruptWindow` opt-in. Civ VI sets it `true`
+now that per-kind shielding is in place; without it CAMM's
+3-second post-NOINTERRUPT window over-dampens legitimate higher-
+priority interrupts.
+
+### Production picker (Stage 1)
+
+Promoted out of "out of scope for 0.5.x" after speech-clobber
+testing during the migration confirmed the picker design was
+already functional in dev. Shipped as `ProductionPickerAddin`:
+
+- BaseMenu shell, three tabs (Produce / Gold / Faith) with auto-
+  hide of empty tabs, six groups per tab (Units / Districts /
+  Buildings / Wonders / Projects / Queue) as flat-with-headers.
+- Tab nav: Tab forward, PageUp / PageDown backward / forward.
+- Group nav: Shift+PageUp / Shift+PageDown (slurp/burp-confirmed
+  Shift modifier survives in PageUp / PageDown Civ VI input).
+- Item nav: arrow up/down, Home / End for first/last.
+- Activate: Enter / Space / Shift+Enter all commit. Esc closes.
+- Long form: Ctrl+T expands description, yield delta, boost
+  relevance, prerequisites, disabled reason — via engine's
+  `ToolTipHelper`.
+- Prev / next city: comma / period cycle target without leaving
+  the picker.
+- Commit via `CityManager.RequestOperation` with the right
+  CityOperationTypes verb per kind (BUILD for units / buildings /
+  districts, ADVANCE for projects).
+- Disabled items announce the engine's tooltip reason in the
+  label ("Settler — disabled, This city needs at least 2
+  Population.").
+
+Entry point: hotkey **Shift+P** opens the picker for the head-
+selected city (fallback chain head-selected → capital → first).
+Activating a `CHOOSE_CITY_PRODUCTION` notification from the
+notification center also opens it (`NotificationPanel.lua` now
+fires `LuaEvents.CivViAccess_OpenProductionPicker` with
+notification-plot → head-selected → capital → first-city
+resolution instead of the stale "not yet keyboard-accessible"
+placeholder).
+
+Tile placement for districts / wonders is deferred to a follow-
+up (Section K/L of `docs/PICKER_DESIGN.md`); committing one of
+those today fires the engine's normal placement mode which is
+mouse-only. Tech and civic pickers also pending; design lives in
+the same doc.
+
+### Smaller fixes shipped in the same batch
+
+- **FoundCity with 0-MP Settler**: engine silently refused but
+  `speakAlways("Founding city. Press Enter to confirm.")` misled
+  the user. `HexCursorAddin` now pre-checks `GetMovesRemaining()`
+  before announcing; speaks "Cannot found city, no moves
+  remaining. End the turn first." instead.
+- **Reminder double-fire**: `Notifications.maybeFireReminder`
+  now stamps `lastReminderAt` before `Speech.emit` so any
+  reentrant call (where Speech.emit's `print()` triggers an
+  engine event that loops back through `PublishComplete`) sees
+  the updated timestamp and bails. Eliminates the "1 thing to
+  do" double-fire observed in Lua.log 2026-05-26.
+- **`_pending.startX`/`startY`** in `UnitMovement.lua` were
+  referenced but never set — the "Move blocked" branch was dead
+  code. Now records start coords at commit; `resolveAndSpeak`
+  correctly distinguishes "didn't budge" (engine silently
+  refused) from "moved partway" (terrain MP cost exhausted).
+- **Stale "0.5.1 not accessible" text** in `NotificationPanel`
+  removed; replaced with picker-LuaEvent dispatch.
+- **Orientation hint string** in `CivVIAccessStrings.xml`: fix
+  Shift → Alt typo for direct-move modifier, remove stale 0.5.1
+  reference, mention Alt+P for the auto-unblock.
+
 ## 0.5.2 — 2026-05-25 — Notifications center + production unblock
 
 Two pieces shipped together because both unblock end-turn-blocker
