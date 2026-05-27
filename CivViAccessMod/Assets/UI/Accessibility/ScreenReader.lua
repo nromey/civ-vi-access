@@ -183,6 +183,11 @@ function Speech.emit(message, kind)
         and ((now - _emitTime[kind]) < (def.shield / 1000));
 
     -- Decision matrix:
+    --   status kind (shield=0) → ALWAYS queue. Status is the "queue
+    --       politely behind anything in flight" tier; it must never
+    --       clobber a long-running announce (e.g. the LoadScreen
+    --       briefing's status-tier continuations still playing 30s
+    --       later when "Loading complete." fires).
     --   other higher/equal kind shielding → queue (NOINTERRUPT)
     --   same kind within own shield + coalesce → interrupt (replace
     --       our own prior in-flight speech with this fresh line)
@@ -190,7 +195,9 @@ function Speech.emit(message, kind)
     --       user hears both back-to-back announces in order)
     --   clear path → interrupt
     local interrupt;
-    if otherShielded then
+    if def.shield == 0 then
+        interrupt = false;
+    elseif otherShielded then
         interrupt = false;
     elseif sameKindShield then
         interrupt = def.coalesce == true;

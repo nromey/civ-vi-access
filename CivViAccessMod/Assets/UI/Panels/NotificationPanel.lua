@@ -1765,6 +1765,26 @@ function OnLuaActivateNotification( pNotification:table )
 			end
 			return;
 		end
+		-- CHOOSE_TECH → TechPicker. Research is civ-wide so no city
+		-- resolution needed; fire the LuaEvent and let the picker
+		-- pull current tech state on its end.
+		if pNotification:GetType() == NotificationTypes.CHOOSE_TECH then
+			if LuaEvents ~= nil and LuaEvents.CivViAccess_OpenTechPicker ~= nil then
+				LuaEvents.CivViAccess_OpenTechPicker();
+			else
+				Speech.emit("Tech picker unavailable", "meta");
+			end
+			return;
+		end
+		-- CHOOSE_CIVIC → CivicPicker. Same shape as CHOOSE_TECH.
+		if pNotification:GetType() == NotificationTypes.CHOOSE_CIVIC then
+			if LuaEvents ~= nil and LuaEvents.CivViAccess_OpenCivicPicker ~= nil then
+				LuaEvents.CivViAccess_OpenCivicPicker();
+			else
+				Speech.emit("Civic picker unavailable", "meta");
+			end
+			return;
+		end
 		-- End ScreenReaderAccess mod change
 		local playerID			:number = pNotification:GetPlayerID();
 		local notificationID	:number = pNotification:GetID();
@@ -1961,9 +1981,9 @@ function Initialize()
 	ContextPtr:SetShutdown( OnShutdown );
 
 	Controls.ScrollStack:RegisterSizeChanged( OnStackSizeChanged );
-	
+
 	if (m_debugSuppressPopups == nil) then m_debugSuppressPopup = false; end
-	m_isLoadComplete = false;	
+	m_isLoadComplete = false;
 end
 
 -- This wildcard include will include all loaded files beginning with "NotificationPanel_"

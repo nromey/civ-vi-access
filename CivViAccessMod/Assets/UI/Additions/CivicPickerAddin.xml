@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  CivicPicker UI Context. Registered via <AddUserInterfaces context="InGame">
+  in CivViAccessMod.modinfo. Mirror of TechPickerAddin shape — screen-reader-
+  driven modal; engine's CivicsTree stays visible for sighted use.
+-->
+<Context Name="CivicPickerAccess" Hidden="1">
+  <Grid ID="Root" Size="1,1" Anchor="C,C"/>
+</Context>

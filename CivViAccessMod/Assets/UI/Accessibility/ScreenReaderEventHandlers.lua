@@ -370,15 +370,13 @@ local function OnCityAddedToMap(playerID, cityID, x, y)
     local parts = {};
     parts[#parts + 1] = "City of " .. name .. " founded at " .. tostring(x) .. ", " .. tostring(y);
     parts[#parts + 1] = "Population " .. tostring(pop);
-    -- The engine pops a modal / takes input focus after founding
-    -- (most likely the auto-opened ProductionPanel slide-out). The
-    -- user's first keystroke to recover is Enter — that dismisses
-    -- the engine's prompt. Then they're free to either let the
-    -- engine pick production (it'll fire the notification each turn
-    -- until something is queued) or use our picker via Shift+P.
-    -- Surface this explicitly so the user isn't stranded guessing.
-    parts[#parts + 1] = "Press Enter to dismiss the engine production prompt";
-    parts[#parts + 1] = "Then Shift+P to choose production";
+    -- After founding, engine fires CHOOSE_CITY_PRODUCTION as a
+    -- notification (NOT a modal — there's nothing to dismiss with
+    -- Enter). The blocker stays active until production is picked,
+    -- so the turn can't end. Tell user directly: Shift+P opens our
+    -- picker, Alt+P auto-picks the cheapest defaults across all
+    -- empty blockers (production, research, civic) in one keystroke.
+    parts[#parts + 1] = "Press Shift+P to choose production, or Alt+P to auto-pick";
     -- critical kind: this is a major game-state change. Its 2000ms
     -- shield protects against the engine auto-selecting another unit
     -- (firing UnitSelectionChanged → "Warrior" selection announce)

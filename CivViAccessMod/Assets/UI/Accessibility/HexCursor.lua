@@ -340,31 +340,77 @@ end
 local cursorHandler;
 
 function HexCursor.openHelp()
-    Help.enter(cursorHandler);
+    -- Collect entries in this VM (HandlerStack is per-VM; HelpAddin's
+    -- separate UI VM has no idea what's on our stack). Marshal across
+    -- via the LuaEvent so HelpAddin can render without needing its
+    -- own handler stack. HelpAddin then opens as a modal popup with
+    -- raw keyboard — gives us arrow-nav + type-to-filter that
+    -- HexCursorAddin's InputAction dispatch can't provide.
+    local entries = HandlerStack.collectHelpEntries();
+    if LuaEvents ~= nil and LuaEvents.CivViAccess_OpenHelp ~= nil then
+        LuaEvents.CivViAccess_OpenHelp(entries);
+    else
+        -- Fallback: inline path (BaseMenu-style state on the cursor
+        -- handler). User won't have arrow-nav in cursor mode but at
+        -- least hears the preamble + first entry.
+        Help.enter(cursorHandler);
+    end
 end
 
 -- Authored help entries for the cursor handler. ? help walks the stack
--- and surfaces these alongside the commonHelpEntries (Alt+V, Ctrl+T, etc.
--- registered by BaseMenu).
+-- and surfaces these alongside the commonHelpEntries (Alt+V, Ctrl+T,
+-- etc. registered by BaseMenu / shared modules). Order: cursor nav,
+-- unit move, unit ops, unit cycle, pickers, notifications, info.
 local CURSOR_HELP_ENTRIES = {
+    -- Cursor navigation (bare letters)
     { keyLabel = "Q",       description = "Move cursor northwest" },
     { keyLabel = "E",       description = "Move cursor northeast" },
     { keyLabel = "A",       description = "Move cursor west" },
     { keyLabel = "D",       description = "Move cursor east" },
     { keyLabel = "Z",       description = "Move cursor southwest" },
     { keyLabel = "C",       description = "Move cursor southeast" },
-    { keyLabel = "Shift+Q", description = "Move selected unit northwest" },
-    { keyLabel = "Shift+E", description = "Move selected unit northeast" },
-    { keyLabel = "Shift+A", description = "Move selected unit west" },
-    { keyLabel = "Shift+D", description = "Move selected unit east" },
-    { keyLabel = "Shift+Z", description = "Move selected unit southwest" },
-    { keyLabel = "Shift+C", description = "Move selected unit southeast" },
-    { keyLabel = "/",       description = "Speak selected unit's stats" },
-    { keyLabel = "Ctrl+/",  description = "Recenter cursor on selected unit" },
-    { keyLabel = "Ctrl+.",  description = "Cycle to next unit (any state, including units already done)" },
-    { keyLabel = "Ctrl+,",  description = "Cycle to previous unit (any state)" },
-    { keyLabel = "Shift+S", description = "Speak position relative to capital" },
+
+    -- Unit one-hex move (Alt + cursor key)
+    { keyLabel = "Alt+Q",   description = "Move selected unit northwest one hex" },
+    { keyLabel = "Alt+E",   description = "Move selected unit northeast one hex" },
+    { keyLabel = "Alt+A",   description = "Move selected unit west one hex" },
+    { keyLabel = "Alt+D",   description = "Move selected unit east one hex" },
+    { keyLabel = "Alt+Z",   description = "Move selected unit southwest one hex" },
+    { keyLabel = "Alt+C",   description = "Move selected unit southeast one hex" },
+
+    -- Unit actions
+    { keyLabel = "B",       description = "Found city with selected Settler" },
+    { keyLabel = "R",       description = "Rest: fortify military or sleep civilians" },
+    { keyLabel = "Alt+Z",   description = "Strict sleep (civilians only; military redirected to R)" },
+
+    -- Unit cycle
+    { keyLabel = "Period",  description = "Cycle to next unit needing orders" },
+    { keyLabel = "Comma",   description = "Cycle to previous unit needing orders" },
+    { keyLabel = "Ctrl+Period", description = "Cycle to next unit (any state, including done units)" },
+    { keyLabel = "Ctrl+Comma",  description = "Cycle to previous unit (any state)" },
+
+    -- Unit info
+    { keyLabel = "Slash",   description = "Speak selected unit's stats" },
+    { keyLabel = "Ctrl+Slash", description = "Recenter cursor on selected unit" },
+
+    -- Pickers
+    { keyLabel = "Shift+P", description = "Open city production picker" },
+    { keyLabel = "Alt+T",   description = "Open technology picker" },
+    { keyLabel = "Alt+L",   description = "Open civic picker" },
+    { keyLabel = "Alt+P",   description = "Auto-pick cheapest production, research, and civic to unblock end turn" },
+
+    -- Notifications center
+    { keyLabel = "Left Bracket",  description = "Previous notification" },
+    { keyLabel = "Right Bracket", description = "Next notification" },
+    { keyLabel = "Alt+N",   description = "Toggle idle notification reminder on / off" },
+
+    -- Coordinates + verbosity
+    { keyLabel = "Shift+S", description = "Speak cursor position relative to capital" },
     { keyLabel = "Alt+S",   description = "Speak absolute X, Y coordinates" },
+    { keyLabel = "Alt+V",   description = "Toggle verbose / terse announce mode" },
+
+    -- Help itself
+    { keyLabel = "Question mark", description = "Open this help overlay" },
 };
 
 -- Handler record on the HandlerStack. Bindings is empty — input dispatch

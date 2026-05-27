@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  TechPicker UI Context. Registered via <AddUserInterfaces context="InGame">
+  in CivViAccessMod.modinfo. Screen-reader-driven modal — the engine's own
+  TechTree stays visible for sighted use; we hide it on picker open per the
+  sighted-mode-aware design in docs/PICKER_DESIGN.md.
+
+  Hidden="1" + UIManager:QueuePopup pattern (mirrors ProductionPickerAddin).
+  Empty Grid is a layout-root placeholder.
+-->
+<Context Name="TechPickerAccess" Hidden="1">
+  <Grid ID="Root" Size="1,1" Anchor="C,C"/>
+</Context>

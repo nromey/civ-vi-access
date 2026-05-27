@@ -73,6 +73,12 @@ local function applyFilter(entries, filter)
     return out;
 end
 
+-- Public exports — HelpAddin (separate UI VM) consumes these via
+-- include("Help") to render its modal-popup help UI without
+-- duplicating the entry-formatting and filter logic.
+Help.resolveEntry = resolveEntry;
+Help.applyFilter  = applyFilter;
+
 local function speakCurrent(state)
     local visible = applyFilter(state.entries, state.filter);
     state._visibleCount = #visible;
@@ -87,9 +93,15 @@ local function speakCurrent(state)
     Speech.emit(resolveEntry(entry) .. " " .. position, "picker");
 end
 
--- Open help on the given host handler. Snapshot the entries at open time
--- (the stack may mutate while help is up; we want the user reading the
--- bindings they pressed ? to see). Announce the open + first entry.
+-- Open help on the given host handler. Snapshot the entries at open
+-- time (the stack may mutate while help is up). Announce preamble +
+-- first entry; the user navigates via Up/Down arrows from there.
+--
+-- In BaseMenu screens, BaseMenu's raw-keyboard input handler routes
+-- arrow keys to Help.handleKey directly. In cursor mode (no raw
+-- keyboard), HexCursorAddin's OnInputActionTriggered checks for
+-- _helpMode and re-routes CameraPanUp/CameraPanDown InputActions
+-- into Help.handleKey — matching Civ V Access's arrow-nav UX.
 function Help.enter(handler)
     if handler == nil then
         Log.warn("Help.enter: nil handler");
@@ -103,11 +115,6 @@ function Help.enter(handler)
         inputMode = false,
         buffer = "",
     };
-    -- Preamble + first item are both picker tier; the first item
-    -- coalesce-replaces the preamble in flight (same as the prior
-    -- always-interrupt behavior). To preserve the preamble against the
-    -- first item, the entry-list would need a separate kind below
-    -- picker — not worth the kind expansion for help.
     Speech.emit("Help. " .. #entries .. " bindings.", "picker");
     speakCurrent(handler._helpMode);
 end

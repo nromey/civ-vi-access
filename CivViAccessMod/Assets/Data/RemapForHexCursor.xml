@@ -307,6 +307,25 @@
          Name="LOC_CIVVIACCESS_HOTKEY_OPEN_PRODUCTION_PICKER"
          Description="LOC_CIVVIACCESS_HOTKEY_OPEN_PRODUCTION_PICKER_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- 0.5.4 tech picker open hotkey. Notification-activated open
+         (CHOOSE_TECH from notification center) is the canonical
+         entry; Alt+T is the direct-open shortcut. T is bare-key
+         engine-bound; Alt+T mirrors Alt+P's safe shape. -->
+    <Row ActionId="CIVVIACCESS_OpenTechPicker"
+         Name="LOC_CIVVIACCESS_HOTKEY_OPEN_TECH_PICKER"
+         Description="LOC_CIVVIACCESS_HOTKEY_OPEN_TECH_PICKER_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- 0.5.4 civic picker open. Alt+L (mnemonic "law"); originally
+         Alt+C but engine consumed it as bare C. -->
+    <Row ActionId="CIVVIACCESS_OpenCivicPicker"
+         Name="LOC_CIVVIACCESS_HOTKEY_OPEN_CIVIC_PICKER"
+         Description="LOC_CIVVIACCESS_HOTKEY_OPEN_CIVIC_PICKER_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- 0.5.4 verbosity toggle (Alt+V). -->
+    <Row ActionId="CIVVIACCESS_VerbosityToggle"
+         Name="LOC_CIVVIACCESS_HOTKEY_VERBOSITY_TOGGLE"
+         Description="LOC_CIVVIACCESS_HOTKEY_VERBOSITY_TOGGLE_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
   </InputActions>
 
   <!-- ===================================================================
@@ -421,5 +440,20 @@
          engine OnlinePause (multiplayer); Shift+P is unbound. -->
     <Row ActionId="CIVVIACCESS_OpenProductionPicker" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_P"/>
+    <!-- 0.5.4 tech picker open. Alt+T mirrors Alt+P/Alt+Z safe-modifier
+         pattern; bare T is engine-bound, Shift+T may collide with future
+         abilities-reread, Alt+T leaves both alone. -->
+    <Row ActionId="CIVVIACCESS_OpenTechPicker" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_T"/>
+    <!-- 0.5.4 civic picker open. Originally Alt+C but engine consumed
+         it as bare C (CursorSE) — Civ VI's gesture parser ignored the
+         Alt modifier when bare C is already bound. Moved to Alt+L
+         (mnemonic: "law" / "legality"). Confirmed Noel 2026-05-27. -->
+    <Row ActionId="CIVVIACCESS_OpenCivicPicker" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_L"/>
+    <!-- 0.5.4 verbosity toggle (chatty vs terse). Bare V is engine
+         Alert action, so Alt+V is the safe modifier shape. -->
+    <Row ActionId="CIVVIACCESS_VerbosityToggle" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_V"/>
   </InputActionDefaultGestures>
 </GameInfo>

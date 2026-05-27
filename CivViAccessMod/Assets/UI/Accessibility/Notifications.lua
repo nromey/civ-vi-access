@@ -247,13 +247,54 @@ local function sortedListFor(playerID, includeRead)
     return list;
 end
 
--- Public: pending count for a player. Reads our own cache, not the
--- engine — pPlayer:GetNotifications() / NotificationManager have no
--- per-player count API. Used by TurnAnnouncements to append "N
--- pending" to turn-begin speech.
+-- Synthesize a virtual entry from the engine's active end-turn
+-- blocker when our cache is empty but the turn still can't end.
+-- Closes the misalignment we hit 2026-05-27: engine dismissed our
+-- cached COMMAND_UNITS entry briefly (Warrior went out-of-moves),
+-- our cycle then said "no notifications" while the engine's blocker
+-- was still active because the Settler hadn't acted. Cycle and
+-- pendingCount both call this when cache is empty.
+local function synthesizeFromEngineBlocker(pid)
+    if NotificationManager == nil then return nil; end
+    if NotificationManager.GetFirstEndTurnBlocking == nil then return nil; end
+    local okId, blockerId = pcall(NotificationManager.GetFirstEndTurnBlocking, pid);
+    -- blockerId == 0 means "no blocker" per the engine (NOT a valid
+    -- notification ID for our purposes); blockerId < 0 is the
+    -- explicit-nothing sentinel. Either way, skip the Find call.
+    if not okId or blockerId == nil or blockerId <= 0 then return nil; end
+    if NotificationManager.Find == nil then return nil; end
+    local okN, notif = pcall(NotificationManager.Find, pid, blockerId);
+    if not okN or notif == nil then return nil; end
+    local summary = "";
+    local okS, s = pcall(function() return notif:GetSummary(); end);
+    if okS and s ~= nil and s ~= "" then summary = Locale.Lookup(s); end
+    if summary == "" then return nil; end
+    return {
+        id          = blockerId,
+        playerID    = pid,
+        summary     = summary,
+        typeName    = "ENGINE_BLOCKER",
+        addedAt     = timeNow(),
+        read        = false,
+        blocker     = true,
+        dismissable = false,
+        synthesized = true,
+    };
+end
+
+-- Public: pending count for a player. Counts ALL cached entries
+-- (read + unread) — read means "user has heard this once," not
+-- "resolved." Pending = "still needs action." If our cache is empty
+-- but the engine still has an end-turn blocker active (the engine-
+-- vs-cache desync case from 2026-05-27), count that as 1.
 function Notifications.pendingCount(playerID)
     if playerID == nil or playerID < 0 then return 0; end
-    return #sortedListFor(playerID, false);
+    local n = #sortedListFor(playerID, true);
+    if n == 0 then
+        local synth = synthesizeFromEngineBlocker(playerID);
+        if synth ~= nil then return 1; end
+    end
+    return n;
 end
 
 -- =======================================================================
@@ -321,16 +362,43 @@ local function onNotificationAdded(playerID, notificationID)
     if summary == "" then return; end
 
     -- Text-key dedup. Engine fires fresh IDs for the same logical
-    -- reminder (NOTIFICATION_COMMAND_UNITS every turn, etc.). If we've
-    -- already cached an entry with the same (typeName, summary), refresh
-    -- its timestamp but don't speak and don't add a duplicate cache entry.
+    -- reminder (NOTIFICATION_COMMAND_UNITS every turn, etc.). When the
+    -- same (typeName, summary) fires under a new ID, MIGRATE the
+    -- existing cache entry to the new ID rather than just refreshing
+    -- the timestamp. Original behavior was "refresh and return": the
+    -- old canonical kept the cache slot, then engine eventually fired
+    -- NotificationDismissed for the OLD id (since it was the one
+    -- that "expired"), which cleared our cache while the NEW id was
+    -- still alive engine-side. Cycle then said "no notifications"
+    -- with a live blocker still gating turn-end. Confirmed via Lua.log
+    -- 2026-05-27: id=0 added → id=1 added (same text, dedup ate it) →
+    -- id=0 dismissed → cache empty → engine's id=1 still active.
+    --
+    -- Migration semantics: move entry to new ID, keep read state
+    -- (user has already heard this text), suppress arrival re-speak.
     local textKey = typeName .. "::" .. summary;
     if S.textKeys[playerID] == nil then S.textKeys[playerID] = {}; end
     local canonicalID = S.textKeys[playerID][textKey];
     if canonicalID ~= nil
        and S.cache[playerID] ~= nil
-       and S.cache[playerID].entries[canonicalID] ~= nil then
-        S.cache[playerID].entries[canonicalID].addedAt = timeNow();
+       and S.cache[playerID].entries[canonicalID] ~= nil
+       and canonicalID ~= notificationID then
+        local bucket = S.cache[playerID];
+        local entry = bucket.entries[canonicalID];
+        bucket.entries[canonicalID] = nil;
+        entry.id = notificationID;
+        entry.addedAt = timeNow();
+        bucket.entries[notificationID] = entry;
+        for i, id in ipairs(bucket.order) do
+            if id == canonicalID then
+                bucket.order[i] = notificationID;
+                break;
+            end
+        end
+        S.textKeys[playerID][textKey] = notificationID;
+        Log.info("Notifications: migrated dedup entry "
+                 .. tostring(canonicalID) .. " -> " .. tostring(notificationID)
+                 .. " textKey=" .. textKey);
         return;
     end
     S.textKeys[playerID][textKey] = notificationID;
@@ -367,30 +435,46 @@ end
 -- Layer 2 — center: cycle, idle reminder, toggles
 -- =======================================================================
 
--- Speak a cache entry with index + total + blocker tag. Marks read.
+-- Speak a cache entry with index + total + blocker + read/unread tag.
+-- Marks the entry read as a side effect (cycling counts as "heard").
+-- In chatty mode (Verbosity.isOn()) the cycle line appends a
+-- read/unread tag so the user can tell which entries are fresh vs.
+-- already-heard at a glance — the "task list" model Noel sketched
+-- 2026-05-27.
 local function speakEntry(entry, idx, total)
     local parts = { "Notification " .. tostring(idx) .. " of " .. tostring(total) };
     if entry.blocker then table.insert(parts, "blocker"); end
+    local chatty = Verbosity ~= nil and Verbosity.isOn and Verbosity.isOn();
+    if chatty then
+        table.insert(parts, entry.read and "read" or "unread");
+    end
     Speech.emit(table.concat(parts, ", ") .. ". " .. entry.summary, "selection");
     entry.read = true;
 end
 
--- Walk forward through pending notifications. First press from idle
--- snaps to the highest-priority entry (blocker first, oldest first
--- within tier). Subsequent presses advance; wraps at end.
+-- Walk forward through notifications. Always includes both read AND
+-- unread — read just means "you've heard this once," not "hide from
+-- the list" (that was the buried-state bug). Falls back to a
+-- synthesized engine-blocker entry when the cache is empty but the
+-- turn still can't end.
+local function pickCycleList(pid)
+    local list = sortedListFor(pid, true);  -- include read AND unread
+    if #list == 0 then
+        local synth = synthesizeFromEngineBlocker(pid);
+        if synth ~= nil then
+            list = { synth };
+        end
+    end
+    return list;
+end
+
 function Notifications.cycleNext()
     recordUserActivity();
     local pid = localPlayerID();
-    local list = sortedListFor(pid, false);  -- unread only
+    local list = pickCycleList(pid);
     if #list == 0 then
-        -- Fall back to showing read entries — useful for re-checking
-        -- "what did I just dismiss?" Otherwise the center feels empty
-        -- the instant you finish your first walk.
-        list = sortedListFor(pid, true);
-        if #list == 0 then
-            Speech.emit("No notifications", "meta");
-            return;
-        end
+        Speech.emit("No notifications", "meta");
+        return;
     end
     if S.navIndex < 1 or S.navIndex > #list then
         S.navIndex = 1;
@@ -403,13 +487,10 @@ end
 function Notifications.cyclePrev()
     recordUserActivity();
     local pid = localPlayerID();
-    local list = sortedListFor(pid, false);
+    local list = pickCycleList(pid);
     if #list == 0 then
-        list = sortedListFor(pid, true);
-        if #list == 0 then
-            Speech.emit("No notifications", "meta");
-            return;
-        end
+        Speech.emit("No notifications", "meta");
+        return;
     end
     if S.navIndex < 1 or S.navIndex > #list then
         S.navIndex = #list;
@@ -432,7 +513,8 @@ end
 
 -- Periodic idle reminder. Fires when:
 --   * reminder is enabled, AND
---   * there are unread pending notifications, AND
+--   * there are pending notifications (read OR unread — read means
+--     "heard once," not "resolved"), AND
 --   * time since last user activity exceeds the current backoff window.
 -- After firing, backoff doubles (capped) so the user isn't yelled at if
 -- they're deliberately ignoring. User activity (any hotkey, any
@@ -441,8 +523,8 @@ local function maybeFireReminder()
     if not S.reminderEnabled then return; end
     local pid = localPlayerID();
     if pid < 0 then return; end
-    local list = sortedListFor(pid, false);
-    if #list == 0 then return; end
+    local count = Notifications.pendingCount(pid);
+    if count == 0 then return; end
     local now = timeNow();
     if now - S.lastUserActivity < S.currentBackoffSeconds then return; end
     if now - S.lastReminderAt < S.currentBackoffSeconds then return; end
@@ -458,7 +540,6 @@ local function maybeFireReminder()
     S.currentBackoffSeconds = math.min(S.currentBackoffSeconds * 2, IDLE_THRESHOLD_MAX);
 
     playReminderEarcon();
-    local count = #list;
     local text = (count == 1) and "1 thing to do"
                               or (tostring(count) .. " things to do");
     Speech.emit(text, "meta");
@@ -469,6 +550,8 @@ end
 -- =======================================================================
 
 local function onNotificationDismissed(playerID, notificationID)
+    Log.info("NotificationDismissed: pid=" .. tostring(playerID)
+             .. " id=" .. tostring(notificationID));
     cacheRemove(playerID, notificationID);
 end
 

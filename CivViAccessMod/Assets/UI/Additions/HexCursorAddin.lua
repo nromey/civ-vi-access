@@ -162,7 +162,19 @@ local _postFoundCityCapture = 0;
 -- Input dispatch — every action firing is spoken
 -- ---------------------------------------------------------------------------
 
+-- HelpAddin lives in a separate UI VM. Civ VI's InputAction events
+-- fire globally regardless of which context owns the modal popup,
+-- so without an explicit lockout the cursor still moves and units
+-- still respond to letter keys while help is open. HelpAddin
+-- broadcasts CivViAccess_HelpOpened / _HelpClosed; we track the
+-- flag and bail out of OnInputActionTriggered while help is up so
+-- the user's filter typing doesn't double-fire as cursor / unit
+-- nav. Confirmed Noel 2026-05-27 — filter typing was previously
+-- captured by Q/E/A/D/Z/C cursor handlers.
+local _helpOpen = false;
+
 local function OnInputActionTriggered(actionId)
+    if _helpOpen then return; end
     local name = _idToName[actionId] or ("ActionID " .. tostring(actionId));
     Log.info("HexCursorAddin: action fired id=" .. tostring(actionId) .. " name=" .. name);
     speak("Action " .. name);
@@ -420,6 +432,57 @@ local function Initialize()
         end
     end);
 
+    -- 0.5.4 tech picker open (Alt+T). Lives in TechPickerAddin's
+    -- separate UI VM, same cross-VM LuaEvent dispatch shape as the
+    -- production picker. The picker doesn't need a city — research
+    -- is civilization-wide — so no fallback resolution is required
+    -- here, just a no-arg LuaEvent fire.
+    lookupAction("CIVVIACCESS_OpenTechPicker", function()
+        if LuaEvents == nil then
+            Speech.emit("LuaEvents unavailable", "meta");
+            return;
+        end
+        Log.info("HexCursorAddin: firing LuaEvent CivViAccess_OpenTechPicker");
+        local ok, err = pcall(function()
+            LuaEvents.CivViAccess_OpenTechPicker();
+        end);
+        if not ok then
+            Log.error("HexCursorAddin: tech picker LuaEvent fire failed: " .. tostring(err));
+            Speech.emit("Tech picker dispatch failed", "meta");
+        end
+    end);
+
+    -- 0.5.4 civic picker open (Alt+L). Civ-wide same as tech. L for
+    -- "law" — bare C in cursor mode is CursorSE, and Civ VI's gesture
+    -- parser ignored the Alt modifier on Alt+C, firing CursorSE. Alt+L
+    -- mirrors the Alt+letter safe-modifier pattern.
+    lookupAction("CIVVIACCESS_OpenCivicPicker", function()
+        if LuaEvents == nil then
+            Speech.emit("LuaEvents unavailable", "meta");
+            return;
+        end
+        Log.info("HexCursorAddin: firing LuaEvent CivViAccess_OpenCivicPicker");
+        local ok, err = pcall(function()
+            LuaEvents.CivViAccess_OpenCivicPicker();
+        end);
+        if not ok then
+            Log.error("HexCursorAddin: civic picker LuaEvent fire failed: " .. tostring(err));
+            Speech.emit("Civic picker dispatch failed", "meta");
+        end
+    end);
+
+    -- 0.5.4 verbosity toggle (Alt+V). BaseMenu screens already wire
+    -- this internally; this binding makes it work in the world /
+    -- cursor mode where no BaseMenu is on top of the stack.
+    lookupAction("CIVVIACCESS_VerbosityToggle", function()
+        if Verbosity == nil or Verbosity.toggle == nil then
+            Speech.emit("Verbosity unavailable", "meta");
+            return;
+        end
+        local on = Verbosity.toggle();
+        Speech.emit(on and "Verbose on" or "Verbose off", "event");
+    end);
+
     -- 0.5.2 notifications center: bare [ / ] walk pending, Alt+N
     -- toggles the idle reminder. Notifications module is loaded via
     -- AddGameplayScripts and exposes the global Notifications.* API.
@@ -482,6 +545,22 @@ local function Initialize()
                 local ok = pcall(function() ev.Add(makeLuaEventLogger(name)); end);
                 if ok then Log.info("HexCursorAddin: subscribed LuaEvent " .. name); end
             end
+        end
+
+        -- Help open/close: lock out our InputAction handler while
+        -- help is up so cursor / unit keys don't fire underneath
+        -- HelpAddin's filter input.
+        if LuaEvents.CivViAccess_HelpOpened ~= nil then
+            LuaEvents.CivViAccess_HelpOpened.Add(function()
+                _helpOpen = true;
+                Log.info("HexCursorAddin: _helpOpen=true");
+            end);
+        end
+        if LuaEvents.CivViAccess_HelpClosed ~= nil then
+            LuaEvents.CivViAccess_HelpClosed.Add(function()
+                _helpOpen = false;
+                Log.info("HexCursorAddin: _helpOpen=false");
+            end);
         end
     end
 

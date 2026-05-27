@@ -248,7 +248,7 @@ local COMMIT_VERB_BY_PARAM = {
     [CityOperationTypes.PARAM_PROJECT_TYPE]  = "Starting project",
 };
 
-local function commitBuild(pCity, paramKey, hash, displayName)
+local function commitBuild(pCity, paramKey, hash, displayName, turnsStr)
     local tParameters = {};
     tParameters[paramKey] = hash;
     local ok, err = pcall(function()
@@ -260,11 +260,16 @@ local function commitBuild(pCity, paramKey, hash, displayName)
         return;
     end
     local verb = COMMIT_VERB_BY_PARAM[paramKey] or "Building";
-    Speech.emit(verb .. " " .. displayName, "event");
-    -- Tell close() to skip the "Production picker closed." announce
-    -- so it doesn't clobber the commit confirmation speech (both are
-    -- INTERRUPT and fire in immediate succession).
-    _state.closingSilently = true;
+    -- Include turns-to-complete in the commit announce so the user
+    -- knows how many turns to expect ("Training Builder, 8 turns to
+    -- complete"). Per Noel 2026-05-27: "for the production queue, it
+    -- doesn't actually tell how long we have until ... the builder
+    -- will be done."
+    local msg = verb .. " " .. displayName;
+    if turnsStr ~= nil and turnsStr ~= "" then
+        msg = msg .. ", " .. turnsStr .. " to complete";
+    end
+    Speech.emit(msg, "event");
     ProductionPicker.close();
 end
 
@@ -360,7 +365,7 @@ local function makeChoiceWithState(pCity, paramKey, hash, displayName,
                     .. "Skipping for now.", "meta");
                 return;
             end
-            commitBuild(pCity, paramKey, hash, displayName);
+            commitBuild(pCity, paramKey, hash, displayName, turnsStr);
         end,
     };
 end

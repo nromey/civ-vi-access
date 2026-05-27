@@ -85,7 +85,11 @@ local function announceEndTurnBlockingChanged(prevType, newType)
     -- ("Warrior fortify") fires from the user's keypress and sets its
     -- own shield; meta is below event's priority so this queues behind
     -- the action-confirmation rather than clobbering it.
-    Speech.emit("Ready to end turn", "meta");
+    -- Chatty mode adds the actual keystroke hint per Noel 2026-05-27.
+    local chatty = Verbosity ~= nil and Verbosity.isOn and Verbosity.isOn();
+    local msg = chatty and "Ready to end turn. Press Enter to end turn."
+                        or "Ready to end turn";
+    Speech.emit(msg, "meta");
 end
 
 local function Initialize()

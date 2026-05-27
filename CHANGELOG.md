@@ -22,6 +22,149 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.5.4 — 2026-05-27 — Tech + civic pickers, help with type-to-filter, notification redesign
+
+Builds on 0.5.3's picker scaffold. Tech and civic now have dedicated
+modal pickers; help is its own addin with arrow nav, type-to-filter,
+and engine-binding suppression; notifications cycle reflects the real
+end-turn blocker instead of only what's in our cache.
+
+### Tech picker (Alt+T) and civic picker (Alt+L)
+
+`Assets/UI/Additions/TechPickerAddin.{lua,xml}` and `CivicPickerAddin.{lua,xml}`
+clone the ProductionPicker shape. Both modal addins, both follow the same
+contract: open via LuaEvent, list grouped by Available / Locked / Researched
+(or Studying / Studied for civics), commit via `UI.RequestPlayerOperation`
+with `PlayerOperations.RESEARCH` / `PROGRESS_CIVIC`.
+
+Turn counts come from the engine's canonical APIs — `pPlayerTechs:GetTurnsToResearch(idx)`
+and `pPlayerCulture:GetTurnsToProgressCivic(idx)` — not cost / yield division.
+Civic version uses "Inspired" instead of "Boosted" and "Studying" instead of
+"Researching" to match Civ VI's in-game vocabulary.
+
+Alt+C wanted to be the civic key for mnemonic but Civ VI's engine consumes
+bare-C as a World action; the Alt modifier didn't fall through. Moved to
+Alt+L (for "law") instead.
+
+Close path now resets `InterfaceModeTypes.SELECTION` and hides the addin
+ContextPtr — fixes the case where Enter was blocked until the user pressed
+Escape after picking a tech.
+
+### HelpAddin — separate addin with arrow nav + type-to-filter
+
+`Help.lua` previously lived inside the host handler (BaseMenu or HexCursor)
+as a transient sub-mode. That worked for BaseMenu screens where raw keyboard
+flowed naturally, but HexCursor dispatches via engine InputActions, not raw
+keyboard — so arrow nav inside help never reached `Help.handleKey`.
+
+Extracted into `Assets/UI/Additions/HelpAddin.{lua,xml}`. Its own UI VM,
+its own ContextPtr, raw-keyboard `SetInputHandler`. Other contexts open it
+by firing `LuaEvents.CivViAccess_OpenHelp(entries)` — the firing VM
+collects entries from its own HandlerStack and marshals them across, since
+HandlerStack is per-VM.
+
+UX (mirrors Civ V Access's help-and-find pattern):
+
+- `Up` / `Down` walk the list
+- `Home` / `End` jump to first / last
+- `Enter` / `Space` re-speak the current entry
+- `Backspace` removes the last filter char (Esc with empty filter closes)
+- Any letter / digit appends to a live filter — list narrows on every keystroke
+
+No Ctrl+F mode switch. Filter and nav share the same mode because there's
+no overlap between nav keys and printable input.
+
+### Engine bare-letter suppression — `Input.PushActiveContext(GameOptions)`
+
+Civ VI's engine binds bare letters (M=MoveTo, O=troop toggle, etc.) as
+World-context InputActions. `ContextPtr:SetInputHandler(handler, true)`
+does NOT suppress these — the InputAction system fires alongside our
+raw-keyboard handler regardless. Confirmed via Noel test 2026-05-27:
+typing "move" into the help filter was double-firing the engine's
+MoveTo binding.
+
+Fix: push `InputContext.GameOptions` on help open, pop on close. Mirrors
+`Base/Assets/UI/Menus/InGameTopOptionsMenu.lua`'s pattern.
+
+`InputContext` is NOT exposed in standalone `<AddUserInterfaces>` addin
+VMs by default — only `Input.*` (the C++ API) is. But `InputContext` is
+defined as a plain Lua table in `Base/Assets/UI/Scripts/InputSupport.lua`.
+`include("InputSupport")` at the top of HelpAddin pulls it in — no
+cross-VM bridge needed. (We tried a bridge through shadowed
+NotificationPanel.lua first; addin VMs and shadowed-file InGame VMs do
+NOT share LuaEvent tables, so the bridge never fired.)
+
+### Addin VM keyboard delivery — three message types
+
+Diagnostic 2026-05-27 revealed Civ VI delivers three message types to
+the addin VM, each carrying different data:
+
+- `KeyEvents.KeyDown` (msg=0): idiosyncratic VK code. Letters arrive
+  as Ctrl+letter ASCII control codes (M→0x0D, O→0x0F, V→0x16, etc.).
+  Unreliable for filter input.
+- `KeyEvents.Character` (msg=2): the actual lowercase ASCII byte
+  (m→0x6D, e→0x65, v→0x76). **Right path for filter input.**
+- `KeyEvents.KeyUp` (msg=1): same idiosyncratic codes as KeyDown.
+  Engine convention is to act on KeyUp to avoid auto-repeat fights.
+
+HelpAddin handles `Character` for filter input, `KeyUp` for nav.
+`KeyEvents.Character` may be nil in the addin VM even though msg=2
+events still dispatch — literal-`2` fallback added.
+
+Arrow keys with NumLock OFF arrive as numpad VK codes
+(`VK_NUMPAD8`/`2`/`7`/`1`), not the regular `VK_UP`/`VK_DOWN`/`VK_HOME`/`VK_END`.
+HelpAddin matches both conventions.
+
+### Notification cycle redesign — engine-blocker-aware + read/unread
+
+`Notifications.cycle` previously walked the in-VM cache only. Two
+failure modes:
+
+1. Cache empty but engine still blocking end-turn (e.g. fresh game,
+   notification fired before our handler subscribed). User cycled,
+   heard nothing, didn't know what was blocking.
+2. Same-text refire while the engine assigned a new ID. Our dedup
+   absorbed it into the canonical entry, but if the canonical was
+   dismissed in the meantime, the new ID was orphaned. User had a
+   blocker the cache didn't know about.
+
+Fix 1: when cache empty, `synthesizeFromEngineBlocker(pid)` queries
+`NotificationManager.GetFirstEndTurnBlocking(pid)` and emits a one-line
+synthetic entry from the engine's blocker. Cycle is now always honest
+about what's still blocking.
+
+Fix 2: dedup now MIGRATES the existing entry to the new notification
+ID instead of just refreshing the timestamp. Same-text refire keeps
+the entry alive under whichever ID the engine currently knows.
+
+Speech in chatty mode appends `, read` / `, unread` to each cycled
+entry — matches the user's mental model of "what's left in my task
+list before I can end turn."
+
+### Verbosity binding in cursor mode (Alt+V)
+
+`Verbosity.toggle()` was only reachable from BaseMenu screens. Added
+`CIVVIACCESS_VerbosityToggle` engine action bound to Alt+V in
+`RemapForHexCursor.xml` and a handler in HexCursorAddin so the user
+can flip chatty / terse without leaving the world.
+
+### Status kind always NOINTERRUPT
+
+`Speech.emit(msg, "status")` was firing as INTERRUPT when no other
+shield was active — "Loading complete" stomped on briefings, query
+results stomped on each other. `status` is for follow-up / multi-line
+continuation by definition; always NOINTERRUPT regardless of shield
+state.
+
+### Misc polish
+
+- City-founded announce changed from "Press Enter to dismiss, then
+  Shift+P" to "Press Shift+P to choose production, or Alt+P to
+  auto-pick" — direct path, no dismiss step.
+- "Ready to end turn" appends ", Press Enter to end turn" when
+  Verbosity.isOn() (chatty mode hint for new players).
+- Help icon strings stripped via the standard helper before speech.
+
 ## 0.5.3 — 2026-05-27 — Speech scheduler + cross-VM shield + production picker
 
 Sea-change release. Three pieces shipped together because they

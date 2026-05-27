@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  HelpAccess UI Context. Modal popup that owns the in-game help UI.
+  Registered as a separate AddUserInterfaces entry so it lives in its
+  own Lua VM with full raw-keyboard input via ContextPtr:SetInput
+  Handler. Mirrors the production/tech/civic picker pattern.
+
+  Other contexts fire LuaEvents.CivViAccess_OpenHelp(entries) when
+  the user presses ?; HelpAddin pops the modal and walks the list
+  with arrow keys + type-to-filter.
+-->
+<Context Name="HelpAccess" Hidden="1">
+  <Grid ID="Root" Size="1,1" Anchor="C,C"/>
+</Context>
