@@ -22,6 +22,48 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.5.5 — 2026-05-27 — Leader portrait coverage complete (86 leaders)
+
+Filled the remaining gaps in `LeaderDescriptions.xml`. The mod now has
+visual descriptions for every leader the engine can put in front of a
+player, including alt personas and scenario-only leaders.
+
+### 16 new leader portraits
+
+Major-civ leaders that were previously falling back to "Leader portrait
+description not yet available":
+
+- `LEADER_ALEXANDER` (Macedonia, vanilla)
+- `LEADER_AMANITORE` (Nubia, vanilla)
+- `LEADER_CYRUS` (Persia, vanilla)
+- `LEADER_GITARJA` (Indonesia, Gathering Storm)
+- `LEADER_JAYAVARMAN` (Khmer, Gathering Storm)
+- `LEADER_KUBLAI_KHAN_MONGOLIA` (Mongolia alt, Rulers of China)
+- `LEADER_LUDWIG` (Germany alt — Ludwig II of Bavaria)
+- `LEADER_SEJONG` (Korea alt, Rulers of China)
+- `LEADER_SULEIMAN_ALT` (Ottoman alt, Persona Pack)
+- `LEADER_SUNDIATA_KEITA` (Mali, NFP)
+- `LEADER_THEODORA` (Byzantium alt, Persona Pack)
+
+Scenario-only leaders also covered for completeness — they may appear
+in scenario games and the user shouldn't hit "no description" there
+either:
+
+- `LEADER_DARIUS_III` (Macedonia_Persia scenario — no canonical Civ VI
+  portrait exists; used Wikipedia's Alexander Mosaic detail as the
+  reference, description honestly identifies it as a mosaic)
+- `LEADER_NUBIAN_SCENARIO` (Nubian scenario — same diplo art as
+  Amanitore; described independently)
+- `LEADER_OSTROGSKI`, `LEADER_POTOCKI`, `LEADER_RADZIWILL`
+  (Poland_Jadwiga scenario — Polish nobles)
+
+Total leader count: 70 → 86. All sourced from Civ Fandom wiki except
+Darius III. Regenerated via `tools/wonder-describer/describe.py` with
+the existing leaders.txt prompt — no prompt changes. Audit method:
+diff engine `<Leaders>` rows in `Base/Assets/Gameplay/Data/Leaders.xml`
+and DLC equivalents against `LOC_CIVVIACCESS_LDR_LEADER_*_SHORT` keys
+in our XML; anything in engine but not ours is a gap.
+
 ## 0.5.4 — 2026-05-27 — Tech + civic pickers, help with type-to-filter, notification redesign
 
 Builds on 0.5.3's picker scaffold. Tech and civic now have dedicated
