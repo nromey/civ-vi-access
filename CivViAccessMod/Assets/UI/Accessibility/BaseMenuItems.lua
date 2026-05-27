@@ -300,7 +300,7 @@ function BaseMenuItems.Checkbox(spec)
             end
         end
         -- Re-announce the new state.
-        OutputMessageToScreenReader(self:announce(menu))
+        Speech.emit(self:announce(menu), "picker")
     end
     return item
 end
@@ -347,7 +347,7 @@ function BaseMenuItems.VirtualCheckbox(spec)
     function item:activate(menu)
         local newValue = not self._getValue()
         self._setValue(newValue)
-        OutputMessageToScreenReader(self:announce(menu))
+        Speech.emit(self:announce(menu), "picker")
     end
     return item
 end
@@ -537,7 +537,7 @@ function BaseMenuItems.Pulldown(spec)
             end
             subItem.activate = function(self, m)
                 if not self:isActivatable() then
-                    OutputMessageToScreenReader(self:announce(m))
+                    Speech.emit(self:announce(m), "picker")
                     return
                 end
                 -- Parameter mode: commit via the GameParameters singleton.
@@ -575,7 +575,7 @@ function BaseMenuItems.Pulldown(spec)
         if #subItems == 0 then
             -- Nothing to pick: re-speak the label so the user knows the
             -- press was received but had no effect.
-            OutputMessageToScreenReader(self:announce(menu))
+            Speech.emit(self:announce(menu), "picker")
             return
         end
         BaseMenu.pushSubMenu(menu, {
@@ -647,12 +647,12 @@ function BaseMenuItems.Pulldown(spec)
             if desc ~= nil and desc ~= "" then
                 local resolved = Locale.Lookup(desc)
                 if resolved ~= nil and resolved ~= "" and resolved ~= desc then
-                    OutputMessageToScreenReader(base .. ". " .. resolved)
+                    Speech.emit(base .. ". " .. resolved, "picker")
                     return
                 end
             end
         end
-        OutputMessageToScreenReader(base)
+        Speech.emit(base, "picker")
     end
 
     return item
@@ -744,7 +744,7 @@ function BaseMenuItems.ParameterCheckbox(spec)
             print("[BaseMenu '" .. menu.name .. "' parameter-checkbox '" .. tostring(self._parameter.ParameterId) .. "'] toggle failed: " .. tostring(err))
             return
         end
-        OutputMessageToScreenReader(self:announce(menu))
+        Speech.emit(self:announce(menu), "picker")
     end
     return item
 end
@@ -797,9 +797,10 @@ function BaseMenuItems.NumberInput(spec)
             cursor = #current,
             originalValue = self._parameter.Value,
         }
-        OutputMessageToScreenReader(
+        Speech.emit(
             "edit, current value " .. (current == "" and "(none)" or current)
-            .. ". Use left and right to navigate, backspace to delete, enter to commit, escape to cancel.")
+            .. ". Use left and right to navigate, backspace to delete, enter to commit, escape to cancel.",
+            "picker")
     end
 
     function item:commitEdit(newValue, menu)
@@ -811,9 +812,9 @@ function BaseMenuItems.NumberInput(spec)
         end)
         if not ok then
             print("[BaseMenuItems NumberInput] commit failed: " .. tostring(err))
-            OutputMessageToScreenReader("commit failed")
+            Speech.emit("commit failed", "meta")
         else
-            OutputMessageToScreenReader("set to " .. tostring(newValue))
+            Speech.emit("set to " .. tostring(newValue), "event")
         end
     end
 
@@ -853,11 +854,11 @@ function BaseMenuItems.Slider(spec)
             end)
             if not ok then
                 print("[BaseMenuItems Slider] adjust failed: " .. tostring(err))
-                OutputMessageToScreenReader("commit failed")
+                Speech.emit("commit failed", "meta")
                 return
             end
         end
-        OutputMessageToScreenReader(tostring(newValue))
+        Speech.emit(tostring(newValue), "picker")
     end
 
     return item

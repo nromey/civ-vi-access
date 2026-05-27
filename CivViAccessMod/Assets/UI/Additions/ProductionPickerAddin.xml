@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ProductionPicker UI Context. Registered via <AddUserInterfaces
+  context="InGame"> in CivViAccessMod.modinfo. Stage-1 shell only —
+  no visible UI controls because the picker is a screen-reader
+  modal (engine's own ProductionPanel still exists for sighted use;
+  we hide it on picker open per the sighted-mode-aware design in
+  docs/PICKER_DESIGN.md).
+
+  Hidden="1" + UIManager:QueuePopup pattern (mirrors engine popups
+  like BoostUnlockedPopup): we open with QueuePopup so the engine
+  makes us the active modal and routes raw keyboard input via
+  ContextPtr:SetInputHandler.
+
+  An empty Grid is included so the engine has a layout root to
+  attach the Context to (purely a placeholder — Size 1×1, no
+  rendering content).
+-->
+<Context Name="ProductionPickerAccess" Hidden="1">
+  <Grid ID="Root" Size="1,1" Anchor="C,C"/>
+</Context>

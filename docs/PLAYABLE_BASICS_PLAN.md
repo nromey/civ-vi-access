@@ -279,6 +279,12 @@ modal list of researchable techs and let the user pick via arrows.
 
 ## Phase 4: City production
 
+**Detailed design lives in `docs/PICKER_DESIGN.md`** as of 2026-05-26.
+That doc is the canonical spec for the production picker AND its
+tech / civic extensions, with a serial execution queue. The notes
+below remain as a high-level summary; for implementation, work from
+the picker design doc.
+
 Each city has a production queue. Player needs to:
 - See current production
 - See what's available to build (units, buildings, districts, wonders)

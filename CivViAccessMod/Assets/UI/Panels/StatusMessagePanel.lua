@@ -43,7 +43,10 @@ function OnStatusMessage( message:string, displayTime:number, type:number, subTy
 	end
 
 	-- Begin ScreenReaderAccess mod change
-	OutputMessageToScreenReader(message, true);
+	-- meta tier: status messages are background gossip / system info
+	-- (city growth, civ encounter notes etc.) — should yield to any
+	-- higher-priority in-flight speech and queue.
+	Speech.emit(message, "meta");
 	-- End ScreenReaderAccess mod change
 
 	RealizeMainAreaPosition();

@@ -85,7 +85,7 @@ local function flushAnnounce()
     if #parts == 0 then
         return;
     end
-    OutputMessageToScreenReader(table.concat(parts, ". "));
+    Speech.emit(table.concat(parts, ". "), "selection");
 end
 
 local function moveFocus(step)
@@ -101,7 +101,7 @@ local function moveFocus(step)
     end
     m_focused = target;
     playNavSound();
-    OutputMessageToScreenReader(m_buttons[target].label);
+    Speech.emit(m_buttons[target].label, "picker");
 end
 
 local function moveTo(idx)
@@ -110,7 +110,7 @@ local function moveTo(idx)
     end
     m_focused = idx;
     playNavSound();
-    OutputMessageToScreenReader(m_buttons[idx].label);
+    Speech.emit(m_buttons[idx].label, "picker");
 end
 
 -- AddButton internally wraps each callback as `function() self:Close(); cb() end`
@@ -121,7 +121,7 @@ local function fireButton(btn)
     if btn == nil then
         return;
     end
-    OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_ITEM_ACTIVATED", btn.label));
+    Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_ITEM_ACTIVATED", btn.label), "event");
     m_kPopupDialog:Close();
     if btn.callback ~= nil then
         btn.callback();
@@ -244,7 +244,7 @@ function ExitOK()
         pFriends:ClearRichPresence();
     end
 
-    OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_QUITTING"));
+    Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_QUITTING"), "event");
     Events.UserConfirmedClose();
 end
 

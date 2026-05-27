@@ -38,8 +38,8 @@ local function announceWorldInteractive()
     end
 
     _announced = true;
-    OutputMessageToScreenReader(
-        Locale.Lookup("LOC_CIVVIACCESS_WORLD_INTERACTIVE"));
+    Speech.emit(
+        Locale.Lookup("LOC_CIVVIACCESS_WORLD_INTERACTIVE"), "critical");
 end
 
 local function Initialize()

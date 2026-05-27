@@ -115,9 +115,14 @@ local function safeLookup(key)
     return stripIconTags(value);
 end
 
+-- Local wrapper. All load-screen speech is detail-tier (user-asked
+-- portrait / abilities / transcript readouts, post-Sean prompts) —
+-- map to status. The legacy nointerrupt arg is ignored; status is
+-- always queue-friendly (shield 0, no coalesce; gateway emits as
+-- interrupt when nothing's shielding, NOINTERRUPT otherwise).
 local function speak(text, nointerrupt)
     if text == nil or text == "" then return; end
-    OutputMessageToScreenReader(text, nointerrupt);
+    Speech.emit(text, "status");
 end
 
 local function playClipEarcon()
@@ -303,12 +308,13 @@ end
 local function speakBriefing()
     local lines = m_briefing.lines or {};
     if #lines == 0 then return; end
-    -- First line interrupts (this is the player's first orientation
-    -- cue, they should hear it immediately even if Sean Bean is
-    -- buffering); subsequent lines queue.
-    OutputMessageToScreenReader(lines[1]);
+    -- First line emits as critical (load-screen briefing is the
+    -- player's primary orientation moment); the gateway holds its
+    -- shield for the follow-up status lines so the full briefing
+    -- speaks in order instead of being clobbered.
+    Speech.emit(lines[1], "critical");
     for i = 2, #lines do
-        OutputMessageToScreenReader(lines[i], true);
+        Speech.emit(lines[i], "status");
     end
 end
 
@@ -542,11 +548,11 @@ local function onInputActionTriggered(actionId)
     -- in the FrontEnd context but the engine fires Events.Input
     -- ActionTriggered globally. After LoadScreenClose, when R/T/I/S
     -- press in-game, this handler is still invoked but the FrontEnd
-    -- globals it depends on (OutputMessageToScreenReader, Locale) are
-    -- nil — confirmed via Lua.log runtime errors 2026-05-24. Skip if
-    -- the speech infrastructure isn't available; there's no briefing
-    -- to re-read in-game anyway (briefing is LoadScreen-only).
-    if OutputMessageToScreenReader == nil or Locale == nil then return; end
+    -- globals it depends on (Speech, Locale) are nil after teardown —
+    -- confirmed via Lua.log runtime errors 2026-05-24. Skip if the
+    -- speech infrastructure isn't available; there's no briefing to
+    -- re-read in-game anyway (briefing is LoadScreen-only).
+    if Speech == nil or Speech.emit == nil or Locale == nil then return; end
     lookupActionIds();
     if _actionIds == nil then return; end
     if actionId == _actionIds.repeatBriefing then

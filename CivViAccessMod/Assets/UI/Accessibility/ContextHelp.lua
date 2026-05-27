@@ -80,8 +80,8 @@ function ContextHelp.Speak(key)
     local text = resolveHelp(key);
     if text == "" then return; end
     text = stripIconTags(text);
-    if OutputMessageToScreenReader ~= nil then
-        OutputMessageToScreenReader(text, false);
+    if Speech ~= nil and Speech.emit ~= nil then
+        Speech.emit(text, "status");
     end
 end
 

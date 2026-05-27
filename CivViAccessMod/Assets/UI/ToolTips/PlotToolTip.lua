@@ -648,7 +648,9 @@ function View( data:table )
 		end
 
 		local description = table.concat(details, "[NEWLINE]");
-		OutputMessageToScreenReader(description);
+		-- status: tooltip text is user-asked plot detail (Ctrl+T). Queue
+		-- behind anything in flight rather than clobbering it.
+		Speech.emit(description, "status");
 	end
 	-- End ScreenReaderAccess mod change
 end

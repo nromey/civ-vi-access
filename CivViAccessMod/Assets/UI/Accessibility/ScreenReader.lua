@@ -1,34 +1,133 @@
 -- Speech gateway for Civ VI Access.
 --
--- Every spoken line in the mod funnels through OutputMessageToScreenReader.
--- The Lua side does not talk to Tolk directly — it prints prefix-marked
--- lines into Civ VI's Lua.log, and the C# launcher (CivVIAccess.Launcher)
--- tails that log, parses the prefix, and routes the body to Tolk with the
+-- Every spoken line in the mod funnels through this file. The Lua side
+-- does not talk to Tolk directly — it prints prefix-marked lines into
+-- Civ VI's Lua.log, and the C# launcher (CivVIAccess.Launcher) tails
+-- that log, parses the prefix, and routes the body to Tolk with the
 -- right interrupt level. Two prefixes mean two routes:
 --
 --   #SCREENREADER -             interrupting (replaces in-flight speech)
---   #SCREENREADER[NOINTERRUPT] - queued (waits in line behind whatever is
---                                speaking now)
+--   #SCREENREADER[NOINTERRUPT] - queued (waits in line behind whatever
+--                                is speaking now)
 --
--- Both arms also auto-strip Civ VI's inline icon markers ([ICON_Faith],
--- [ICON_Bullet], etc.) so callers can pass raw button labels straight
--- through. The launcher does not need to know about icon tags — they're
--- gone by the time the log line is written.
+-- Both arms auto-strip Civ VI's inline icon markers ([ICON_Faith],
+-- [ICON_Bullet], etc.) and double '%' to survive Civ VI's printf-style
+-- print processing.
 --
--- include("ScreenReader") in any companion to gain access to the two
--- exported globals: OutputMessageToScreenReader and stripIconTags.
+-- =====================================================================
+-- Speech.emit(message, kind) — the preferred call shape (0.5.x onward).
+-- =====================================================================
+--
+-- Background: a boolean interrupt flag isn't enough. When two emits
+-- fire in quick succession both as interrupts, the second clobbers the
+-- first. The classic failure is City founded → engine auto-selects
+-- another unit → "Warrior" interrupt clobbers the "City of X founded
+-- at coords. Population 1." announce mid-word. Boosting the city-
+-- founded message's volume doesn't help; what's needed is a notion of
+-- WHICH announce wins when two race.
+--
+-- Each emit declares a `kind`. Each kind has a priority and a shield
+-- window (ms). When a kind fires, it installs a "shield": for the
+-- next shield-window ms, any emit with strictly lower priority is
+-- downgraded from interrupt to queued (NOINTERRUPT). Same-priority
+-- emits queue unless the kind opts into coalesce, which lets a
+-- same-kind emit replace its own prior in-flight speech (used for
+-- engine double-fires and arrow-key mashes where the user only wants
+-- the most recent state).
+--
+-- Kinds and their semantics:
+--
+--   critical    pri 10  shield 2000ms  major game state — turn begin,
+--                                       city founded, victory, defeat
+--   event       pri  8  shield 1500ms  user-driven game state change —
+--                                       Fortify, Building Monument,
+--                                       Researching Pottery
+--   move_result pri  7  shield 1200ms  unit move outcome — "Moved west.
+--                                       1 move remaining" / "Stopped
+--                                       short". Coalesces (engine
+--                                       multi-fires events for one move)
+--   picker      pri  6  shield  600ms  picker preamble, group header,
+--                                       item focus. Coalesces (arrow-
+--                                       mash collapses to latest)
+--   selection   pri  5  shield  400ms  unit / city selection. Coalesces
+--   nav         pri  4  shield  200ms  cursor tile description.
+--                                       Coalesces aggressively
+--   meta        pri  3  shield  100ms  key-press feedback ("No unit
+--                                       selected"), notification arrivals,
+--                                       reminders. Coalesces
+--   status      pri  2  no shield      query results (Ctrl+T, where-am-I,
+--                                       unit info). Always queues —
+--                                       user asked, don't clobber what's
+--                                       in flight
+--
+-- =====================================================================
+-- OutputMessageToScreenReader(message, nointerrupt) — back-compat shim.
+-- =====================================================================
+--
+-- The 0.4.x API. 168 call sites at audit time. Each call routes
+-- through the gateway as a "_legacy" kind so the shielding still
+-- applies (legacy_interrupt rides selection-tier; legacy_queue rides
+-- meta-tier). Migration is incremental — rewrite a file's emit sites
+-- as Speech.emit(msg, "kind") one batch at a time; the back-compat
+-- shim stays until every caller is migrated.
+--
+-- include("ScreenReader") in any companion to gain access to the
+-- exported globals: Speech, OutputMessageToScreenReader, stripIconTags.
 
-local PREFIX_INTERRUPT    : string = "#SCREENREADER - ";
-local PREFIX_NO_INTERRUPT : string = "#SCREENREADER[NOINTERRUPT] - ";
+include("Log");
 
--- Civ VI's UI text frequently embeds inline icon markers — "[ICON_Faith]",
--- "[ICON_Bullet]", "[ICON_GreatPerson_Individual]" — that the engine renders
--- as small graphics inline with the surrounding text. Spoken literally by a
--- screen reader these come out as "icon faith production five" which is
--- meaningless. We strip them, then collapse the whitespace they leave behind
--- so the body reads cleanly. The regex matches [ICON_<anything-but-]>] so
--- nested or malformed tags don't escape, and the whitespace pass handles
--- both interior runs and leading/trailing space.
+-- Marker prefixes. The kind is now embedded in the bracket alongside
+-- any NOINTERRUPT flag so the launcher can apply cross-VM shielding
+-- (the within-VM gateway can only see emits from its own Lua state;
+-- a critical-tier announce in the gameplay VM doesn't shield a
+-- selection-tier announce in the addin VM. The launcher sees ALL
+-- log lines from ALL VMs and re-runs the shield logic globally).
+local MARKER = "#SCREENREADER";
+
+-- =====================================================================
+-- Kind taxonomy. Tweak these numbers in one place to retune the whole
+-- mod's speech priority. shield is in milliseconds (converted to
+-- seconds at compare-time since os.clock returns float seconds).
+-- =====================================================================
+
+local KINDS = {
+    critical    = { priority = 10, shield = 2000, coalesce = false },
+    event       = { priority =  8, shield = 1500, coalesce = false },
+    move_result = { priority =  7, shield = 1200, coalesce = true  },
+    picker      = { priority =  6, shield =  600, coalesce = true  },
+    selection   = { priority =  5, shield =  400, coalesce = true  },
+    nav         = { priority =  4, shield =  200, coalesce = true  },
+    meta        = { priority =  3, shield =  100, coalesce = true  },
+    status      = { priority =  2, shield =    0, coalesce = false },
+    -- Back-compat. Old callers that passed nointerrupt=false ride the
+    -- interrupt path at selection-tier; those that passed true ride
+    -- the queue path at meta-tier. Tagged legacy=true so the audit can
+    -- count them and surface "still on legacy" call sites.
+    _legacy_interrupt = { priority = 5, shield = 400, coalesce = false, legacy = true },
+    _legacy_queue     = { priority = 3, shield = 100, coalesce = false, legacy = true },
+};
+
+-- Per-kind last-emit timestamp. Drives both shield checks (am I
+-- still inside another kind's shield?) and coalesce detection (did
+-- the same kind fire within its own shield window?).
+local _emitTime = {};
+
+-- One-shot warn dedup for unknown kinds. Without this, a typo in one
+-- emit call site would spam the log on every fire.
+local _unknownKindWarned = {};
+
+local function timeNow()
+    if os ~= nil and os.clock ~= nil then
+        local ok, v = pcall(os.clock);
+        if ok and v ~= nil then return v; end
+    end
+    return 0;
+end
+
+-- =====================================================================
+-- Public helpers
+-- =====================================================================
+
 function stripIconTags(text)
     if text == nil or text == "" then
         return "";
@@ -40,32 +139,89 @@ function stripIconTags(text)
     return text;
 end
 
--- message:     the line to speak. Icon markers are stripped automatically;
---              callers don't need to pre-strip.
--- nointerrupt: false / nil (default) speaks immediately, cutting whatever
---              Tolk is currently saying. true queues the line behind
---              in-flight speech. Use noninterrupt for status announcements
---              that aren't a direct reaction to a keystroke, so the user's
---              own navigation cues don't get clobbered by background events.
-function OutputMessageToScreenReader(message: string, nointerrupt: boolean)
-    if message == nil then
-        return;
+Speech = Speech or {};
+
+-- Emit a screen-reader line classified by kind. Default kind is
+-- _legacy_interrupt to keep parity with bare OutputMessageToScreenReader
+-- calls (which is what the back-compat shim hands us when callers
+-- haven't migrated yet).
+function Speech.emit(message, kind)
+    if message == nil then return; end
+    kind = kind or "_legacy_interrupt";
+    local def = KINDS[kind];
+    if def == nil then
+        if not _unknownKindWarned[kind] then
+            _unknownKindWarned[kind] = true;
+            Log.warn("Speech.emit: unknown kind '" .. tostring(kind)
+                     .. "', routing as _legacy_interrupt (further occurrences silenced)");
+        end
+        kind = "_legacy_interrupt";
+        def = KINDS[kind];
     end
+
     local body = stripIconTags(tostring(message));
-    if body == "" then
-        return;
-    end
-    -- Civ VI's print runs printf-style format processing on its argument,
-    -- so a stray '%' followed by a letter (e.g. "+15% Science") is parsed
-    -- as a format spec, finds no arg, and silently nulls the entire
-    -- output line — the body never reaches Lua.log and the screen reader
-    -- speaks nothing. This was hit by city-state Suzerain bonuses that
-    -- contain percent-yield language (Geneva, Taruga). Double the '%' so
-    -- the format processor emits a literal '%' instead.
+    if body == "" then return; end
     body = body:gsub("%%", "%%%%");
-    if nointerrupt == true then
-        print(PREFIX_NO_INTERRUPT .. body);
+
+    local now = timeNow();
+
+    -- Shield check: any OTHER kind at >= my priority still inside its
+    -- shield window? If so, downgrade to queued. Same-kind self-check
+    -- happens separately below via the coalesce branch.
+    local otherShielded = false;
+    for k, kdef in pairs(KINDS) do
+        if k ~= kind and kdef.priority >= def.priority and _emitTime[k] ~= nil then
+            if (now - _emitTime[k]) < (kdef.shield / 1000) then
+                otherShielded = true;
+                break;
+            end
+        end
+    end
+
+    -- Same-kind back-to-back inside own shield window?
+    local sameKindShield = (_emitTime[kind] ~= nil)
+        and ((now - _emitTime[kind]) < (def.shield / 1000));
+
+    -- Decision matrix:
+    --   other higher/equal kind shielding → queue (NOINTERRUPT)
+    --   same kind within own shield + coalesce → interrupt (replace
+    --       our own prior in-flight speech with this fresh line)
+    --   same kind within own shield + no coalesce → queue (so the
+    --       user hears both back-to-back announces in order)
+    --   clear path → interrupt
+    local interrupt;
+    if otherShielded then
+        interrupt = false;
+    elseif sameKindShield then
+        interrupt = def.coalesce == true;
     else
-        print(PREFIX_INTERRUPT .. body);
+        interrupt = true;
+    end
+
+    -- Emit format includes the kind so the launcher (C# side) can
+    -- run the same shield/coalesce logic globally across VMs:
+    --   #SCREENREADER[kind=critical] - body
+    --   #SCREENREADER[NOINTERRUPT,kind=meta] - body
+    -- The launcher may further downgrade interrupt → NOINTERRUPT if
+    -- a higher-priority kind fired recently in any VM. Our in-VM
+    -- decision still informs Tolk and provides defense-in-depth if
+    -- the launcher is briefly behind on log-tail reads.
+    if interrupt then
+        print(MARKER .. "[kind=" .. kind .. "] - " .. body);
+    else
+        print(MARKER .. "[NOINTERRUPT,kind=" .. kind .. "] - " .. body);
+    end
+
+    _emitTime[kind] = now;
+end
+
+-- Back-compat shim. Routes the legacy boolean-flag callers through
+-- Speech.emit so they get the shielding for free. Migration target:
+-- zero legacy emits at runtime.
+function OutputMessageToScreenReader(message: string, nointerrupt: boolean)
+    if nointerrupt == true then
+        Speech.emit(message, "_legacy_queue");
+    else
+        Speech.emit(message, "_legacy_interrupt");
     end
 end

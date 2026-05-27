@@ -104,7 +104,7 @@ end
 --   - Visible (currently in sight): speak everything as before
 local function AnnouncePlot(plot)
     if plot == nil then
-        OutputMessageToScreenReader("No plot");
+        Speech.emit("No plot", "meta");
         return;
     end
     local x = plot:GetX();
@@ -129,7 +129,7 @@ local function AnnouncePlot(plot)
     end
 
     if not isRevealed then
-        OutputMessageToScreenReader("Unexplored");
+        Speech.emit("Unexplored", "nav");
         return;
     end
 
@@ -145,10 +145,10 @@ local function AnnouncePlot(plot)
         -- Fog of war: speak only the static terrain memory. Current units
         -- and city state could have changed since the player last saw it.
         if #parts == 0 then
-            OutputMessageToScreenReader("Unknown");
+            Speech.emit("Unknown", "nav");
             return;
         end
-        OutputMessageToScreenReader(table.concat(parts, ". ") .. ". Fog of war.");
+        Speech.emit(table.concat(parts, ". ") .. ". Fog of war.", "nav");
         return;
     end
 
@@ -169,10 +169,10 @@ local function AnnouncePlot(plot)
     end
 
     if #parts == 0 then
-        OutputMessageToScreenReader("Unknown");
+        Speech.emit("Unknown", "nav");
         return;
     end
-    OutputMessageToScreenReader(table.concat(parts, ". "));
+    Speech.emit(table.concat(parts, ". "), "nav");
 end
 
 HexCursor.AnnouncePlot = AnnouncePlot;
@@ -275,13 +275,13 @@ local function move(direction)
     if not _initialized then
         HexCursor.init();
         if not _initialized then
-            OutputMessageToScreenReader("Cursor not ready");
+            Speech.emit("Cursor not ready", "meta");
             return;
         end
     end
     local nextPlot = Map.GetAdjacentPlot(_x, _y, direction);
     if nextPlot == nil then
-        OutputMessageToScreenReader("Edge of map");
+        Speech.emit("Edge of map", "meta");
         return;
     end
     setCursor(nextPlot);
@@ -310,27 +310,34 @@ end
 
 function HexCursor.speakWhereAmIAbs()
     if not _initialized then
-        OutputMessageToScreenReader("Cursor not ready");
+        Speech.emit("Cursor not ready", "meta");
         return;
     end
-    OutputMessageToScreenReader(HexGeom.absoluteCoords(_x, _y));
+    Speech.emit(HexGeom.absoluteCoords(_x, _y), "status");
 end
 
 function HexCursor.speakWhereAmI()
     if not _initialized then
-        OutputMessageToScreenReader("Cursor not ready");
+        Speech.emit("Cursor not ready", "meta");
         return;
     end
     local rel = HexGeom.relativeToCapital(_x, _y);
     if rel == nil then
         -- No capital yet — fall back to absolute so the user always hears
         -- something useful, not silence.
-        OutputMessageToScreenReader(HexGeom.absoluteCoords(_x, _y)
-                                    .. ". No capital yet.");
+        Speech.emit(HexGeom.absoluteCoords(_x, _y) .. ". No capital yet.",
+                    "status");
         return;
     end
-    OutputMessageToScreenReader(rel);
+    Speech.emit(rel, "status");
 end
+
+-- Forward declaration. cursorHandler is fully populated below; declared
+-- here so HexCursor.openHelp's closure binds to the local rather than
+-- a (nil) global. Without this, ? help would log "Help.enter: nil
+-- handler" because Lua resolves the symbol at function-define time as
+-- a global, not the future local. Confirmed via Lua.log 2026-05-26.
+local cursorHandler;
 
 function HexCursor.openHelp()
     Help.enter(cursorHandler);
@@ -365,7 +372,7 @@ local CURSOR_HELP_ENTRIES = {
 -- InputRouter walking these bindings (the addin's ContextPtr never gets
 -- raw keyboard; see [[reference-addUserInterfaces-no-keyboard]]). The
 -- handler IS still pushed onto the stack so ? help collects helpEntries.
-local cursorHandler = {
+cursorHandler = {
     name = "HexCursor",
     helpEntries = CURSOR_HELP_ENTRIES,
     bindings = {},  -- intentionally empty

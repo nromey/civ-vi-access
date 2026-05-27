@@ -68,23 +68,24 @@ end
 -- speak() and speakQueued() route through the DIAGNOSTIC_SPEECH gate
 -- so the verbose announcer can be silenced without changing every
 -- call site. Real (non-diagnostic) speech that must always reach the
--- user should call OutputMessageToScreenReader directly via
--- speakAlways() below.
+-- user should go through speakAlways() below.
 local function speak(text)
     if not DIAGNOSTIC_SPEECH then return; end
-    OutputMessageToScreenReader(text);
+    Speech.emit(text, "status");
 end
 
 local function speakQueued(text)
     if not DIAGNOSTIC_SPEECH then return; end
-    OutputMessageToScreenReader(text, true);
+    Speech.emit(text, "status");
 end
 
 -- Bypasses the DIAGNOSTIC_SPEECH gate. Use for actions the user
 -- genuinely needs audible confirmation of every time, regardless of
 -- diagnostic mode (Tab → Next unit, Enter → End turn, etc.).
+-- meta tier: brief keypress-feedback that yields to game-state events
+-- like the city-founded announce immediately following B.
 local function speakAlways(text)
-    OutputMessageToScreenReader(text);
+    Speech.emit(text, "meta");
 end
 
 -- Curated map: actions that should ALWAYS speak their human-readable
@@ -106,7 +107,18 @@ local ALWAYS_ANNOUNCE_ACTIONS = {
     CIVVIACCESS_PrevUnitAll = "Previous unit",
     EndTurn   = "End turn",
     SkipTurn  = "Skip turn",
-    FoundCity = "Found city",
+    -- FoundCity speaks an IMMEDIATE confirmation so the user knows
+    -- their B keypress took effect. The richer
+    -- "City of [name] founded at [x, y]. Population [N]. ..." speech
+    -- fires moments later via CityAddedToMap and INTERRUPTs this
+    -- short message — net effect: user hears "Founding city" the
+    -- instant they press B, then the full info as the engine
+    -- finishes processing. Earlier we removed FoundCity entirely
+    -- assuming the SREH speech would arrive in time; in practice
+    -- the SREH speech got NOINTERRUPT-queued behind plot tooltip /
+    -- notification speech and arrived AFTER the user had already
+    -- pressed Enter to dismiss the engine modal.
+    FoundCity = "Founding city. Press Enter to confirm.",
     Sleep     = "Sleep",
     Fortify   = "Fortify",
     Alert     = "Alert",
@@ -116,6 +128,35 @@ local ALWAYS_ANNOUNCE_ACTIONS = {
     QuickSave = "Quick save",
     QuickLoad = "Quick load",
 };
+
+-- Cycle-to-self detection v3 (2026-05-26 evening).
+-- Earlier attempts:
+--   v1 — "expecting change" flag, cleared by UnitSelectionChanged,
+--        checked on GameCoreEventPublishComplete. False-fired because
+--        GameCoreEventPublishComplete sometimes ran BEFORE
+--        UnitSelectionChanged in the engine's dispatch order, leaving
+--        the flag set even when the cycle succeeded.
+--   v2 — unit ID snapshot pre-cycle vs post-cycle (UI.GetHeadSelectedUnit).
+--        Failed because UI.GetHeadSelectedUnit in the UI VM lags
+--        behind UnitSelectionChanged — the cached selection still
+--        read as the old unit even after the engine processed the
+--        cycle.
+--
+-- v3 — countdown over 2 GameCoreEventPublishComplete firings. Sets
+-- _cycleBatchesUntilCheck=2 on PrevUnit/NextUnit trigger.
+-- UnitSelectionChanged for own player clears it to 0. Each
+-- GameCoreEventPublishComplete decrements. If it reaches 0 by
+-- decrement (not by clear), the cycle didn't change selection
+-- within 2 engine batches → speak "Only one ready unit".
+-- The 2-batch window gives UnitSelectionChanged time to arrive even
+-- if it lags a batch behind the input event.
+local _cycleBatchesUntilCheck = 0;
+
+-- DIAGNOSTIC 2026-05-26: capture the first InputAction fired within
+-- ~5 seconds AFTER FoundCity, plus the current UI state, so we can
+-- identify what the "press Enter to dismiss" engine modal is after
+-- city founding. Set on FoundCity trigger; cleared after one fire.
+local _postFoundCityCapture = 0;
 
 -- ---------------------------------------------------------------------------
 -- Input dispatch — every action firing is spoken
@@ -130,9 +171,67 @@ local function OnInputActionTriggered(actionId)
     -- the user needs to know fired (Tab/Enter/B/etc.). This is the
     -- "did the engine see my keypress" signal — silence means the
     -- key was intercepted before reaching Civ VI.
+    --
+    -- FoundCity pre-check: Civ VI silently refuses to found a city
+    -- when the Settler has 0 moves remaining (the action propagates
+    -- to the engine but no CityAddedToMap fires). Without this
+    -- guard, our speakAlways("Founding city. Press Enter to confirm.")
+    -- misleads the user — they hear the prompt, press Enter, hear
+    -- the engine error click, and have no idea why nothing happened.
+    -- Confirmed via Lua.log 2026-05-26: Trajan Settler moved SE
+    -- (out of moves), B pressed, no city ever created.
+    if name == "FoundCity" then
+        local pUnit = (UI ~= nil and UI.GetHeadSelectedUnit ~= nil)
+                      and UI.GetHeadSelectedUnit() or nil;
+        if pUnit ~= nil and pUnit.GetMovesRemaining ~= nil then
+            local mpOk, mp = pcall(function() return pUnit:GetMovesRemaining(); end);
+            if mpOk and mp ~= nil and mp <= 0 then
+                Speech.emit("Cannot found city, no moves remaining. End the turn first.",
+                            "meta");
+                return;
+            end
+        end
+    end
     local always = ALWAYS_ANNOUNCE_ACTIONS[name];
     if always ~= nil then
         speakAlways(always);
+    end
+
+    -- Engine cycle: arm the 2-batch deferred check for cycle-to-self.
+    if name == "PrevUnit" or name == "NextUnit" then
+        _cycleBatchesUntilCheck = 2;
+    end
+
+    -- DIAGNOSTIC: post-FoundCity action capture. Arm on FoundCity;
+    -- log the NEXT action after that with full UI state context so
+    -- we can identify the "press Enter" engine modal.
+    if name == "FoundCity" then
+        _postFoundCityCapture = 5;  -- capture up to next 5 actions
+        local mode = "?";
+        local prodHidden = "?";
+        pcall(function()
+            if UI ~= nil and UI.GetInterfaceMode ~= nil then
+                mode = tostring(UI.GetInterfaceMode());
+            end
+            if ContextPtr ~= nil and ContextPtr.LookUpControl ~= nil then
+                local prod = ContextPtr:LookUpControl("/InGame/ProductionPanel");
+                if prod ~= nil and prod.IsHidden ~= nil then
+                    prodHidden = tostring(prod:IsHidden());
+                end
+            end
+        end);
+        Log.info("POSTFOUND_DIAG: FoundCity fired. InterfaceMode=" .. mode
+                 .. " ProductionPanel:IsHidden=" .. prodHidden);
+    elseif _postFoundCityCapture > 0 and name ~= "FoundCity" then
+        _postFoundCityCapture = _postFoundCityCapture - 1;
+        local mode = "?";
+        pcall(function()
+            if UI ~= nil and UI.GetInterfaceMode ~= nil then
+                mode = tostring(UI.GetInterfaceMode());
+            end
+        end);
+        Log.info("POSTFOUND_DIAG: next action after FoundCity = " .. name
+                 .. " (id=" .. tostring(actionId) .. ") InterfaceMode=" .. mode);
     end
 
     local handler = _actionHandlers[actionId];
@@ -180,6 +279,38 @@ end
 local function OnUnitSelectionChanged(playerId, unitId, hexI, hexJ, hexK, isSelected, isEditable)
     if Game ~= nil and playerId == Game.GetLocalPlayer() and isSelected then
         speakQueued("Unit selected at " .. tostring(hexI) .. " " .. tostring(hexJ));
+        -- Cycle succeeded — clear the pending cycle-to-self check.
+        _cycleBatchesUntilCheck = 0;
+    end
+end
+
+-- Fires after each engine event batch. If the cycle-to-self counter
+-- was armed (PrevUnit/NextUnit pressed), decrement once per batch.
+-- If we reach 0 by decrement (not by UnitSelectionChanged clearing
+-- it), the cycle didn't change selection within 2 batches → speak
+-- "Only one ready unit" NOINTERRUPT so it queues behind the
+-- action-name announce. Resilient against the UI-VM selection lag
+-- that v1/v2 hit.
+local function OnGameCoreEventPublishComplete()
+    if _cycleBatchesUntilCheck <= 0 then return; end
+    _cycleBatchesUntilCheck = _cycleBatchesUntilCheck - 1;
+    if _cycleBatchesUntilCheck == 0 then
+        -- Include the current unit's name so the user knows what
+        -- they're still on, not just that nothing changed.
+        local msg = "Only one ready unit";
+        if UI ~= nil and UI.GetHeadSelectedUnit ~= nil then
+            local sel = UI.GetHeadSelectedUnit();
+            if sel ~= nil then
+                local row = GameInfo.Units[sel:GetUnitType()];
+                if row ~= nil and row.Name ~= nil then
+                    local nm = Locale.Lookup(row.Name);
+                    if nm ~= nil and nm ~= "" then
+                        msg = msg .. ". " .. nm;
+                    end
+                end
+            end
+        end
+        Speech.emit(msg, "meta");
     end
 end
 
@@ -231,6 +362,64 @@ local function Initialize()
     -- Monument / Warrior / cheapest-available into every blocked city.
     lookupAction("CIVVIACCESS_UnblockProduction", CityProduction.unblockAll);
 
+    -- 0.5.2 Rest (R) = smart cascade. Civilians sleep, military
+    -- fortifies; ALERT/HEAL/SKIP_TURN as fallbacks. Civ V Access
+    -- parity for "one key to rest a unit."
+    lookupAction("CIVVIACCESS_Rest", UnitMovement.rest);
+    -- 0.5.2 strict Sleep (Alt+Z) = sleep-only with educational
+    -- redirect to R for military units (Civ V muscle-memory catch).
+    lookupAction("CIVVIACCESS_Sleep", UnitMovement.sleepStrict);
+
+    -- 0.5.1 production picker open (Shift+P). Stage-1 test hotkey;
+    -- Stage 2 makes notification activation the canonical entry.
+    -- Picker lives in its own UI Context (ProductionPickerAddin) with
+    -- a SEPARATE Lua VM — globals aren't shared. Cross-VM via
+    -- LuaEvents.CivViAccess_OpenProductionPicker(ownerID, cityID). The
+    -- picker Context subscribes and resolves the city on its end.
+    -- Resolves city to open against: head-selected city, else capital,
+    -- else first city in iteration order.
+    lookupAction("CIVVIACCESS_OpenProductionPicker", function()
+        local localPlayerID = Game.GetLocalPlayer();
+        if localPlayerID == -1 then return; end
+        local pPlayer = Players[localPlayerID];
+        if pPlayer == nil then return; end
+        local pCity = nil;
+        if UI ~= nil and UI.GetHeadSelectedCity ~= nil then
+            pCity = UI.GetHeadSelectedCity();
+        end
+        if pCity == nil then
+            pCity = pPlayer:GetCities():GetCapitalCity();
+        end
+        if pCity == nil then
+            for _, c in pPlayer:GetCities():Members() do
+                pCity = c;
+                break;
+            end
+        end
+        if pCity == nil then
+            Speech.emit("No city to manage", "meta");
+            return;
+        end
+        Log.info("HexCursorAddin: firing LuaEvent CivViAccess_OpenProductionPicker for owner="
+                 .. tostring(pCity:GetOwner()) .. " cityID=" .. tostring(pCity:GetID()));
+        if LuaEvents == nil then
+            Speech.emit("LuaEvents unavailable", "meta");
+            return;
+        end
+        -- Civ VI auto-creates LuaEvent slots on first access. No nil
+        -- check needed; fire unconditionally and let the subscriber
+        -- side handle it. If no subscriber (different VM, not yet
+        -- loaded), this is a silent no-op — we'd see no follow-up in
+        -- the log and Noel hears nothing.
+        local ok, err = pcall(function()
+            LuaEvents.CivViAccess_OpenProductionPicker(pCity:GetOwner(), pCity:GetID());
+        end);
+        if not ok then
+            Log.error("HexCursorAddin: LuaEvent fire failed: " .. tostring(err));
+            Speech.emit("Picker dispatch failed", "meta");
+        end
+    end);
+
     -- 0.5.2 notifications center: bare [ / ] walk pending, Alt+N
     -- toggles the idle reminder. Notifications module is loaded via
     -- AddGameplayScripts and exposes the global Notifications.* API.
@@ -270,6 +459,9 @@ local function Initialize()
     if Events.HideLeaderScreen ~= nil then Events.HideLeaderScreen.Add(OnHideLeaderScreen); end
     if Events.LocalPlayerTurnBegin ~= nil then Events.LocalPlayerTurnBegin.Add(OnLocalPlayerTurnBegin); end
     if Events.UnitSelectionChanged ~= nil then Events.UnitSelectionChanged.Add(OnUnitSelectionChanged); end
+    if Events.GameCoreEventPublishComplete ~= nil then
+        Events.GameCoreEventPublishComplete.Add(OnGameCoreEventPublishComplete);
+    end
 
     -- LuaEvents — popup / advisor signals
     if LuaEvents ~= nil then

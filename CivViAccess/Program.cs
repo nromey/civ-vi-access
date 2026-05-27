@@ -38,4 +38,10 @@ return await CammHost.RunAsync(args, new CammModManifest
     Sanitizer = new CivViMessageSanitizer(),
     MarkerProtocol = new CivViScreenReaderMarkerProtocol(),
     GameInstance = new CivViGameInstance(),
+    // The MarkerProtocol now applies per-kind shielding across all
+    // Lua VMs via CivViSpeechShield. CAMM's coarse 3-second sticky
+    // NOINTERRUPT window is redundant and over-dampens legitimate
+    // higher-priority interrupts (e.g. a critical-tier "Turn 2."
+    // arriving 100ms after a status-tier continuation).
+    DisableStickyNoInterruptWindow = true,
 });

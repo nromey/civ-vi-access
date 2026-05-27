@@ -37,7 +37,7 @@ local function announceTurnBegin()
 
     local turnText = Locale.Lookup(
         "LOC_CIVVIACCESS_TURN_BEGIN_FORMAT", currentTurn);
-    OutputMessageToScreenReader(turnText);
+    Speech.emit(turnText, "critical");
 
     -- Augment with a notification count when non-zero. Queued
     -- (nointerrupt=true) so the primary turn announce doesn't get
@@ -48,20 +48,21 @@ local function announceTurnBegin()
     if localPlayerID == nil or localPlayerID < 0 then
         return;
     end
-    local pPlayer = Players[localPlayerID];
-    if pPlayer == nil then
+    -- pPlayer:GetNotifications() and NotificationManager have no
+    -- per-player count API; our Notifications module owns the cache
+    -- (subscribes to Events.NotificationAdded / Dismissed and tracks
+    -- per-player). Read pending count from there.
+    if Notifications == nil or Notifications.pendingCount == nil then
         return;
     end
-    local notifications = pPlayer:GetNotifications();
-    if notifications == nil then
-        return;
-    end
-    local count = notifications:GetCount();
+    local count = Notifications.pendingCount(localPlayerID);
     if count ~= nil and count > 0 then
-        OutputMessageToScreenReader(
+        -- status: queues behind the turn-begin critical announce
+        -- regardless of arrival timing.
+        Speech.emit(
             Locale.Lookup("LOC_CIVVIACCESS_TURN_NOTIFICATIONS_PENDING",
                           count),
-            true);
+            "status");
     end
 end
 
@@ -79,7 +80,12 @@ local function announceEndTurnBlockingChanged(prevType, newType)
     if EndTurnBlockingTypes == nil then return; end
     if newType ~= EndTurnBlockingTypes.NO_ENDTURN_BLOCKING then return; end
     if prevType == EndTurnBlockingTypes.NO_ENDTURN_BLOCKING then return; end
-    OutputMessageToScreenReader("Ready to end turn");
+    -- meta tier: fires asynchronously from the engine after a unit
+    -- action clears the last blocker. event-tier action-confirm speech
+    -- ("Warrior fortify") fires from the user's keypress and sets its
+    -- own shield; meta is below event's priority so this queues behind
+    -- the action-confirmation rather than clobbering it.
+    Speech.emit("Ready to end turn", "meta");
 end
 
 local function Initialize()

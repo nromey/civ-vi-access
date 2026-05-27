@@ -91,9 +91,12 @@ local function safeLookup(key)
     return stripIconTags(value);
 end
 
+-- Advisor popup speech: nointerrupt=true → status (continuation
+-- lines after the popup body), false/nil → selection (popup landing /
+-- button focus changes).
 local function speak(text, nointerrupt)
     if text == nil or text == "" then return; end
-    OutputMessageToScreenReader(text, nointerrupt);
+    Speech.emit(text, nointerrupt and "status" or "selection");
 end
 
 local function buttonLabel(idx)

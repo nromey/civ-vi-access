@@ -127,7 +127,7 @@ function onMouseOverProductionItem(message: string, disabled: boolean)
 		UI.PlaySound("Main_Menu_Mouse_Over");
 	end
 
-	OutputMessageToScreenReader(message);
+	Speech.emit(message, "picker");
 end
 
 ------------------------------------------------------------------------------

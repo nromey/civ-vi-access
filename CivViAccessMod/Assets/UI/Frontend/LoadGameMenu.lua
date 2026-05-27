@@ -57,7 +57,10 @@ do
         m_navIndex = idx;
         SetSelected(idx);
         playNavSound();
-        OutputMessageToScreenReader(describeEntry(g_FileList[idx], idx, #g_FileList), not interrupt);
+        -- interrupt=true: arrow nav (coalesce-friendly picker). false:
+        -- first-entry after the count preamble (status queues behind).
+        Speech.emit(describeEntry(g_FileList[idx], idx, #g_FileList),
+                    interrupt and "picker" or "status");
     end
 
     local function moveBy(step)
@@ -86,14 +89,14 @@ do
         local count = g_FileList and #g_FileList or 0;
         if count == 0 then
             m_navIndex = 0;
-            OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_LOADGAME_EMPTY"));
+            Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_LOADGAME_EMPTY"), "selection");
             return;
         end
         local countKey = (count == 1) and "LOC_CIVVIACCESS_LOADGAME_COUNT_ONE"
                                        or  "LOC_CIVVIACCESS_LOADGAME_COUNT_MANY";
         local line = Locale.Lookup(countKey, count)
             .. " " .. Locale.Lookup("LOC_CIVVIACCESS_LOADGAME_NAV_HELP");
-        OutputMessageToScreenReader(line);
+        Speech.emit(line, "selection");
         focusEntry(1, false);
     end
 

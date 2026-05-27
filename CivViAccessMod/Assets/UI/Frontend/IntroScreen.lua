@@ -68,7 +68,7 @@ function AcceptEULA( savedAccept : boolean )
 		-- the gate cleared. On auto-accept (savedAccept=true) we stay
 		-- silent — those launches should feel as seamless to a blind
 		-- user as they do to a sighted one.
-		OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_EULA_ACCEPTED"));
+		Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_EULA_ACCEPTED"), "event");
 	end
 end
 
@@ -99,7 +99,7 @@ function OnShow()
 	if needsAccept and not m_announced then
 		m_announced = true;
 		local body = Locale.Lookup("LOC_COPYRIGHT_TEXT");
-		OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_EULA_INTRO", body));
+		Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_EULA_INTRO", body), "critical");
 	end
 end
 
@@ -123,7 +123,7 @@ function OnUpdateDelay(fDTime)
 				-- chains after the OnShow announce rather than cutting it
 				-- off mid-license-text.
 				m_acceptReady = true;
-				OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_EULA_PROMPT"), true);
+				Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_EULA_PROMPT"), "status");
 			end
 		end
 	end

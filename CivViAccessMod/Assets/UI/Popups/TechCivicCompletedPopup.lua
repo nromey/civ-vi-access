@@ -113,7 +113,10 @@ function ShowCivicCompletedPopup( player:number, civic:number, quote:string, aud
 	Controls.ChangeGovernmentButton:SetHide(false);		-- Show Change Government Button	
 
 	-- begin ScreenReader access mod change
-	OutputMessageToScreenReader(Controls.ResearchName:GetText())
+	-- critical: tech/civic completion is a major game-state announce
+	-- (player worked turns to reach this). 2000ms shield protects it
+	-- against engine-incidental selection-changed announces.
+	Speech.emit(Controls.ResearchName:GetText(), "critical")
 	-- End ScreenReader access mod change
 end
 
@@ -180,7 +183,10 @@ function ShowTechCompletedPopup( player:number, tech:number, quote:string, audio
 	Controls.ChangeGovernmentButton:SetHide(true);		-- Hide Change Government Button
 
 	-- begin ScreenReader access mod change
-	OutputMessageToScreenReader(Controls.ResearchName:GetText())
+	-- critical: tech/civic completion is a major game-state announce
+	-- (player worked turns to reach this). 2000ms shield protects it
+	-- against engine-incidental selection-changed announces.
+	Speech.emit(Controls.ResearchName:GetText(), "critical")
 	-- End ScreenReader access mod change
 end
 

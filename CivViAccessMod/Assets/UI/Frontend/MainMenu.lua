@@ -99,6 +99,9 @@ do
         return 0;
     end
 
+    -- interrupt=true: nav-tier (immediate keypress feedback, coalesces
+    -- so arrow-mashing hears only the latest item). interrupt=false:
+    -- after-preamble continuation (queues behind selection-tier title).
     local function speakIndex(options, idx, interrupt)
         local entry = options[idx];
         if entry == nil then
@@ -108,11 +111,11 @@ do
         if label == "" then
             return;
         end
-        OutputMessageToScreenReader(label, not interrupt);
+        Speech.emit(label, interrupt and "picker" or "status");
     end
 
     local function announceMenuRoot()
-        OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_MAIN_MENU_TITLE"));
+        Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_MAIN_MENU_TITLE"), "selection");
         if m_mainIndex > 0 then
             speakIndex(m_mainOptions, m_mainIndex, false);
         end
@@ -185,7 +188,7 @@ do
         -- feedback before any submenu/popup transition kicks in.
         local label = labelForControl(entry.control);
         if label ~= "" then
-            OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_ITEM_ACTIVATED", label));
+            Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_ITEM_ACTIVATED", label), "event");
         end
         entry.activate();
     end
@@ -196,7 +199,7 @@ do
             m_subOptions = {};
             m_subIndex = 0;
             playNavSound();
-            OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_MAIN_MENU_BACK_CUE"));
+            Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_MAIN_MENU_BACK_CUE"), "selection");
             if m_mainIndex > 0 then
                 speakIndex(m_mainOptions, m_mainIndex, false);
             end

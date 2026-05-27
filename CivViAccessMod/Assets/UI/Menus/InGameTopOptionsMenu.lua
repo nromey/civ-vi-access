@@ -123,11 +123,12 @@ local function accessibleAnnouncePopupOpen(text)
     m_popupText  = text or "";
     m_popupIndex = (#m_popupButtons >= 1) and 1 or 0;
     if m_popupText ~= "" then
-        OutputMessageToScreenReader(m_popupText);
+        Speech.emit(m_popupText, "selection");
     end
     if m_popupIndex >= 1 then
-        -- Queue the button label so it doesn't cut the prompt mid-word.
-        OutputMessageToScreenReader(m_popupButtons[m_popupIndex].label, true);
+        -- Queue the button label as status so it speaks AFTER the prompt
+        -- rather than coalesce-replacing it (picker would clobber).
+        Speech.emit(m_popupButtons[m_popupIndex].label, "status");
     end
     -- Install modal handler on the active BaseMenu handler so popup nav
     -- intercepts Up/Down/Left/Right/Enter ahead of pause-menu nav. The
@@ -141,7 +142,7 @@ end
 
 local function accessibleAnnouncePopupCurrent()
     if m_popupIndex < 1 or m_popupIndex > #m_popupButtons then return; end
-    OutputMessageToScreenReader(m_popupButtons[m_popupIndex].label);
+    Speech.emit(m_popupButtons[m_popupIndex].label, "picker");
 end
 
 local function accessiblePopupNav(step)
@@ -368,8 +369,8 @@ function OnCancelExit()
 	if m_isRaisedForExitConfirm then
 		m_isRaisedForExitConfirm = false;
 		Log.info("OnCancelExit: dismissing pause menu raised for Alt+F4 confirmation");
-		if OutputMessageToScreenReader ~= nil then
-			OutputMessageToScreenReader("Exit cancelled. Back to game.");
+		if Speech ~= nil and Speech.emit ~= nil then
+			Speech.emit("Exit cancelled. Back to game.", "event");
 		end
 		CloseImmediately();
 		-- CloseImmediately dequeues the popup but doesn't pop the input
@@ -456,7 +457,7 @@ function OnQuickSaveGame()
 		-- Begin CivViAccess mod change: confirm quicksave audibly. The engine
 		-- plays Confirm_Bed_Positive but a screen-reader user has no other
 		-- signal that the save fired.
-		OutputMessageToScreenReader("Quicksave");
+		Speech.emit("Quicksave", "event");
 		-- End CivViAccess mod change
 	end
 end
@@ -530,8 +531,8 @@ function Close()
 	-- Audible confirmation that the pause menu has closed. Without this
 	-- the user pressed "Return to Game", heard nothing, and was stuck not
 	-- knowing what state the game was in (Noel 2026-05-24 test).
-	if OutputMessageToScreenReader ~= nil then
-		OutputMessageToScreenReader("Returned to game");
+	if Speech ~= nil and Speech.emit ~= nil then
+		Speech.emit("Returned to game", "event");
 	end
 	-- End ScreenReaderAccess mod change
 
@@ -737,11 +738,11 @@ function OnYes( )
 	-- shuts down and the main menu rebuilds. Speak so the user knows
 	-- something is happening and isn't staring at silence wondering if
 	-- the keypress registered.
-	if OutputMessageToScreenReader ~= nil then
+	if Speech ~= nil and Speech.emit ~= nil then
 		if ms_ExitToMain then
-			OutputMessageToScreenReader("Returning to main menu.");
+			Speech.emit("Returning to main menu.", "event");
 		else
-			OutputMessageToScreenReader("Exiting game.");
+			Speech.emit("Exiting game.", "event");
 		end
 	end
 	-- End CivViAccess mod change

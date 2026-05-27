@@ -196,10 +196,13 @@ local function clampUnit(v)
     return v;
 end
 
+-- Local wrapper. Options is BaseMenu-driven (settings list); map all
+-- speech to picker so item nav coalesces and shielding works. The
+-- legacy `continue` arg is unused now.
 local function speak(text, continue)
     if text == nil or text == "" then return; end
-    if OutputMessageToScreenReader ~= nil then
-        OutputMessageToScreenReader(text, continue);
+    if Speech ~= nil and Speech.emit ~= nil then
+        Speech.emit(text, "picker");
     end
 end
 

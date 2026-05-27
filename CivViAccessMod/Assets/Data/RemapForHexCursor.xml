@@ -73,17 +73,16 @@
         <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_A</GestureData>
       </Set>
     </Update>
-    <!-- Sleep on Alt+Z. Slurp/burp diagnostic 2026-05-25 confirmed
-         Alt+Z fires actions ("alt z fires" heard). Earlier Sleep
-         silence was likely a unit-not-selected case (Sleep has
-         CategoryId="UNIT" in engine XML, only fires with a unit
-         actively selected). Test with a unit selected to confirm. -->
-    <Update>
-      <Where ActionId="Sleep" Index="0" GestureType="KBMouse"/>
-      <Set>
-        <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_Z</GestureData>
-      </Set>
-    </Update>
+    <!-- Engine ActionId="Sleep" is wired to UNITOPERATION_SLEEP via
+         HotkeyId="Sleep" in UnitOperations.xml; that data-driven
+         dispatch path doesn't honor mod XML rebinds for existing
+         engine actions (diagnostic 2026-05-26: bare-J test fired no
+         action id 53 in Lua.log even with a unit selected). Engine
+         Sleep is left on default key Z, which is taken by our
+         CursorSW rebind — so engine Sleep is effectively unbound.
+         Our working path: CIVVIACCESS_Rest (R, smart cascade) and
+         CIVVIACCESS_Sleep (Alt+Z, strict-with-educational-redirect).
+         See InputActions block. -->
     <Update>
       <Where ActionId="ToggleCivicsTree" Index="0" GestureType="KBMouse"/>
       <Set>
@@ -282,6 +281,32 @@
          Name="LOC_CIVVIACCESS_HOTKEY_DAWN_OF_MAN_TRANSCRIPT"
          Description="LOC_CIVVIACCESS_HOTKEY_DAWN_OF_MAN_TRANSCRIPT_HELP"
          CategoryId="GLOBAL" ContextId="Universal" LayoutType="PC"/>
+    <!-- 0.5.2 Rest cascade (R). Civ V Access parity: one key wraps
+         SLEEP for civilians, FORTIFY for military, with ALERT / HEAL /
+         SKIP_TURN as additional fallbacks. R coexists with
+         CIVVIACCESS_RepeatBriefing on bare R; the briefing handler is
+         a no-op in World context so dual-dispatch is harmless. -->
+    <Row ActionId="CIVVIACCESS_Rest"
+         Name="LOC_CIVVIACCESS_HOTKEY_REST"
+         Description="LOC_CIVVIACCESS_HOTKEY_REST_HELP"
+         CategoryId="UNIT" ContextId="World" LayoutType="PC"/>
+    <!-- 0.5.2 strict Sleep (Alt+Z). Civ V muscle-memory key — Civ V
+         bound Sleep on Z, but in Civ VI Z is our CursorSW. Alt+Z
+         catches the user-with-Civ-V-muscle-memory case: civilians
+         actually sleep; military gets an educational redirect to R
+         ("Cannot sleep Warrior. Press R to fortify instead."). -->
+    <Row ActionId="CIVVIACCESS_Sleep"
+         Name="LOC_CIVVIACCESS_HOTKEY_SLEEP"
+         Description="LOC_CIVVIACCESS_HOTKEY_SLEEP_HELP"
+         CategoryId="UNIT" ContextId="World" LayoutType="PC"/>
+    <!-- 0.5.1 Stage-1 production picker open hotkey. Temporary —
+         Stage 2 wires picker open via notification activation (the
+         canonical entry per docs/PICKER_DESIGN.md). Shift+P stays
+         as a power-user direct-open shortcut. -->
+    <Row ActionId="CIVVIACCESS_OpenProductionPicker"
+         Name="LOC_CIVVIACCESS_HOTKEY_OPEN_PRODUCTION_PICKER"
+         Description="LOC_CIVVIACCESS_HOTKEY_OPEN_PRODUCTION_PICKER_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
   </InputActions>
 
   <!-- ===================================================================
@@ -382,5 +407,19 @@
          GestureData="LOC_OPTIONS_KEY_I"/>
     <Row ActionId="CIVVIACCESS_DawnOfManTranscript" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_S"/>
+    <!-- 0.5.2: Sleep backstop on bare J. Mnemonic: J for "snooze."
+         J is in the unbound singleton set (D/I/J/K/N/S/U/X) and clear
+         of all our other letter bindings. -->
+    <!-- Rest on bare R. Coexists with CIVVIACCESS_RepeatBriefing on R
+         (briefing handler no-ops in World context). -->
+    <Row ActionId="CIVVIACCESS_Rest" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_R"/>
+    <!-- Strict Sleep on Alt+Z (Civ V muscle memory). -->
+    <Row ActionId="CIVVIACCESS_Sleep" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_Z"/>
+    <!-- 0.5.1 Stage-1 picker open. Shift+P chosen because bare P is
+         engine OnlinePause (multiplayer); Shift+P is unbound. -->
+    <Row ActionId="CIVVIACCESS_OpenProductionPicker" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_P"/>
   </InputActionDefaultGestures>
 </GameInfo>

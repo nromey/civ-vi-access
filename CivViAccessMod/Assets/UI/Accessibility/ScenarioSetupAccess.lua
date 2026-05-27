@@ -191,18 +191,18 @@ local function parameterItem(parameter, gameParameters)
                         LuaEvents.CityStatePicker_Initialize(parameter, gameParameters)
                         Controls.CityStatePicker:SetHide(false)
                     else
-                        OutputMessageToScreenReader(
+                        Speech.emit(
                             Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE",
-                                resolveLocText(parameter.Name)))
+                                resolveLocText(parameter.Name)), "meta")
                     end
                 elseif pid == "LeaderPool1" or pid == "LeaderPool2" then
                     if Controls and Controls.LeaderPicker ~= nil then
                         LuaEvents.LeaderPicker_Initialize(parameter, gameParameters)
                         Controls.LeaderPicker:SetHide(false)
                     else
-                        OutputMessageToScreenReader(
+                        Speech.emit(
                             Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE",
-                                resolveLocText(parameter.Name)))
+                                resolveLocText(parameter.Name)), "meta")
                     end
                 else
                     -- MultiSelectWindow path (Natural Wonders et al.).
@@ -210,9 +210,9 @@ local function parameterItem(parameter, gameParameters)
                         LuaEvents.MultiSelectWindow_Initialize(parameter)
                         Controls.MultiSelectWindow:SetHide(false)
                     else
-                        OutputMessageToScreenReader(
+                        Speech.emit(
                             Locale.Lookup("LOC_CIVVIACCESS_PICKER_NOT_ACCESSIBLE",
-                                resolveLocText(parameter.Name)))
+                                resolveLocText(parameter.Name)), "meta")
                     end
                 end
             end,

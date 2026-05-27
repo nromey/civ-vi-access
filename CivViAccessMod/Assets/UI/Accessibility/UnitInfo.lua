@@ -77,7 +77,7 @@ end
 function UnitInfo.speakInfo()
     local pUnit = selectedUnit();
     if pUnit == nil then
-        OutputMessageToScreenReader("No unit selected");
+        Speech.emit("No unit selected", "meta");
         return;
     end
 
@@ -117,7 +117,9 @@ function UnitInfo.speakInfo()
         parts[#parts + 1] = tostring(hp) .. " of " .. tostring(maxDamage) .. " HP";
     end
 
-    OutputMessageToScreenReader(table.concat(parts, ". "));
+    -- status: user asked for info (pressed /). Queue politely behind
+    -- whatever's in flight rather than clobbering it.
+    Speech.emit(table.concat(parts, ". "), "status");
 end
 
 -- Cycle through ALL local-player units regardless of orders state.
@@ -153,7 +155,7 @@ function UnitInfo.cycleAllUnits(forward)
     local list = collectAllUnits(pPlayer);
     local n = #list;
     if n == 0 then
-        OutputMessageToScreenReader("No units");
+        Speech.emit("No units", "meta");
         return;
     end
     -- Find current unit in list.
@@ -180,6 +182,17 @@ function UnitInfo.cycleAllUnits(forward)
     end
     local nextUnit = list[idx];
     if nextUnit == nil then return; end
+    -- Cycle-to-self gate. With one selectable unit, idx wraps back to
+    -- the currently selected unit. UI.SelectUnit on the already-
+    -- selected unit doesn't fire UnitSelectionChanged, so the speech
+    -- path stays silent and the user gets no feedback at all.
+    -- Announce explicitly so the user knows the cycle did something
+    -- (even if "something" was confirming there's nothing else).
+    if current ~= nil and nextUnit:GetID() == current:GetID()
+       and nextUnit:GetOwner() == current:GetOwner() then
+        Speech.emit("Only one unit. " .. StringifyUnit(nextUnit), "meta");
+        return;
+    end
     if UI ~= nil and UI.SelectUnit ~= nil then
         UI.SelectUnit(nextUnit);
     end
@@ -199,7 +212,7 @@ end
 function UnitInfo.recenterOnUnit()
     local pUnit = selectedUnit();
     if pUnit == nil then
-        OutputMessageToScreenReader("No unit selected");
+        Speech.emit("No unit selected", "meta");
         return;
     end
     local x, y = pUnit:GetX(), pUnit:GetY();
@@ -208,7 +221,7 @@ function UnitInfo.recenterOnUnit()
     end
     -- Speak position + unit so the user gets a confirmation, since
     -- jumpTo is silent by design.
-    OutputMessageToScreenReader("Cursor on " .. StringifyUnit(pUnit));
+    Speech.emit("Cursor on " .. StringifyUnit(pUnit), "event");
 end
 
 local function Initialize()

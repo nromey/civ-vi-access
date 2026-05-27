@@ -80,9 +80,11 @@ local function safeLookup(key)
     return stripIconTags(value);
 end
 
+-- Expansion intro speech: nointerrupt=true → status (page detail
+-- continuation), false/nil → selection (page landing).
 local function speak(text, nointerrupt)
     if text == nil or text == "" then return; end
-    OutputMessageToScreenReader(text, nointerrupt);
+    Speech.emit(text, nointerrupt and "status" or "selection");
 end
 
 local function descriptionForPage(idx)

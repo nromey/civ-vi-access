@@ -116,11 +116,15 @@ local function playNavSound()
     end
 end
 
+-- BaseMenu speech wrapper. The legacy nointerrupt arg routes calls
+-- through two kinds: nointerrupt=true → status (always queues, used
+-- for follow-up lines after preamble); false/nil → picker (item nav
+-- tier, coalesces so arrow-mash hears only the latest landing).
 local function speak(text, nointerrupt)
     if text == nil or text == "" then
         return
     end
-    OutputMessageToScreenReader(text, nointerrupt)
+    Speech.emit(text, nointerrupt and "status" or "picker")
 end
 
 -- Resolve a preamble (string | function) at call time so F1 always reads

@@ -75,19 +75,19 @@ end
 function UnitMovement.directMove(direction)
     local pUnit = selectedUnit();
     if pUnit == nil then
-        OutputMessageToScreenReader("No unit selected");
+        Speech.emit("No unit selected", "meta");
         return;
     end
     local localPlayerID = Game.GetLocalPlayer();
     if localPlayerID == -1 then return; end
     if pUnit:GetOwner() ~= localPlayerID then
-        OutputMessageToScreenReader("Not your unit");
+        Speech.emit("Not your unit", "meta");
         return;
     end
     local sx, sy = pUnit:GetX(), pUnit:GetY();
     local target = Map.GetAdjacentPlot(sx, sy, direction);
     if target == nil then
-        OutputMessageToScreenReader("Edge of map");
+        Speech.emit("Edge of map", "meta");
         return;
     end
     local tx, ty = target:GetX(), target:GetY();
@@ -97,16 +97,16 @@ function UnitMovement.directMove(direction)
     -- MoveUnitToPlot route to RANGE_ATTACK / COASTAL_RAID / ATTACK.
     local enemy = enemyAt(target, localPlayerID);
     if enemy ~= nil then
-        OutputMessageToScreenReader(
+        Speech.emit(
             unitTypeName(enemy) .. " " .. DIR_NAMES[direction]
-            .. ". Combat coming in a future release.");
+            .. ". Combat coming in a future release.", "meta");
         return;
     end
     -- 0-MP gate. Without this the engine accepts the move and queues it
     -- for next turn, which is invisible to a screen-reader user and
     -- collides with future target-mode queueing (Phase 2 Shift+Enter).
     if pUnit:GetMovesRemaining() <= 0 then
-        OutputMessageToScreenReader("Out of moves");
+        Speech.emit("Out of moves", "meta");
         return;
     end
     -- Pre-validate. If the operation can't start (impassable terrain,
@@ -117,15 +117,22 @@ function UnitMovement.directMove(direction)
     tParameters[UnitOperationTypes.PARAM_Y] = ty;
     if not UnitManager.CanStartOperation(pUnit, UnitOperationTypes.MOVE_TO,
                                          nil, tParameters) then
-        OutputMessageToScreenReader("Cannot move " .. DIR_NAMES[direction]);
+        Speech.emit("Cannot move " .. DIR_NAMES[direction], "meta");
         return;
     end
     -- Stash before commit so the UnitMoveComplete listener has the
-    -- direction the user pressed when it fires.
+    -- direction the user pressed when it fires. startX/startY let
+    -- resolveAndSpeak distinguish "didn't move at all" (Move blocked)
+    -- from "moved partway" (Stopped short) — without them, the engine
+    -- accepting MOVE_TO but the unit not budging (insufficient MP for
+    -- the cheapest path step, etc.) would falsely announce as
+    -- "Stopped short. 1 move remaining", confusing the user.
     _pending = {
         playerID = localPlayerID,
         unitID = pUnit:GetID(),
         direction = direction,
+        startX = sx,
+        startY = sy,
         targetX = tx,
         targetY = ty,
     };
@@ -154,9 +161,11 @@ local function resolveAndSpeak()
     if pUnit == nil then return; end
     local x, y = pUnit:GetX(), pUnit:GetY();
     -- If the unit didn't move (still at start), the engine refused the
-    -- operation. Speak that explicitly rather than misleading "Moved".
+    -- operation silently. Speak that explicitly rather than misleading
+    -- "Moved" or "Stopped short" — both of which imply some motion.
     if x == snap.startX and y == snap.startY then
-        OutputMessageToScreenReader("Move blocked " .. (DIR_NAMES[snap.direction] or "?"));
+        Speech.emit("Move blocked " .. (DIR_NAMES[snap.direction] or "?"),
+                    "move_result");
         return;
     end
     local direction = DIR_NAMES[snap.direction] or "?";
@@ -164,7 +173,7 @@ local function resolveAndSpeak()
     local lead = reached and ("Moved " .. direction)
                           or ("Stopped short " .. direction);
     local mpText = formatMovesRemaining(pUnit:GetMovesRemaining());
-    OutputMessageToScreenReader(lead .. ". " .. mpText);
+    Speech.emit(lead .. ". " .. mpText, "move_result");
     if HexCursor ~= nil and HexCursor.jumpTo ~= nil then
         HexCursor.jumpTo(x, y);
     end
@@ -193,6 +202,89 @@ function UnitMovement.onUnitOperationsCleared(playerID, unitID, hOp, iData1)
     if _pending == nil then return; end
     if playerID ~= _pending.playerID or unitID ~= _pending.unitID then return; end
     resolveAndSpeak();
+end
+
+-- Civ V Access pattern: one "rest" key wraps both MISSION_FORTIFY
+-- (military) and MISSION_SLEEP (civilian) — see
+-- CivVAccess_UnitControlMovement.lua line 313:
+--   SLEEP = { "MISSION_FORTIFY", "MISSION_SLEEP" }
+-- Civ VI keeps SLEEP / FORTIFY / ALERT / HEAL / SKIP_TURN as separate
+-- UnitOperations and the engine refuses SLEEP on military units
+-- (Warrior CanStart=false, no failure reasons populated). Diagnostic
+-- 2026-05-26 confirmed via cascade trial: Sleep refused on Warrior,
+-- Fortify accepted on same unit.
+--
+-- R = smart Rest: cascade through the rest operations and dispatch
+-- the first the engine accepts. Civilians land on SLEEP, military on
+-- FORTIFY, others fall through. ALERT is included so units that can
+-- defend but aren't combat-fortifiable still have a resting state.
+local REST_CASCADE = {
+    { name = "Sleep",    op = UnitOperationTypes.SLEEP },
+    { name = "Fortify",  op = UnitOperationTypes.FORTIFY },
+    { name = "Alert",    op = UnitOperationTypes.ALERT },
+    { name = "Heal",     op = UnitOperationTypes.HEAL },
+    { name = "SkipTurn", op = UnitOperationTypes.SKIP_TURN },
+};
+
+function UnitMovement.rest()
+    local pUnit = selectedUnit();
+    if pUnit == nil then
+        Speech.emit("No unit selected", "meta");
+        return;
+    end
+    local localPlayerID = Game.GetLocalPlayer();
+    if localPlayerID == -1 then return; end
+    if pUnit:GetOwner() ~= localPlayerID then
+        Speech.emit("Not your unit", "meta");
+        return;
+    end
+    for _, entry in ipairs(REST_CASCADE) do
+        local ok = UnitManager.CanStartOperation(
+            pUnit, entry.op, nil, false, OperationResultsTypes.NO_TARGETS);
+        if ok then
+            UnitManager.RequestOperation(pUnit, entry.op, nil);
+            Speech.emit(unitTypeName(pUnit) .. " " .. string.lower(entry.name), "event");
+            return;
+        end
+    end
+    Speech.emit("Cannot rest " .. unitTypeName(pUnit), "meta");
+end
+
+-- Alt+Z (Civ V muscle memory) = strict Sleep. Civilians actually sleep.
+-- Military units get an educational redirect to R: "Cannot sleep
+-- Warrior. Press R to fortify instead." On a civilian that's mid-task
+-- (Sleep also refused), don't suggest R — Fortify won't accept either.
+function UnitMovement.sleepStrict()
+    local pUnit = selectedUnit();
+    if pUnit == nil then
+        Speech.emit("No unit selected", "meta");
+        return;
+    end
+    local localPlayerID = Game.GetLocalPlayer();
+    if localPlayerID == -1 then return; end
+    if pUnit:GetOwner() ~= localPlayerID then
+        Speech.emit("Not your unit", "meta");
+        return;
+    end
+    local ok = UnitManager.CanStartOperation(
+        pUnit, UnitOperationTypes.SLEEP, nil, false, OperationResultsTypes.NO_TARGETS);
+    if ok then
+        UnitManager.RequestOperation(pUnit, UnitOperationTypes.SLEEP, nil);
+        Speech.emit(unitTypeName(pUnit) .. " sleeping", "event");
+        return;
+    end
+    -- Sleep refused. If Fortify would accept, this is a military unit —
+    -- redirect to R. Otherwise the unit is stuck on its own state
+    -- (mid-mission civilian, etc.), no R suggestion.
+    local fortifyOk = UnitManager.CanStartOperation(
+        pUnit, UnitOperationTypes.FORTIFY, nil, false, OperationResultsTypes.NO_TARGETS);
+    if fortifyOk then
+        Speech.emit(
+            "Cannot sleep " .. unitTypeName(pUnit) .. ". Press R to fortify instead.",
+            "meta");
+    else
+        Speech.emit("Cannot sleep " .. unitTypeName(pUnit), "meta");
+    end
 end
 
 local function Initialize()

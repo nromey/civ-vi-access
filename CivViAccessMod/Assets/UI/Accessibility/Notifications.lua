@@ -247,6 +247,15 @@ local function sortedListFor(playerID, includeRead)
     return list;
 end
 
+-- Public: pending count for a player. Reads our own cache, not the
+-- engine — pPlayer:GetNotifications() / NotificationManager have no
+-- per-player count API. Used by TurnAnnouncements to append "N
+-- pending" to turn-begin speech.
+function Notifications.pendingCount(playerID)
+    if playerID == nil or playerID < 0 then return 0; end
+    return #sortedListFor(playerID, false);
+end
+
 -- =======================================================================
 -- Layer 1 — inline announce
 -- =======================================================================
@@ -264,7 +273,7 @@ local function drain()
     S.pending = {};
     for _, e in ipairs(queue) do
         playArrivalEarcon();
-        OutputMessageToScreenReader("Notification. " .. e.summary, true);
+        Speech.emit("Notification. " .. e.summary, "meta");
     end
 end
 
@@ -362,7 +371,7 @@ end
 local function speakEntry(entry, idx, total)
     local parts = { "Notification " .. tostring(idx) .. " of " .. tostring(total) };
     if entry.blocker then table.insert(parts, "blocker"); end
-    OutputMessageToScreenReader(table.concat(parts, ", ") .. ". " .. entry.summary);
+    Speech.emit(table.concat(parts, ", ") .. ". " .. entry.summary, "selection");
     entry.read = true;
 end
 
@@ -379,7 +388,7 @@ function Notifications.cycleNext()
         -- the instant you finish your first walk.
         list = sortedListFor(pid, true);
         if #list == 0 then
-            OutputMessageToScreenReader("No notifications");
+            Speech.emit("No notifications", "meta");
             return;
         end
     end
@@ -398,7 +407,7 @@ function Notifications.cyclePrev()
     if #list == 0 then
         list = sortedListFor(pid, true);
         if #list == 0 then
-            OutputMessageToScreenReader("No notifications");
+            Speech.emit("No notifications", "meta");
             return;
         end
     end
@@ -415,9 +424,9 @@ function Notifications.toggleReminder()
     recordUserActivity();
     S.reminderEnabled = not S.reminderEnabled;
     if S.reminderEnabled then
-        OutputMessageToScreenReader("Notification reminders on");
+        Speech.emit("Notification reminders on", "event");
     else
-        OutputMessageToScreenReader("Notification reminders off");
+        Speech.emit("Notification reminders off", "event");
     end
 end
 
@@ -438,13 +447,21 @@ local function maybeFireReminder()
     if now - S.lastUserActivity < S.currentBackoffSeconds then return; end
     if now - S.lastReminderAt < S.currentBackoffSeconds then return; end
 
+    -- Update state BEFORE the emit. If Speech.emit's print() triggers
+    -- the engine to publish another event (loops back through
+    -- onPublishComplete → maybeFireReminder), the reentrant call sees
+    -- the freshly-stamped lastReminderAt and bails on the backoff
+    -- check. Confirmed via Lua.log 2026-05-26: "1 thing to do" emitted
+    -- twice back-to-back; reentrancy is the only consistent
+    -- explanation given the within-VM same-table state.
+    S.lastReminderAt = now;
+    S.currentBackoffSeconds = math.min(S.currentBackoffSeconds * 2, IDLE_THRESHOLD_MAX);
+
     playReminderEarcon();
     local count = #list;
     local text = (count == 1) and "1 thing to do"
                               or (tostring(count) .. " things to do");
-    OutputMessageToScreenReader(text, true);
-    S.lastReminderAt = now;
-    S.currentBackoffSeconds = math.min(S.currentBackoffSeconds * 2, IDLE_THRESHOLD_MAX);
+    Speech.emit(text, "meta");
 end
 
 -- =======================================================================

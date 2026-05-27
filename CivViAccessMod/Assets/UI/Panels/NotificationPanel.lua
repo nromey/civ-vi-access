@@ -784,8 +784,11 @@ function OnDefaultAddNotification( pNotification:table )
 				function()
 					OnMouseEnterNotification( notificationEntry.m_Instance );
 					-- Begin ScreenReaderAccess mod change
+					-- status: user mouse-hovered a notification (rare for
+					-- keyboard users); queue politely behind anything in
+					-- flight rather than clobber.
 					local message:string = Locale.Lookup(pNotification:GetMessage()) .. "[NEWLINE]" .. Locale.Lookup(pNotification:GetSummary());
-					OutputMessageToScreenReader(message);
+					Speech.emit(message, "status");
 					-- End ScreenReaderAccess mod change
 				end
 			);
@@ -1712,18 +1715,54 @@ end
 -- ===========================================================================
 function OnLuaActivateNotification( pNotification:table )
 	if (pNotification ~= nil and pNotification:IsValidForPhase()) then
-		-- Begin ScreenReaderAccess mod change (0.5.0)
-		-- Intercept CHOOSE_CITY_PRODUCTION so the user isn't trapped in
-		-- the mouse-only production panel. The blocker stays active (the
-		-- turn can't end until production is chosen), but the modal trap
-		-- doesn't open. Production picker accessibility lands in 0.5.1.
-		-- Without this guard, pressing Enter after founding a city routed
-		-- to the panel and Alt+F4 was the only escape.
+		-- Begin ScreenReaderAccess mod change (0.5.0, rewired 0.5.x)
+		-- Intercept CHOOSE_CITY_PRODUCTION and route to our keyboard-
+		-- accessible picker (ProductionPickerAddin) instead of the
+		-- mouse-only sighted production panel. The notification is the
+		-- canonical entry point: user activates it via the notification
+		-- center → picker opens for that city.
 		if pNotification:GetType() == NotificationTypes.CHOOSE_CITY_PRODUCTION then
-			OutputMessageToScreenReader(
-				"City needs production. The production picker is not yet "
-				.. "keyboard-accessible; it lands in 0.5.1. Open the pause "
-				.. "menu with Escape to save and exit cleanly.");
+			local ownerID = pNotification:GetPlayerID();
+			-- Resolve the city: notification target plot first (most
+			-- accurate when multiple cities need production at once),
+			-- then UI head-selected, then capital, then first city.
+			-- Picker's LuaEvent subscriber aborts on nil cityID, so we
+			-- must resolve here rather than letting it fall through.
+			local pCity = nil;
+			local nx, ny = pNotification:GetX(), pNotification:GetY();
+			if nx ~= nil and ny ~= nil and nx >= 0 and ny >= 0 then
+				local pPlot = Map.GetPlot(nx, ny);
+				if pPlot ~= nil then
+					local pPlotCity = Cities.GetPlotPurchaseCity(pPlot);
+					if pPlotCity ~= nil and pPlotCity:GetOwner() == ownerID then
+						pCity = pPlotCity;
+					end
+				end
+			end
+			if pCity == nil and UI ~= nil and UI.GetHeadSelectedCity ~= nil then
+				pCity = UI.GetHeadSelectedCity();
+			end
+			if pCity == nil then
+				local pPlayer = Players[ownerID];
+				if pPlayer ~= nil then
+					pCity = pPlayer:GetCities():GetCapitalCity();
+					if pCity == nil then
+						for _, c in pPlayer:GetCities():Members() do
+							pCity = c;
+							break;
+						end
+					end
+				end
+			end
+			if pCity == nil then
+				Speech.emit("No city to manage", "meta");
+				return;
+			end
+			if LuaEvents ~= nil and LuaEvents.CivViAccess_OpenProductionPicker ~= nil then
+				LuaEvents.CivViAccess_OpenProductionPicker(pCity:GetOwner(), pCity:GetID());
+			else
+				Speech.emit("Production picker unavailable", "meta");
+			end
 			return;
 		end
 		-- End ScreenReaderAccess mod change

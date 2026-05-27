@@ -258,20 +258,23 @@ function OnUnitSelectionChanged(playerID :number, unitID :number,
         _firstTurnAnnounceDone = true;
         local lines = firstTurnOrientationLines(pUnit, hexI, hexJ);
         if #lines > 0 then
-            OutputMessageToScreenReader(lines[1]);
+            -- Lead is the unit-selection announce; subsequent lines
+            -- queue behind it as status (never interrupt, never
+            -- coalesce — multi-line briefing must speak all parts).
+            Speech.emit(lines[1], "selection");
             for i = 2, #lines do
-                OutputMessageToScreenReader(lines[i], true);
+                Speech.emit(lines[i], "status");
             end
             return;
         end
     end
 
-    OutputMessageToScreenReader(ownUnitAnnouncement(pUnit));
+    Speech.emit(ownUnitAnnouncement(pUnit), "selection");
 
     local pois = GetAdjacentPointsOfInterestFrom(hexI, hexJ);
     local line = TurnPointsOfInterestIntoString(pois);
     if line ~= nil then
-        OutputMessageToScreenReader(line, true);
+        Speech.emit(line, "status");
     end
 end
 
@@ -290,7 +293,7 @@ function OnCitySelectionChanged(owner :number, cityID :number,
     local name       = Locale.Lookup(pCity:GetName());
     local population = pCity:GetPopulation();
     local popLabel   = Locale.Lookup("LOC_HUD_CITY_POPULATION");
-    OutputMessageToScreenReader(name .. " (" .. popLabel .. " " .. population .. ")");
+    Speech.emit(name .. " (" .. popLabel .. " " .. population .. ")", "selection");
 end
 
 -- Notification announcement moved to Notifications.lua (0.5.1) —
@@ -300,20 +303,89 @@ end
 
 -- Drain any pending first-turn orientation queued by a Settler-
 -- selection event that fired during the loading screen window.
-local function OnLoadScreenClose()
-    _loadScreenClosed = true;
+local function flushPendingFirstTurn()
     if _pendingFirstTurn ~= nil and not _firstTurnAnnounceDone then
         local q = _pendingFirstTurn;
         _pendingFirstTurn = nil;
         _firstTurnAnnounceDone = true;
         local lines = firstTurnOrientationLines(q.pUnit, q.hexI, q.hexJ);
         if #lines > 0 then
-            OutputMessageToScreenReader(lines[1]);
+            Speech.emit(lines[1], "selection");
             for i = 2, #lines do
-                OutputMessageToScreenReader(lines[i], true);
+                Speech.emit(lines[i], "status");
             end
         end
     end
+end
+
+local function OnLoadScreenClose()
+    _loadScreenClosed = true;
+    flushPendingFirstTurn();
+end
+
+-- Backstop for OnLoadScreenClose. As of 2026-05-26, LoadScreenClose
+-- is silent on Noel's build for new games (HexCursor + SREH both
+-- subscribe but the event never fires). Without this safety net, the
+-- gate above keeps queueing UnitSelectionChanged events forever and
+-- ownUnitAnnouncement never speaks — every unit cycle ends silently.
+-- LocalPlayerTurnBegin is reliable across new-game and load-game per
+-- the Lua.log, so we use it as the alternate trigger to mark load
+-- done. Earliest it fires is just after the first turn's orientation
+-- moment, so this doesn't preempt the briefing flow on a healthy load.
+local function OnLocalPlayerTurnBeginBackstop()
+    if not _loadScreenClosed then
+        _loadScreenClosed = true;
+        flushPendingFirstTurn();
+    end
+end
+
+-- Task G — founded-city speech. Engine fires Events.CityAddedToMap
+-- when a city is created (Settler founds, raze undone, etc.). Without
+-- our handler, B-to-found gives no audible confirmation beyond the
+-- generic "Found city" action announce and a notification chime; the
+-- user has no idea the city was actually placed, what it's named, or
+-- what to do next.
+--
+-- Speech composition:
+--   "City of [name] founded at [x, y]. Population [N]. Press Shift+P
+--    to choose production."
+--
+-- The Shift+P hint front-loads the next action so users don't have to
+-- guess. When the production picker entry-point moves to notification
+-- activation in a future stage, swap this hint for the appropriate
+-- guidance ("press bracket to cycle to the production notification,
+-- enter to choose").
+local function OnCityAddedToMap(playerID, cityID, x, y)
+    if Game == nil or playerID ~= Game.GetLocalPlayer() then return; end
+    local pPlayer = Players[playerID];
+    if pPlayer == nil then return; end
+    local pCities = pPlayer:GetCities();
+    if pCities == nil then return; end
+    local pCity = pCities:FindID(cityID);
+    if pCity == nil then return; end
+
+    local name = Locale.Lookup(pCity:GetName());
+    local pop  = pCity:GetPopulation() or 1;
+
+    local parts = {};
+    parts[#parts + 1] = "City of " .. name .. " founded at " .. tostring(x) .. ", " .. tostring(y);
+    parts[#parts + 1] = "Population " .. tostring(pop);
+    -- The engine pops a modal / takes input focus after founding
+    -- (most likely the auto-opened ProductionPanel slide-out). The
+    -- user's first keystroke to recover is Enter — that dismisses
+    -- the engine's prompt. Then they're free to either let the
+    -- engine pick production (it'll fire the notification each turn
+    -- until something is queued) or use our picker via Shift+P.
+    -- Surface this explicitly so the user isn't stranded guessing.
+    parts[#parts + 1] = "Press Enter to dismiss the engine production prompt";
+    parts[#parts + 1] = "Then Shift+P to choose production";
+    -- critical kind: this is a major game-state change. Its 2000ms
+    -- shield protects against the engine auto-selecting another unit
+    -- (firing UnitSelectionChanged → "Warrior" selection announce)
+    -- which previously clobbered this line mid-word. Selection-tier
+    -- emits inside the shield window downgrade to NOINTERRUPT and
+    -- queue behind this announce instead.
+    Speech.emit(table.concat(parts, ". ") .. ".", "critical");
 end
 
 local function Initialize()
@@ -324,6 +396,12 @@ local function Initialize()
     Events.UnitSelectionChanged.Add(OnUnitSelectionChanged);
     Events.CitySelectionChanged.Add(OnCitySelectionChanged);
     Events.LoadScreenClose.Add(OnLoadScreenClose);
+    if Events.LocalPlayerTurnBegin ~= nil then
+        Events.LocalPlayerTurnBegin.Add(OnLocalPlayerTurnBeginBackstop);
+    end
+    if Events.CityAddedToMap ~= nil then
+        Events.CityAddedToMap.Add(OnCityAddedToMap);
+    end
     print("[CivViAccess][INFO ] ScreenReaderEventHandlers: subscriptions complete");
 end
 

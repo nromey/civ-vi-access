@@ -285,17 +285,32 @@ end
 function CityProduction.unblockAll()
     local pid = localPlayerID();
     if pid < 0 then
-        OutputMessageToScreenReader("No active player");
+        Speech.emit("No active player", "meta");
         return;
     end
     local pPlayer = Players[pid];
     if pPlayer == nil then
-        OutputMessageToScreenReader("Player not available");
+        Speech.emit("Player not available", "meta");
         return;
     end
     local pCities = pPlayer:GetCities();
     if pCities == nil then
-        OutputMessageToScreenReader("No cities");
+        Speech.emit("No cities", "meta");
+        return;
+    end
+
+    -- Count cities up front. If zero, the whole point of "unblock
+    -- end-turn" is moot: research / civic without a city generate 0
+    -- science / 0 culture per turn so auto-picking them is misleading
+    -- ("Research set to Pottery" when nothing is actually researching).
+    -- Found a city first, then this hotkey makes sense. Per Noel
+    -- 2026-05-26.
+    local cityCount = 0;
+    for _ in pCities:Members() do
+        cityCount = cityCount + 1;
+    end
+    if cityCount == 0 then
+        Speech.emit("No cities to unblock. Found a city first.", "meta");
         return;
     end
 
@@ -344,37 +359,45 @@ function CityProduction.unblockAll()
         end
     end
 
-    -- Announce. Order: production first (per-city + total), then
-    -- research, then civic, then skip count. Each spoken-line queued
-    -- (NOINTERRUPT after the first) so the burst doesn't truncate.
+    -- Announce. Order: production first, then research, then civic,
+    -- then skip count. All routed as event kind; the gateway queues
+    -- same-kind-back-to-back automatically (event coalesce=false), so
+    -- we don't need the prior `spoke`-flag NOINTERRUPT bookkeeping.
+    --
+    -- Speech actor must be explicit per line. Earlier wording
+    -- ("Queued Warrior in Cape Town. Researching Pottery.") read to
+    -- Noel as a single phrase — "Warrior researching Pottery" — and
+    -- gave him the mental model that the unit was doing the research.
+    -- City-level + civ-level actions sound continuous in Tolk's
+    -- rapid-fire delivery; subject prefix per line resolves it.
     local spoke = false;
 
     if #queued == 1 then
-        OutputMessageToScreenReader("Queued " .. queued[1]);
+        Speech.emit("Queued " .. queued[1], "event");
         spoke = true;
     elseif #queued > 1 then
-        OutputMessageToScreenReader("Queued " .. tostring(#queued) .. " cities. "
-                                    .. table.concat(queued, ", "));
+        Speech.emit("Queued " .. tostring(#queued) .. " cities. "
+                    .. table.concat(queued, ", "), "event");
         spoke = true;
     end
 
     if researchPicked ~= nil then
-        OutputMessageToScreenReader("Researching " .. researchPicked, spoke);
+        Speech.emit("Research set to " .. researchPicked, "event");
         spoke = true;
     end
     if civicPicked ~= nil then
-        OutputMessageToScreenReader("Studying " .. civicPicked, spoke);
+        Speech.emit("Civic set to " .. civicPicked, "event");
         spoke = true;
     end
 
     if skipped > 0 then
-        OutputMessageToScreenReader(tostring(skipped) .. " cities had nothing to queue",
-                                    spoke);
+        Speech.emit(tostring(skipped) .. " cities had nothing to queue",
+                    "meta");
         spoke = true;
     end
 
     if not spoke then
-        OutputMessageToScreenReader("No blockers to clear");
+        Speech.emit("No blockers to clear", "meta");
     end
 end
 

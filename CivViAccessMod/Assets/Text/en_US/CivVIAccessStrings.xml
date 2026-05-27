@@ -256,7 +256,7 @@
             <Text>Visible nearby: {1_List}.</Text>
         </Row>
         <Row Tag="LOC_CIVVIACCESS_FIRST_TURN_NAV_HINT">
-            <Text>Press B to found a city here with the Settler. Press period to cycle to the next unit that needs orders, comma for the previous. Hold Shift with Q, E, A, D, Z, or C to move the selected unit. Heads up: city production isn't keyboard-accessible until 0.5.1, so once you found a city you can move units and explore turn 1, but you can't end the turn yet. Use the pause menu with Escape to save and exit cleanly when you're done.</Text>
+            <Text>Press B to found a city here with the Settler. Press period to cycle to the next unit that needs orders, comma for the previous. Hold Alt with Q, E, A, D, Z, or C to move the selected unit one hex. After you found a city, press Shift+P to choose what it produces. Research is not yet keyboard-accessible; press Alt+P to auto-pick the cheapest research and civic so you can end your turn.</Text>
         </Row>
 
         <!-- Advisor popup (waypoint 06). Two-button choice support via

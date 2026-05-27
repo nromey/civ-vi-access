@@ -77,14 +77,14 @@ local function speakCurrent(state)
     local visible = applyFilter(state.entries, state.filter);
     state._visibleCount = #visible;
     if #visible == 0 then
-        OutputMessageToScreenReader("No matching bindings");
+        Speech.emit("No matching bindings", "meta");
         return;
     end
     if state.index < 1 then state.index = 1; end
     if state.index > #visible then state.index = #visible; end
     local entry = visible[state.index];
     local position = "(" .. state.index .. " of " .. #visible .. ")";
-    OutputMessageToScreenReader(resolveEntry(entry) .. " " .. position);
+    Speech.emit(resolveEntry(entry) .. " " .. position, "picker");
 end
 
 -- Open help on the given host handler. Snapshot the entries at open time
@@ -103,14 +103,19 @@ function Help.enter(handler)
         inputMode = false,
         buffer = "",
     };
-    OutputMessageToScreenReader("Help. " .. #entries .. " bindings.");
+    -- Preamble + first item are both picker tier; the first item
+    -- coalesce-replaces the preamble in flight (same as the prior
+    -- always-interrupt behavior). To preserve the preamble against the
+    -- first item, the entry-list would need a separate kind below
+    -- picker — not worth the kind expansion for help.
+    Speech.emit("Help. " .. #entries .. " bindings.", "picker");
     speakCurrent(handler._helpMode);
 end
 
 function Help.exit(handler)
     if handler == nil or handler._helpMode == nil then return; end
     handler._helpMode = nil;
-    OutputMessageToScreenReader("Help closed");
+    Speech.emit("Help closed", "event");
 end
 
 function Help.isOpen(handler)
@@ -127,7 +132,7 @@ local function handleInputModeKey(state, key, ctrlDown, altDown)
         state.filter = state.buffer;
         state.inputMode = false;
         state.index = 1;
-        OutputMessageToScreenReader("Filter applied");
+        Speech.emit("Filter applied", "event");
         speakCurrent(state);
         return true;
     end
@@ -136,14 +141,14 @@ local function handleInputModeKey(state, key, ctrlDown, altDown)
         state.filter = nil;
         state.inputMode = false;
         state.index = 1;
-        OutputMessageToScreenReader("Filter cleared");
+        Speech.emit("Filter cleared", "event");
         speakCurrent(state);
         return true;
     end
     if key == Keys.VK_BACK then
         if #state.buffer > 0 then
             state.buffer = state.buffer:sub(1, -2);
-            OutputMessageToScreenReader("Filter " .. state.buffer);
+            Speech.emit("Filter " .. state.buffer, "picker");
         end
         return true;
     end
@@ -153,7 +158,7 @@ local function handleInputModeKey(state, key, ctrlDown, altDown)
         if (key >= 0x41 and key <= 0x5A) or (key >= 0x30 and key <= 0x39) or key == 0x20 then
             local ch = string.char(key);
             state.buffer = state.buffer .. string.lower(ch);
-            OutputMessageToScreenReader("Filter " .. state.buffer);
+            Speech.emit("Filter " .. state.buffer, "picker");
             return true;
         end
     end
@@ -185,7 +190,7 @@ function Help.handleKey(handler, key, ctrlDown, altDown, shiftDown)
     if ctrlDown and key == Keys.F then
         state.inputMode = true;
         state.buffer = "";
-        OutputMessageToScreenReader("Filter. Type to search, Enter to apply, Escape to clear.");
+        Speech.emit("Filter. Type to search, Enter to apply, Escape to clear.", "selection");
         return true;
     end
     if key == Keys.VK_UP then

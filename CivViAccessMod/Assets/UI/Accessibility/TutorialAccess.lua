@@ -87,7 +87,7 @@ end
 function TutorialAccess.OnAdvisorRaise(advisorInfo)
     local line = buildAdvisorAnnouncement(advisorInfo);
     if line ~= "" then
-        OutputMessageToScreenReader(line);
+        Speech.emit(line, "selection");
     end
 end
 
@@ -107,7 +107,7 @@ function TutorialAccess.OnGoalAdd(goal)
         return;
     end
     m_goalTextById[goal.Id] = text;
-    OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_TUTORIAL_GOAL_ADDED", text));
+    Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_TUTORIAL_GOAL_ADDED", text), "event");
 end
 
 function TutorialAccess.OnGoalMarkComplete(goalId, turn)
@@ -118,7 +118,7 @@ function TutorialAccess.OnGoalMarkComplete(goalId, turn)
     -- in normal flow but is defensive — engine reload, mid-session join,
     -- or a tutorial item that completes a goal it didn't add itself).
     local text = m_goalTextById[goalId] or tostring(goalId);
-    OutputMessageToScreenReader(Locale.Lookup("LOC_CIVVIACCESS_TUTORIAL_GOAL_COMPLETE", text));
+    Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_TUTORIAL_GOAL_COMPLETE", text), "event");
 end
 
 function TutorialAccess.OnShowWorldPointer(plotID, direction, offset, head, body)
@@ -143,10 +143,11 @@ function TutorialAccess.OnShowWorldPointer(plotID, direction, offset, head, body
     end
 
     if #parts > 0 then
-        -- Queued speech: world-pointer announcement usually follows the
-        -- advisor popup on the same step, and we don't want to clobber
-        -- the popup's spoken body mid-sentence.
-        OutputMessageToScreenReader(table.concat(parts, ". "), true);
+        -- status: world-pointer announcement usually follows the advisor
+        -- popup on the same step. status (pri 2) sits below the advisor
+        -- popup's selection tier (pri 5) so the gateway queues this
+        -- behind the popup body rather than clobbering it mid-sentence.
+        Speech.emit(table.concat(parts, ". "), "status");
     end
 end
 
