@@ -70,6 +70,7 @@
       <File priority="10001">Assets/UI/Accessibility/ScreenReader.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
       <File priority="10001">Assets/UI/Accessibility/Help.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/RevealPopupAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexGeom.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexCursor.lua</File>
       <File priority="10001">Assets/UI/Accessibility/UnitMovement.lua</File>
@@ -91,6 +92,15 @@
       <File priority="10001">Assets/UI/Panels/NotificationPanel.lua</File>
       <File priority="10001">Assets/UI/Panels/ProductionPanel.lua</File>
       <File priority="10001">Assets/UI/Popups/TechCivicCompletedPopup.lua</File>
+      <File priority="10001">Assets/UI/Popups/NaturalWonderPopup.lua</File>
+      <File priority="10001">Assets/UI/Popups/BoostUnlockedPopup.lua</File>
+      <File priority="10001">Assets/UI/Popups/ProjectBuiltPopup.lua</File>
+      <File priority="10001">Assets/UI/Popups/WonderBuiltPopup.lua</File>
+      <File priority="10001">Assets/UI/Additions/HeroesPopup.lua</File>
+      <File priority="10001">Assets/UI/Additions/SecretSocietyPopup.lua</File>
+      <File priority="10001">Assets/UI/Additions/NaturalDisasterPopup.lua</File>
+      <File priority="10001">Assets/UI/Additions/RockBandMoviePopup.lua</File>
+      <File priority="10001">Assets/UI/Additions/EraCompletePopup.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
       <File priority="10001">Assets/UI/Accessibility/OptionsAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/AdvisorPopupAccess.lua</File>
@@ -237,6 +247,16 @@
     <File>Assets/UI/Panels/ProductionPanel.lua</File>
     <File>Assets/UI/Panels/StatusMessagePanel.lua</File>
     <File>Assets/UI/Popups/TechCivicCompletedPopup.lua</File>
+    <File>Assets/UI/Popups/NaturalWonderPopup.lua</File>
+    <File>Assets/UI/Popups/BoostUnlockedPopup.lua</File>
+    <File>Assets/UI/Popups/ProjectBuiltPopup.lua</File>
+    <File>Assets/UI/Popups/WonderBuiltPopup.lua</File>
+    <File>Assets/UI/Additions/HeroesPopup.lua</File>
+    <File>Assets/UI/Additions/SecretSocietyPopup.lua</File>
+    <File>Assets/UI/Additions/NaturalDisasterPopup.lua</File>
+    <File>Assets/UI/Additions/RockBandMoviePopup.lua</File>
+    <File>Assets/UI/Additions/EraCompletePopup.lua</File>
+    <File>Assets/UI/Accessibility/RevealPopupAccess.lua</File>
     <File>Assets/UI/ToolTips/PlotToolTip.lua</File>
     <File>Assets/Data/RemapForHexCursor.xml</File>
     <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
