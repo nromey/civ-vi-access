@@ -21,7 +21,12 @@ kDiscoveredImages["SECRETSOCIETY_VOIDSINGERS"]		= "GovernorSelectedSTK_VoidSinge
 kDiscoveredImages["SECRETSOCIETY_SANGUINE_PACT"]	= "GovernorSelectedSTK_SanguinePact";
 
 -- begin ScreenReaderAccess mod change
-local m_sPendingAnnounce:string = nil;
+-- Structured pending NotifyShow opts, built in ShowDiscovery / ShowJoined
+-- (where kSocietyDef is in scope) and consumed in Open(): event-specific
+-- lead-in + the engine text as gameplay + a forward-wired society visual
+-- description (Press I), keyed by SecretSocietyType. nil until an
+-- SecretSocietyDescriptions.xml ships.
+local m_pendingOpts:table = nil;
 -- end ScreenReaderAccess mod change
 
 -- ===========================================================================
@@ -40,17 +45,9 @@ function Open()
 	UIManager:QueuePopup(ContextPtr, PopupPriority.Low);
 
 	-- begin ScreenReaderAccess mod change
-	if m_sPendingAnnounce ~= nil and m_sPendingAnnounce ~= "" then
-		local text = m_sPendingAnnounce;
-		if stripIconTags ~= nil then
-			text = stripIconTags(text);
-		end
-		RevealPopupAccess.NotifyShow({
-			text    = text,
-			onClose = function() Close() end,
-			kind    = "critical",
-		});
-		m_sPendingAnnounce = nil;
+	if m_pendingOpts ~= nil then
+		RevealPopupAccess.NotifyShow(m_pendingOpts);
+		m_pendingOpts = nil;
 	end
 	-- end ScreenReaderAccess mod change
 end
@@ -142,7 +139,16 @@ function ShowDiscovery(pNotification:table)
 	Controls.SocietyDescription:SetText(sSocietyDesc);
 
 	-- begin ScreenReaderAccess mod change
-	m_sPendingAnnounce = sTitle .. ". " .. sEventDesc .. ". " .. sSocietyDesc;
+	local _ssKey = "LOC_CIVVIACCESS_SS_" .. tostring(kSocietyDef.SecretSocietyType);
+	m_pendingOpts = {
+		leadIn   = "Secret society discovered",
+		gameplay = sTitle .. ". " .. sEventDesc .. ". " .. sSocietyDesc,
+		short    = RevealPopupAccess.locOrNil(_ssKey .. "_SHORT"),
+		long     = RevealPopupAccess.locOrNil(_ssKey .. "_LONG"),
+		typeNoun = "secret society",
+		onClose  = function() Close() end,
+		kind     = "critical",
+	};
 	-- end ScreenReaderAccess mod change
 
 	Open();
@@ -190,7 +196,16 @@ function ShowJoined(ePlayer:number, eSociety:number)
 	Controls.SocietyDescription:SetText(sSocietyDesc);
 
 	-- begin ScreenReaderAccess mod change
-	m_sPendingAnnounce = sTitle .. ". " .. sEventDesc .. ". " .. sSocietyDesc;
+	local _ssKey = "LOC_CIVVIACCESS_SS_" .. tostring(kSocietyDef.SecretSocietyType);
+	m_pendingOpts = {
+		leadIn   = "Secret society joined",
+		gameplay = sTitle .. ". " .. sEventDesc .. ". " .. sSocietyDesc,
+		short    = RevealPopupAccess.locOrNil(_ssKey .. "_SHORT"),
+		long     = RevealPopupAccess.locOrNil(_ssKey .. "_LONG"),
+		typeNoun = "secret society",
+		onClose  = function() Close() end,
+		kind     = "critical",
+	};
 	-- end ScreenReaderAccess mod change
 
 	Open();
@@ -228,3 +243,14 @@ function Initialize()
 	Controls.ContinueButton:RegisterCallback( Mouse.eLClick, OnContinueButton );
 end
 Initialize();
+
+-- begin ScreenReaderAccess mod change (debug)
+-- FireTuner (any state): LuaEvents.CivViAccess_DebugRaisePopup("SecretSociety")
+-- (needs the Secret Societies game mode active).
+RevealPopupAccess.RegisterDebugRaiser("SecretSociety", function()
+	if GameInfo.SecretSocieties == nil then return; end
+	local s; for r in GameInfo.SecretSocieties() do s = r; break; end
+	if s == nil then return; end
+	ShowJoined(Game.GetLocalPlayer(), s.Index);
+end);
+-- end ScreenReaderAccess mod change (debug)

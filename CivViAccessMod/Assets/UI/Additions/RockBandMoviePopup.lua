@@ -116,25 +116,22 @@ function ShowPopup( kData:table )
 	Controls.RockBandLevel:SetText(kData.rockLevel);
 
 	-- begin ScreenReaderAccess mod change
-	-- Assemble band name + rock level + tourism into one announce.
-	local parts = {};
-	if kData.Name ~= nil and kData.Name ~= "" then
-		table.insert(parts, kData.Name);
-	end
+	-- Structured announce (Noel 2026-05-29): lead-in → band name → level +
+	-- tourism → dismiss. A concert is a cinematic scene (audit: gameplay
+	-- text suffices, no visual description).
+	local gparts = {};
 	if kData.rockLevel ~= nil then
-		table.insert(parts, "Rock band level " .. tostring(kData.rockLevel));
+		table.insert(gparts, "Rock band level " .. tostring(kData.rockLevel));
 	end
 	if kData.tourism ~= nil and kData.tourism > 0 then
-		table.insert(parts, tostring(kData.tourism) .. " tourism gained");
-	end
-	local text = table.concat(parts, ". ");
-	if stripIconTags ~= nil then
-		text = stripIconTags(text);
+		table.insert(gparts, tostring(kData.tourism) .. " tourism gained");
 	end
 	RevealPopupAccess.NotifyShow({
-		text    = text,
-		onClose = function() Close() end,
-		kind    = "critical",
+		leadIn   = "Rock band concert",
+		name     = (kData.Name ~= nil and kData.Name ~= "") and kData.Name or nil,
+		gameplay = table.concat(gparts, ". "),
+		onClose  = function() Close() end,
+		kind     = "critical",
 	});
 	-- end ScreenReaderAccess mod change
 end
@@ -283,3 +280,14 @@ function Initialize()
 	LuaEvents.GameDebug_Return.Add(OnGameDebugReturn);
 end
 Initialize();
+
+-- begin ScreenReaderAccess mod change (debug)
+-- FireTuner (any state): LuaEvents.CivViAccess_DebugRaisePopup("RockBand")
+-- (needs Gathering Storm). Best-effort synthetic args; dispatcher pcall-guards.
+RevealPopupAccess.RegisterDebugRaiser("RockBand", function()
+	local lp = Game.GetLocalPlayer();
+	local u = UI.GetHeadSelectedUnit();
+	local x, y = (u and u:GetX() or 0), (u and u:GetY() or 0);
+	OnRockBandConcert(lp, (u and u:GetID() or 0), x, y, 0, 100);
+end);
+-- end ScreenReaderAccess mod change (debug)

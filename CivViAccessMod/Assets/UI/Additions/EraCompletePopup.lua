@@ -142,25 +142,15 @@ function StartEraShow()
 	end
 
 	-- begin ScreenReaderAccess mod change
-	-- Assemble era name + age verdict into one announce.
-	local parts = {};
-	if newEraName ~= nil then
-		local sEra = Locale.Lookup(newEraName);
-		if sEra ~= nil and sEra ~= "" then
-			table.insert(parts, sEra);
-		end
-	end
-	if _sAgeVerdict ~= nil and _sAgeVerdict ~= "" then
-		table.insert(parts, _sAgeVerdict);
-	end
-	local text = table.concat(parts, ". ");
-	if stripIconTags ~= nil then
-		text = stripIconTags(text);
-	end
+	-- Structured announce (Noel 2026-05-29): lead-in → era name → age
+	-- verdict → dismiss. Era transitions are abstract art (audit: marginal),
+	-- so no visual short/long / Press I.
 	RevealPopupAccess.NotifyShow({
-		text    = text,
-		onClose = function() Close() end,
-		kind    = "critical",
+		leadIn   = "New era",
+		name     = (newEraName ~= nil) and Locale.Lookup(newEraName) or nil,
+		gameplay = _sAgeVerdict,
+		onClose  = function() Close() end,
+		kind     = "critical",
 	});
 	-- end ScreenReaderAccess mod change
 end
@@ -312,6 +302,21 @@ end
 -- ===========================================================================
 function Initialize()
 
+	-- begin ScreenReaderAccess mod change
+	-- Eras/Ages gate. RealizeColorKey() below (and OnCheckGameEraChanged,
+	-- which we subscribe to LocalPlayerTurnBegin) call Game.GetEras(),
+	-- which only exists under Rise & Fall / Gathering Storm rulesets.
+	-- Under a vanilla ruleset Game.GetEras is nil and the original code
+	-- crashes at load (Initialize -> RealizeColorKey -> Game.GetEras).
+	-- Bail early so the context stays fully inert — and crash-free — for
+	-- players without the expansion. Gating principle: a wrapper only
+	-- needs this guard if it touches an expansion-only API in its load
+	-- path; handler-only usage is self-gating.
+	if Game.GetEras == nil then
+		return;
+	end
+	-- end ScreenReaderAccess mod change
+
 	ContextPtr:SetInputHandler( OnInputHandler, true );
 	ContextPtr:SetShowHandler( OnShow );
 	ContextPtr:SetInitHandler( OnInit );
@@ -336,3 +341,12 @@ function Initialize()
 
 end
 Initialize();
+
+-- begin ScreenReaderAccess mod change (debug)
+-- FireTuner (any state): LuaEvents.CivViAccess_DebugRaisePopup("EraComplete")
+-- (needs the Eras/Ages system: Rise & Fall or Gathering Storm).
+RevealPopupAccess.RegisterDebugRaiser("EraComplete", function()
+	if Game.GetEras == nil then return; end
+	StartEraShow();
+end);
+-- end ScreenReaderAccess mod change (debug)

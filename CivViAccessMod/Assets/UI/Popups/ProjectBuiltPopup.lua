@@ -111,29 +111,19 @@ function ShowPopup( kData:table )
 	end
 
 	-- begin ScreenReaderAccess mod change
-	-- Assemble headline + project name + description into one announce.
-	local parts = {};
-	table.insert(parts, Locale.Lookup("LOC_UI_PROJECT_COMPLETED_TITLE"));
-	if kData.Name ~= nil then
-		local name = Locale.Lookup(kData.Name);
-		if name ~= nil and name ~= "" then
-			table.insert(parts, name);
-		end
-	end
-	if kData.Description ~= nil then
-		local desc = Locale.Lookup(kData.Description);
-		if desc ~= nil and desc ~= "" then
-			table.insert(parts, desc);
-		end
-	end
-	local text = table.concat(parts, ". ");
-	if stripIconTags ~= nil then
-		text = stripIconTags(text);
-	end
+	-- Structured announce (Noel 2026-05-29): lead-in → name → gameplay →
+	-- dismiss. Projects mute the narrator (no voiced quote to skip). Short/
+	-- long visual descriptions added only if the audit decides projects
+	-- warrant them.
+	local pname    = (kData.Name ~= nil) and Locale.Lookup(kData.Name) or nil;
+	local gameplay = (kData.Description ~= nil) and Locale.Lookup(kData.Description) or nil;
 	RevealPopupAccess.NotifyShow({
-		text    = text,
-		onClose = function() Close() end,
-		kind    = "critical",
+		leadIn   = "Project completed",
+		name     = pname,
+		gameplay = gameplay,
+		typeNoun = "project",
+		onClose  = function() Close() end,
+		kind     = "critical",
 	});
 	-- end ScreenReaderAccess mod change
 end
@@ -264,3 +254,16 @@ function Initialize()
 	LuaEvents.GameDebug_Return.Add( OnGameDebugReturn );
 end
 Initialize();
+
+-- begin ScreenReaderAccess mod change (debug)
+-- FireTuner (any state): LuaEvents.CivViAccess_DebugRaisePopup("ProjectBuilt")
+RevealPopupAccess.RegisterDebugRaiser("ProjectBuilt", function()
+	local p;
+	for r in GameInfo.Projects() do
+		if r.PopupText ~= nil and r.PopupText ~= "" then p = r; break; end
+	end
+	if p == nil then for r in GameInfo.Projects() do p = r; break; end end
+	if p == nil then return; end
+	ShowPopup({ Name = p.Name, Description = p.Description, Icon = "ICON_" .. p.ProjectType, projectPopupText = p.PopupText or "x", locX = -1, locY = -1 });
+end);
+-- end ScreenReaderAccess mod change (debug)

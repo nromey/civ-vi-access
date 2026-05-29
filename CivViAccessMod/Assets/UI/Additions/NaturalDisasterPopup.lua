@@ -277,10 +277,14 @@ function ShowPopup( kData:table )
 	if stripIconTags ~= nil then
 		text = stripIconTags(text);
 	end
+	-- Structured: "Natural disaster" lead-in + the assembled detail (header,
+	-- type, description, losses) as gameplay + dismiss hint. A disaster is a
+	-- cinematic scene (audit: gameplay text suffices, no visual description).
 	RevealPopupAccess.NotifyShow({
-		text    = text,
-		onClose = function() Close() end,
-		kind    = "critical",
+		leadIn   = "Natural disaster",
+		gameplay = text,
+		onClose  = function() Close() end,
+		kind     = "critical",
 	});
 	-- end ScreenReaderAccess mod change
 end
@@ -585,3 +589,16 @@ function Initialize()
 	Events.CameraAnimationNotFound.Add( OnCameraAnimationNotFound );
 end
 Initialize();
+
+-- begin ScreenReaderAccess mod change (debug)
+-- FireTuner (any state): LuaEvents.CivViAccess_DebugRaisePopup("NaturalDisaster")
+-- (needs Gathering Storm). Best-effort synthetic args; dispatcher pcall-guards.
+RevealPopupAccess.RegisterDebugRaiser("NaturalDisaster", function()
+	if GameInfo.RandomEvents == nil then return; end
+	local ev; for r in GameInfo.RandomEvents() do ev = r; break; end
+	if ev == nil then return; end
+	local u = UI.GetHeadSelectedUnit();
+	local x, y = (u and u:GetX() or 0), (u and u:GetY() or 0);
+	ShowRandomEvent(ev.Index, 1, x, y, 0, ev.Index, -1);
+end);
+-- end ScreenReaderAccess mod change (debug)

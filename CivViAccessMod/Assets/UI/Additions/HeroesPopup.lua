@@ -41,7 +41,11 @@ local m_pCommandIM:table		= InstanceManager:new( "CommandInstance", "Top", Contr
 -- begin ScreenReaderAccess mod change
 -- Each show path assembles its own text and stashes it here so Open()
 -- can pass it to RevealPopupAccess. Cleared after the announce fires.
-local m_sPendingAnnounce:string = nil;
+-- Structured pending NotifyShow opts, built in the event handlers (where
+-- kHeroDef is in scope) and consumed in Open(): event-specific lead-in +
+-- the engine message as gameplay + a forward-wired hero visual description
+-- (Press I), keyed by HeroClassType. nil until a HeroDescriptions.xml ships.
+local m_pendingOpts:table = nil;
 -- end ScreenReaderAccess mod change
 
 -- ===========================================================================
@@ -66,17 +70,9 @@ function Open()
 	UIManager:QueuePopup(ContextPtr, PopupPriority.Low);
 
 	-- begin ScreenReaderAccess mod change
-	if m_sPendingAnnounce ~= nil and m_sPendingAnnounce ~= "" then
-		local text = m_sPendingAnnounce;
-		if stripIconTags ~= nil then
-			text = stripIconTags(text);
-		end
-		RevealPopupAccess.NotifyShow({
-			text    = text,
-			onClose = function() Close() end,
-			kind    = "critical",
-		});
-		m_sPendingAnnounce = nil;
+	if m_pendingOpts ~= nil then
+		RevealPopupAccess.NotifyShow(m_pendingOpts);
+		m_pendingOpts = nil;
 	end
 	-- end ScreenReaderAccess mod change
 end
@@ -214,9 +210,18 @@ function OnPlayerDiscoveredHero( ePlayer:number, eClass:number, eSourceType:numb
 		end);
 
 		-- begin ScreenReaderAccess mod change
-		m_sPendingAnnounce = Locale.Lookup("LOC_NOTIFICATION_HERO_DISCOVERED_MESSAGE")
-			.. ". " .. sEventDescription
-			.. ". " .. sHeroDescription;
+		local _heroKey = "LOC_CIVVIACCESS_HERO_" .. tostring(kHeroDef.HeroClassType);
+		m_pendingOpts = {
+			leadIn   = "Hero discovered",
+			gameplay = Locale.Lookup("LOC_NOTIFICATION_HERO_DISCOVERED_MESSAGE")
+				.. ". " .. sEventDescription
+				.. ". " .. sHeroDescription,
+			short    = RevealPopupAccess.locOrNil(_heroKey .. "_SHORT"),
+			long     = RevealPopupAccess.locOrNil(_heroKey .. "_LONG"),
+			typeNoun = "hero",
+			onClose  = function() Close() end,
+			kind     = "critical",
+		};
 		-- end ScreenReaderAccess mod change
 	end
 
@@ -278,9 +283,18 @@ function OnUnitKilledLifespanExpired(iPlayerID : number, eHeroClass : number, x 
 		end
 
 		-- begin ScreenReaderAccess mod change
-		m_sPendingAnnounce = Locale.Lookup("LOC_HERO_EXPIRED_MESSAGE")
-			.. ". " .. sExpiredDesc
-			.. ". " .. sRecallDesc;
+		local _heroKey = "LOC_CIVVIACCESS_HERO_" .. tostring(kHeroDef.HeroClassType);
+		m_pendingOpts = {
+			leadIn   = "Hero lost",
+			gameplay = Locale.Lookup("LOC_HERO_EXPIRED_MESSAGE")
+				.. ". " .. sExpiredDesc
+				.. ". " .. sRecallDesc,
+			short    = RevealPopupAccess.locOrNil(_heroKey .. "_SHORT"),
+			long     = RevealPopupAccess.locOrNil(_heroKey .. "_LONG"),
+			typeNoun = "hero",
+			onClose  = function() Close() end,
+			kind     = "critical",
+		};
 		-- end ScreenReaderAccess mod change
 	end
 
@@ -343,9 +357,18 @@ function OnUnitDamageChanged(iPlayerID:number, iUnitID:number, iDamage:number)
 		end
 
 		-- begin ScreenReaderAccess mod change
-		m_sPendingAnnounce = Locale.Lookup("LOC_HERO_KILLED_MESSAGE")
-			.. ". " .. sKilledDesc
-			.. ". " .. sRecallDesc;
+		local _heroKey = "LOC_CIVVIACCESS_HERO_" .. tostring(kHeroDef.HeroClassType);
+		m_pendingOpts = {
+			leadIn   = "Hero defeated",
+			gameplay = Locale.Lookup("LOC_HERO_KILLED_MESSAGE")
+				.. ". " .. sKilledDesc
+				.. ". " .. sRecallDesc,
+			short    = RevealPopupAccess.locOrNil(_heroKey .. "_SHORT"),
+			long     = RevealPopupAccess.locOrNil(_heroKey .. "_LONG"),
+			typeNoun = "hero",
+			onClose  = function() Close() end,
+			kind     = "critical",
+		};
 		-- end ScreenReaderAccess mod change
 	end
 
@@ -416,3 +439,14 @@ function Initialize()
 	Controls.ImageDescStack:RegisterSizeChanged( UpdateEffectsContainerSize );
 end
 Initialize();
+
+-- begin ScreenReaderAccess mod change (debug)
+-- FireTuner (any state): LuaEvents.CivViAccess_DebugRaisePopup("Heroes")
+-- (needs the Heroes & Legends game mode active).
+RevealPopupAccess.RegisterDebugRaiser("Heroes", function()
+	if GameInfo.HeroClasses == nil then return; end
+	local hc; for r in GameInfo.HeroClasses() do hc = r; break; end
+	if hc == nil then return; end
+	OnPlayerDiscoveredHero(Game.GetLocalPlayer(), hc.Index, 0, 0);
+end);
+-- end ScreenReaderAccess mod change (debug)

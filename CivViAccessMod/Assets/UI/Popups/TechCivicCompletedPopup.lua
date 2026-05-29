@@ -6,6 +6,7 @@
 include("TechAndCivicSupport");			-- (Already includes Civ6Common and InstanceManager) PopulateUnlockablesForTech, PopulateUnlockablesForCivic, GetUnlockablesForCivic, GetUnlockablesForTech
 include("LocalPlayerActionSupport");
 include("ScreenReader")
+include("RevealPopupAccess")
 
 	
 -- ===========================================================================
@@ -116,7 +117,13 @@ function ShowCivicCompletedPopup( player:number, civic:number, quote:string, aud
 	-- critical: tech/civic completion is a major game-state announce
 	-- (player worked turns to reach this). 2000ms shield protects it
 	-- against engine-incidental selection-changed announces.
-	Speech.emit(Controls.ResearchName:GetText(), "critical")
+	RevealPopupAccess.NotifyShow({
+		leadIn   = "Civic completed",
+		name     = Controls.ResearchName:GetText(),
+		gameplay = Controls.UnlockCountLabel:GetText(),
+		onClose  = function() OnClose() end,
+		kind     = "critical",
+	});
 	-- End ScreenReader access mod change
 end
 
@@ -186,7 +193,13 @@ function ShowTechCompletedPopup( player:number, tech:number, quote:string, audio
 	-- critical: tech/civic completion is a major game-state announce
 	-- (player worked turns to reach this). 2000ms shield protects it
 	-- against engine-incidental selection-changed announces.
-	Speech.emit(Controls.ResearchName:GetText(), "critical")
+	RevealPopupAccess.NotifyShow({
+		leadIn   = "Technology researched",
+		name     = Controls.ResearchName:GetText(),
+		gameplay = Controls.UnlockCountLabel:GetText(),
+		onClose  = function() OnClose() end,
+		kind     = "critical",
+	});
 	-- End ScreenReader access mod change
 end
 
@@ -316,6 +329,9 @@ end
 --	Immediate close.
 -- ===========================================================================
 function Close()
+	-- begin ScreenReaderAccess mod change
+	RevealPopupAccess.NotifyClose();
+	-- end ScreenReaderAccess mod change
 	StopSound();
 	m_kPopupData = {};						-- Force no data (e.g., immediate end turn)
 	m_kCurrentData = nil;
@@ -364,6 +380,10 @@ end
 
 -- ===========================================================================
 function OnInputHandler( input )
+	-- begin ScreenReaderAccess mod change
+	-- Reveal helper consumes Enter/Space/Esc (dismiss), T (re-read), I (long).
+	if RevealPopupAccess.HandleKey(input) then return true; end
+	-- end ScreenReaderAccess mod change
 	local msg = input:GetMessageType();
 	if (msg == KeyEvents.KeyUp) then
 		local key = input:GetKey();
@@ -490,3 +510,13 @@ function Initialize()
 	Events.LocalPlayerTurnEnd.Add( OnLocalPlayerTurnEnd );
 end
 Initialize();
+
+-- begin ScreenReaderAccess mod change (debug)
+-- FireTuner (any state): LuaEvents.CivViAccess_DebugRaisePopup("TechCivic")
+RevealPopupAccess.RegisterDebugRaiser("TechCivic", function()
+	local lp = Game.GetLocalPlayer();
+	local t; for r in GameInfo.Technologies() do t = r; break; end
+	if t == nil then return; end
+	ShowTechCompletedPopup(lp, t.Index, t.Quote, nil);
+end);
+-- end ScreenReaderAccess mod change (debug)

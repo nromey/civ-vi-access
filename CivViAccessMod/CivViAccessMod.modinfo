@@ -177,6 +177,7 @@
     <UpdateText id="SRAccess_IG_Text">
       <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
       <File>Assets/Text/en_US/LeaderDescriptions.xml</File>
+      <File>Assets/Text/en_US/NaturalWonderDescriptions.xml</File>
     </UpdateText>
     <!-- RemapForHexCursor is intentionally only registered in
          FrontEndActions. InputActionDefaultGestures lives in the
@@ -261,5 +262,6 @@
     <File>Assets/Data/RemapForHexCursor.xml</File>
     <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
     <File>Assets/Text/en_US/LeaderDescriptions.xml</File>
+    <File>Assets/Text/en_US/NaturalWonderDescriptions.xml</File>
   </Files>
 </Mod>

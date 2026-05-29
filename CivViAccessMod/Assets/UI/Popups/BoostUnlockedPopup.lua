@@ -22,28 +22,26 @@ local m_isPastLoadingScreen		:boolean = false;
 local m_isOnQueue				:boolean = false;
 
 -- begin ScreenReaderAccess mod change
--- Local helper to push the assembled header/cause/desc speech through
--- RevealPopupAccess. Called from the tail of ShowTechBoost /
--- ShowCivicBoost where all three strings are known.
-local function _SRAccessAnnounce(headerString:string, msgString:string, descString:string)
+-- Push the boost speech through RevealPopupAccess. Called from the tail of
+-- ShowTechBoost / ShowCivicBoost. leadIn is the game-term framing ("Eureka"
+-- for tech, "Inspiration" for civic, Noel 2026-05-29); the generic engine
+-- header ("TECH BOOST UNLOCKED") is dropped since leadIn already conveys it.
+-- The cause + progress become the gameplay segment. Boosts show only an icon
+-- + progress bar — no scene to describe — so no visual short/long / Press I.
+local function _SRAccessAnnounce(leadIn:string, msgString:string, descString:string)
 	local parts = {};
-	if headerString ~= nil and headerString ~= "" then
-		table.insert(parts, headerString);
-	end
 	if msgString ~= nil and msgString ~= "" then
 		table.insert(parts, msgString);
 	end
 	if descString ~= nil and descString ~= "" then
 		table.insert(parts, descString);
 	end
-	local text = table.concat(parts, ". ");
-	if stripIconTags ~= nil then
-		text = stripIconTags(text);
-	end
+	local gameplay = table.concat(parts, ". ");
 	RevealPopupAccess.NotifyShow({
-		text    = text,
-		onClose = function() OnClose() end,
-		kind    = "critical",
+		leadIn   = leadIn,
+		gameplay = gameplay,
+		onClose  = function() OnClose() end,
+		kind     = "critical",
 	});
 end
 -- end ScreenReaderAccess mod change
@@ -172,7 +170,7 @@ function ShowTechBoost(techIndex, iTechProgress, eSource)
     end
 
 	-- begin ScreenReaderAccess mod change
-	_SRAccessAnnounce(headerString, msgString, descString);
+	_SRAccessAnnounce("Eureka", msgString, descString);
 	-- end ScreenReaderAccess mod change
 end
 
@@ -282,7 +280,7 @@ function ShowCivicBoost(civicIndex, iCivicProgress, eSource)
     end
 
 	-- begin ScreenReaderAccess mod change
-	_SRAccessAnnounce(headerString, msgString, descString);
+	_SRAccessAnnounce("Inspiration", msgString, descString);
 	-- end ScreenReaderAccess mod change
 end
 
@@ -468,3 +466,10 @@ function Initialize()
 	Events.UIIdle.Add( OnUIIdle );
 end
 Initialize();
+
+-- begin ScreenReaderAccess mod change (debug)
+-- FireTuner (any state): LuaEvents.CivViAccess_DebugRaisePopup("BoostUnlocked")
+RevealPopupAccess.RegisterDebugRaiser("BoostUnlocked", function()
+	ShowTechBoost(0, 1, -1);
+end);
+-- end ScreenReaderAccess mod change (debug)

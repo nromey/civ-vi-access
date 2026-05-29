@@ -114,39 +114,39 @@ function ShowPopup( kData:table )
 	Controls.ReplayButton:SetHide(UI.GetWorldRenderView() ~= WorldRenderView.VIEW_3D);
 
 	-- begin ScreenReaderAccess mod change
-	-- Assemble "Wonder Completed" + name + quote + description into one announce.
-	-- Read source data directly from GameInfo (NaturalWonderPopup pattern).
+	-- Structured announce (Noel 2026-05-29): lead-in → name → gameplay
+	-- effects → [short visual] → [Press I for full world wonder] → dismiss.
+	-- The game VOICES the quote (QuoteAudio, played just above), so we skip
+	-- it to avoid double-speak; if a wonder has no audio the quote is silent
+	-- text, so we fold it into gameplay. Short/long visual descriptions come
+	-- from the wonder-describer pipeline (WorldWonderDescriptions.xml) and get
+	-- wired in once generated.
 	local kBuilding:table = GameInfo.Buildings[buildingIndex];
-	local parts = {};
-	table.insert(parts, Locale.Lookup("LOC_UI_WONDER_COMPLETED_TITLE"));
+	local wname, gameplay;
 	if kBuilding ~= nil then
-		if kBuilding.Name ~= nil then
-			local name = Locale.Lookup(kBuilding.Name);
-			if name ~= nil and name ~= "" then
-				table.insert(parts, name);
-			end
-		end
-		if kBuilding.Quote ~= nil then
-			local quote = Locale.Lookup(kBuilding.Quote);
-			if quote ~= nil and quote ~= "" then
-				table.insert(parts, quote);
-			end
-		end
-		if kBuilding.Description ~= nil then
-			local desc = Locale.Lookup(kBuilding.Description);
-			if desc ~= nil and desc ~= "" then
-				table.insert(parts, desc);
+		wname    = (kBuilding.Name ~= nil) and Locale.Lookup(kBuilding.Name) or nil;
+		gameplay = (kBuilding.Description ~= nil) and Locale.Lookup(kBuilding.Description) or nil;
+		local hasAudio = (kBuilding.QuoteAudio ~= nil and kBuilding.QuoteAudio ~= "");
+		if not hasAudio and kBuilding.Quote ~= nil then
+			local q = Locale.Lookup(kBuilding.Quote);
+			if q ~= nil and q ~= "" then
+				gameplay = (gameplay ~= nil and gameplay ~= "") and (gameplay .. ". " .. q) or q;
 			end
 		end
 	end
-	local text = table.concat(parts, ". ");
-	if stripIconTags ~= nil then
-		text = stripIconTags(text);
-	end
+	-- Visual descriptions keyed by BuildingType (wonder-describer →
+	-- WorldWonderDescriptions.xml). nil until that XML ships.
+	local wwKey = (kBuilding ~= nil and kBuilding.BuildingType ~= nil)
+		and ("LOC_CIVVIACCESS_WW_" .. kBuilding.BuildingType) or nil;
 	RevealPopupAccess.NotifyShow({
-		text    = text,
-		onClose = function() Close() end,
-		kind    = "critical",
+		leadIn   = "World wonder completed",
+		name     = wname,
+		gameplay = gameplay,
+		short    = wwKey and RevealPopupAccess.locOrNil(wwKey .. "_SHORT") or nil,
+		long     = wwKey and RevealPopupAccess.locOrNil(wwKey .. "_LONG") or nil,
+		typeNoun = "world wonder",
+		onClose  = function() Close() end,
+		kind     = "critical",
 	});
 	-- end ScreenReaderAccess mod change
 end
@@ -271,3 +271,18 @@ function Initialize()
 	Events.SystemUpdateUI.Add( OnUpdateUI );
 end
 Initialize();
+
+-- begin ScreenReaderAccess mod change (debug)
+-- FireTuner (any state): LuaEvents.CivViAccess_DebugRaisePopup("WonderBuilt")
+RevealPopupAccess.RegisterDebugRaiser("WonderBuilt", function()
+	local lp = Game.GetLocalPlayer();
+	local bIdx;
+	for r in GameInfo.Buildings() do
+		if r.IsWonder and r.RequiresPlacement then bIdx = r.Index; break; end
+	end
+	if bIdx == nil then return; end
+	local u = UI.GetHeadSelectedUnit();
+	local x, y = (u and u:GetX() or 0), (u and u:GetY() or 0);
+	OnWonderCompleted(x, y, bIdx, lp, -1, 100, 0);
+end);
+-- end ScreenReaderAccess mod change (debug)

@@ -117,30 +117,40 @@ function ShowPopup( kData:table )
 	Controls.QuoteContainer:DoAutoSize();
 
 	-- begin ScreenReaderAccess mod change
-	-- Assemble headline + quote + description into one announce.
-	-- Wrapper-side helper (stripIconTags) lives in ScreenReader.lua,
-	-- pulled in via RevealPopupAccess's include chain. Quote audio
-	-- plays alongside; speech kind is critical so it shields against
-	-- the SetInterfaceMode(CINEMATIC) selection-changed announce.
-	local parts = {};
-	if kData.Name ~= nil and kData.Name ~= "" then
-		table.insert(parts, kData.Name);
+	-- Structured announce (Noel 2026-05-29): lead-in framing → name →
+	-- gameplay effects → [short visual] → [Press I for full <type>] →
+	-- dismiss hint. Short/long visual descriptions come from the
+	-- wonder-describer pipeline (NaturalWonderDescriptions.xml) and get
+	-- wired in once generated; until then they're nil and the helper omits
+	-- the short line + the "Press I" hint.
+	--
+	-- The game VOICES the quote (QuoteAudio) — Sean-Bean-style narration —
+	-- so we DON'T duplicate it (avoids double-speak; Noel's option 1). If a
+	-- feature has no QuoteAudio the quote is silent text, so we fold it in
+	-- after the gameplay effects rather than lose it.
+	local gameplay = kData.Description;
+	if (kData.QuoteAudio == nil or kData.QuoteAudio == "")
+			and kData.Quote ~= nil and kData.Quote ~= "" then
+		if gameplay ~= nil and gameplay ~= "" then
+			gameplay = gameplay .. ". " .. kData.Quote;
+		else
+			gameplay = kData.Quote;
+		end
 	end
-	if kData.Quote ~= nil and kData.Quote ~= "" then
-		table.insert(parts, kData.Quote);
-	end
-	if kData.Description ~= nil and kData.Description ~= "" then
-		table.insert(parts, kData.Description);
-	end
-	local text = table.concat(parts, ". ");
-	-- Strip [ICON_*] markers if the helper exists in this VM.
-	if stripIconTags ~= nil then
-		text = stripIconTags(text);
-	end
+
+	-- Visual descriptions keyed by FeatureType (wonder-describer →
+	-- NaturalWonderDescriptions.xml). nil until that XML ships; then the
+	-- short line + "Press I" hint appear automatically.
+	local nwKey = "LOC_CIVVIACCESS_NW_" .. tostring(kData.TypeName);
 	RevealPopupAccess.NotifyShow({
-		text    = text,
-		onClose = function() Close() end,
-		kind    = "critical",
+		leadIn   = "Natural wonder discovered",
+		name     = kData.Name,
+		gameplay = gameplay,
+		short    = RevealPopupAccess.locOrNil(nwKey .. "_SHORT"),
+		long     = RevealPopupAccess.locOrNil(nwKey .. "_LONG"),
+		typeNoun = "natural wonder",
+		onClose  = function() Close() end,
+		kind     = "critical",
 	});
 	-- end ScreenReaderAccess mod change
 end
@@ -306,3 +316,18 @@ function Initialize()
 
 end
 Initialize();
+
+-- begin ScreenReaderAccess mod change (debug)
+-- Lets FireTuner raise this popup without selecting its Lua state (the state
+-- combo isn't keyboard/screen-reader focusable). From any tuner state:
+--   LuaEvents.CivViAccess_DebugRaisePopup("NaturalWonder")
+RevealPopupAccess.RegisterDebugRaiser("NaturalWonder", function()
+	local f;
+	for r in GameInfo.Features() do
+		if r.NaturalWonder then f = r.Index; break; end
+	end
+	local u = UI.GetHeadSelectedUnit();
+	local x, y = (u and u:GetX() or 0), (u and u:GetY() or 0);
+	OnNaturalWonderRevealed(x, y, f, true);
+end);
+-- end ScreenReaderAccess mod change (debug)
