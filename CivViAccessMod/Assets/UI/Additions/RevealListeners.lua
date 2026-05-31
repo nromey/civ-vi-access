@@ -67,6 +67,13 @@ local m_open        = false;
 local m_vanillaPath = nil;   -- "/InGame/HeroesPopup" etc. — torn down on close
 local m_pending     = nil;   -- {opts, vanillaPath} awaiting the deferred show
 
+-- RockBand delayed-cinematic gate. Default ON so the debug concert generator
+-- exercises it; set false to fall back to the safe announce-only path (the
+-- vanilla popup plays its cinematic immediately and we only speak). See
+-- OnRockBandConcert + the "RockBand delayed-cinematic gate" section below.
+local ROCKBAND_DELAY_CINEMATIC = true;
+local m_rb = nil;   -- {owner, unit, x, y, played, opts} while the gate is active
+
 -- Dequeue a vanilla DLC popup by its context path so it stops owning input /
 -- the screen. Same call the popup's own Close() makes. Guarded — the control
 -- may not exist (mode off, already closed).
@@ -288,18 +295,69 @@ local function heroOpts(kHeroDef, leadIn, eSourceType, iSourceID)
     };
 end
 
-local function societyOpts(kSocietyDef, leadIn, descKey)
+-- The name of the secret society the local player already belongs to (nil if
+-- none). Mirrors the vanilla popup's GetGovernors():GetSecretSociety() check,
+-- which switches the discovery flavor to the "while a member of another" text.
+local function currentMemberSocietyName()
+    local pPlayer = Players and Players[localPlayer()] or nil;
+    if pPlayer == nil or pPlayer.GetGovernors == nil then return nil; end
+    local govs = pPlayer:GetGovernors();
+    if govs == nil or govs.GetSecretSociety == nil then return nil; end
+    local hash = govs:GetSecretSociety();
+    local kMember = (hash ~= nil) and GameInfo.SecretSocieties[hash] or nil;
+    return kMember and L(kMember.Name) or nil;
+end
+
+-- Build the society reveal body exactly as the vanilla SecretSocietyPopup reads
+-- it (PARITY): the event description (LOC_DISCOVERED_SOCIETY_FIRST/SUBSEQUENT or
+-- LOC_JOINED_SOCIETY_DESC) followed by the society's own discovery/membership
+-- flavor (DiscoveryText / MembershipText, or the "while member of another"
+-- variant). The vanilla EventTitle is dropped — our leadIn + name already say
+-- it (same call the hero modal makes). Icon tags are stripped downstream.
+local function societyGameplay(kDef, joined, isFirst, memberOfOtherName)
+    local icon = kDef.IconString or "";
+    local eventDesc, societyDesc;
+    if joined then
+        eventDesc   = L("LOC_JOINED_SOCIETY_DESC", kDef.Name, icon);
+        societyDesc = L(kDef.MembershipText);
+    else
+        eventDesc = isFirst
+            and L("LOC_DISCOVERED_SOCIETY_FIRST_DESC", kDef.Name, icon)
+            or  L("LOC_DISCOVERED_SOCIETY_SUBSEQUENT_DESC", kDef.Name, icon);
+        if memberOfOtherName ~= nil then
+            societyDesc = L("LOC_DISCOVERED_SOCIETY_WHILE_MEMBER_OF_ANOTHER", kDef.Name, memberOfOtherName);
+        else
+            societyDesc = L(kDef.DiscoveryText);
+        end
+    end
+    local parts = {};
+    if eventDesc   ~= nil then parts[#parts + 1] = eventDesc; end
+    if societyDesc ~= nil then parts[#parts + 1] = societyDesc; end
+    return (#parts > 0) and table.concat(parts, " ") or nil;
+end
+
+local function societyOpts(kSocietyDef, leadIn, gameplay)
     if kSocietyDef == nil then return nil; end
     local key  = "LOC_CIVVIACCESS_SS_" .. tostring(kSocietyDef.SecretSocietyType);
     local long = locOrNil(key .. "_LONG");
     setLastLong(long);
+    -- G: open the Governors panel — the vanilla "Open Governors" button
+    -- (OnOpenGovernorsButton -> LuaEvents.GovernorPanel_Open). That panel is
+    -- where a governor title is spent to join the society / unlock its tiers,
+    -- so it's the society reveal's primary action (the hero modal's G analogue).
+    local action = nil;
+    if LuaEvents ~= nil and LuaEvents.GovernorPanel_Open ~= nil then
+        action = function() LuaEvents.GovernorPanel_Open(); end;
+    end
     return {
-        leadIn   = leadIn,
-        name     = L(kSocietyDef.Name),
-        gameplay = locOrNil(descKey),
-        short    = locOrNil(key .. "_SHORT"),
-        long     = long,
-        typeNoun = "secret society",
+        leadIn     = leadIn,
+        name       = L(kSocietyDef.Name),
+        gameplay   = gameplay,
+        short      = locOrNil(key .. "_SHORT"),
+        long       = long,
+        typeNoun   = "secret society",
+        action     = action,
+        actionHint = "open the Governors panel",
     };
 end
 
@@ -320,16 +378,29 @@ local function disasterOpts(kEventInfo, mitigationLevel)
     };
 end
 
-local function rockBandOpts(bandName, totalTourism)
+-- RockBand is ANNOUNCE-ONLY: the vanilla RockBandMoviePopup holds a gamecore
+-- event (ms_eventID = UI.ReferenceCurrentEvent()) released ONLY in its own
+-- Close() (UI.ReleaseEventID). That ID is a local in the vanilla's VM, so if we
+-- dequeued the vanilla to layer our modal over it the hold would never release
+-- -> soft-lock, and we can't release another VM's hold. So we let the vanilla
+-- own the popup + cinematic + Escape-to-close (which releases cleanly) and only
+-- SPEAK. The concert is a cinematic scene with thin, non-navigable content
+-- (band + level + tourism), so AnnounceOnly costs only the R re-read. (Enter-
+-- gating the concert for audio description needs the event-hold solved first —
+-- a focused future session; see the rockband memory.)
+local function rockBandOpts(bandName, rockLevel, totalTourism)
     setLastLong(nil);
-    local gameplay = nil;
+    local gparts = {};
+    if rockLevel ~= nil then
+        gparts[#gparts + 1] = "Rock band level " .. tostring(rockLevel);
+    end
     if totalTourism ~= nil and totalTourism > 0 then
-        gameplay = tostring(totalTourism) .. " tourism gained";
+        gparts[#gparts + 1] = tostring(totalTourism) .. " tourism gained";
     end
     return {
         leadIn   = "Rock band concert",
         name     = bandName,
-        gameplay = gameplay,
+        gameplay = (#gparts > 0) and table.concat(gparts, ". ") or nil,
     };
 end
 
@@ -354,6 +425,92 @@ local function eraOpts(eraIndex, player, eras)
         name     = kEra and L(kEra.Name) or nil,
         gameplay = ageVerdict(eras, player),
     };
+end
+
+-- ===========================================================================
+--  RockBand delayed-cinematic gate (two-stage, soft-lock-safe)
+-- ---------------------------------------------------------------------------
+-- The vanilla RockBandMoviePopup holds a gamecore event it releases ONLY in its
+-- own Close(); that id is private to its VM, so dequeuing the vanilla would
+-- orphan the hold -> soft-lock, and we can't release another VM's hold. So we
+-- DON'T dequeue it: we leave the vanilla up and let its own Escape do the clean
+-- teardown (event release + lens/mode/input restore). We stop the cinematic it
+-- auto-starts (so it doesn't play over our briefing), layer our modal ON TOP
+-- owning input, and Enter replays the concert (Sean-Bean). On dismiss we close
+-- ONLY our modal and cue the user to press Escape once more -> the vanilla then
+-- tears itself down. Two-step dismiss, but zero event-hold risk. (A single-
+-- Escape takeover needs the event-hold release proven on a real concert first.)
+local function rbStopCinematic()
+    if m_rb == nil then return; end
+    pcall(function() Events.StopAllCameraAnimations(); end);
+    pcall(function() Events.UnitStopCinematicAnimation("IDLE", m_rb.owner, m_rb.unit, m_rb.x, m_rb.y); end);
+end
+
+local function rbPlayCinematic()
+    if m_rb == nil then return; end
+    m_rb.played = true;
+    pcall(function() UI.LookAtPlotScreenPosition(m_rb.x, m_rb.y, 0.5, 0.5); end);
+    pcall(function() Events.PlayCameraAnimationAtHex("ROCK_BAND_CONCERT_CAMERA", m_rb.x, m_rb.y, 0.0, true); end);
+    pcall(function() Events.UnitPlayCinematicAnimation("ACTION_1", m_rb.owner, m_rb.unit, m_rb.x, m_rb.y); end);
+end
+
+local function rbSpeak(text)
+    if text == nil or text == "" then return; end
+    if Speech ~= nil and Speech.emit ~= nil then Speech.emit(text, "selection"); end
+end
+
+-- Close ONLY our modal; leave the vanilla popup frontmost to self-teardown on
+-- Escape (it owns the gamecore event hold). Cue the user to press Escape.
+local function rbCloseModal()
+    if m_rb == nil then return; end
+    rbStopCinematic();
+    m_rb = nil;
+    m_open = false;
+    RevealPopupAccess.NotifyClose();
+    pcall(function() if UIManager ~= nil and UIManager.DequeuePopup ~= nil then UIManager:DequeuePopup(ContextPtr); end end);
+    pcall(function()
+        if Input ~= nil and Input.PopContext ~= nil
+           and InputContext ~= nil and InputContext.GameOptions ~= nil
+           and Input.GetActiveContext ~= nil
+           and Input.GetActiveContext() == InputContext.GameOptions then
+            Input.PopContext();
+        end
+    end);
+    pcall(function() if ContextPtr ~= nil and ContextPtr.SetHide ~= nil then ContextPtr:SetHide(true); end end);
+    rbSpeak("Press Escape to continue.");
+end
+
+-- Deferred show: by now the vanilla popup has appeared + started its cinematic
+-- this frame. Stop the cinematic, then layer our modal OVER it (no dequeue).
+local function rbShowDeferred()
+    if ContextPtr ~= nil and ContextPtr.ClearUpdate ~= nil then ContextPtr:ClearUpdate(); end
+    if m_rb == nil then return; end
+    rbStopCinematic();
+    m_open = true;
+    pcall(function() if ContextPtr ~= nil and ContextPtr.SetHide ~= nil then ContextPtr:SetHide(false); end end);
+    pcall(function() if UIManager ~= nil and UIManager.QueuePopup ~= nil then UIManager:QueuePopup(ContextPtr, PopupPriority.Current); end end);
+    pcall(function()
+        if Input ~= nil and Input.PushActiveContext ~= nil and InputContext ~= nil and InputContext.GameOptions ~= nil then
+            Input.PushActiveContext(InputContext.GameOptions);
+        end
+    end);
+    local o = m_rb.opts or {};
+    o.playCinematic = rbPlayCinematic;   -- first Enter replays the concert
+    o.stopCinematic = rbStopCinematic;   -- torn down on dismiss if it was played
+    o.cinematicHint = "Enter to play the concert";
+    o.onClose       = rbCloseModal;
+    o.kind          = "critical";
+    RevealPopupAccess.NotifyShow(o);
+end
+
+local function rbRaiseGate()
+    if ContextPtr ~= nil and ContextPtr.SetUpdate ~= nil then
+        -- Hidden contexts get no SetUpdate tick (root-caused 2026-05-30) — unhide first.
+        if ContextPtr.SetHide ~= nil then ContextPtr:SetHide(false); end
+        ContextPtr:SetUpdate(rbShowDeferred);
+    else
+        rbShowDeferred();   -- fallback: no SetUpdate, show now
+    end
 end
 
 -- ===========================================================================
@@ -386,7 +543,9 @@ local function OnSecretSocietyDiscovered(pNotification)
     local eSociety = pNotification:GetValue("PARAM_DATA1");
     local kDef = eSociety and GameInfo.SecretSocieties[eSociety] or nil;
     if kDef == nil then return; end
-    RaiseLive(societyOpts(kDef, "Secret society discovered", kDef.DiscoveryText), "/InGame/SecretSocietyPopup");
+    local isFirst = pNotification:GetValue("PARAM_DATA2") and true or false;
+    local gameplay = societyGameplay(kDef, false, isFirst, currentMemberSocietyName());
+    RaiseLive(societyOpts(kDef, "Secret society discovered", gameplay), "/InGame/SecretSocietyPopup");
 end
 
 local function OnSecretSocietyJoined(pNotification)
@@ -394,7 +553,7 @@ local function OnSecretSocietyJoined(pNotification)
     local eSociety = pNotification:GetValue("PARAM_DATA1");
     local kDef = eSociety and GameInfo.SecretSocieties[eSociety] or nil;
     if kDef == nil then return; end
-    RaiseLive(societyOpts(kDef, "Secret society joined", kDef.MembershipText), "/InGame/SecretSocietyPopup");
+    RaiseLive(societyOpts(kDef, "Secret society joined", societyGameplay(kDef, true)), "/InGame/SecretSocietyPopup");
 end
 
 local function OnRandomEventOccurred(type, severity, plotx, ploty, mitigationLevel, randomEventID, gameCorePlaybackEventID)
@@ -408,13 +567,35 @@ end
 local function OnRockBandConcert(ownerID, unitID, unitX, unitY, result, totalTourism)
     local lp = localPlayer();
     if lp < 0 or ownerID ~= lp then return; end
+    -- Mirror the vanilla guards: no concert popup in multiplayer, and only for a
+    -- human (skip AI autoplay).
+    if GameConfiguration ~= nil and GameConfiguration.IsAnyMultiplayer
+       and GameConfiguration.IsAnyMultiplayer() then return; end
     local pPlayer = Players and Players[lp] or nil;
-    if pPlayer == nil then return; end
-    local bandName = nil;
+    if pPlayer == nil or (pPlayer.IsHuman and not pPlayer:IsHuman()) then return; end
+    local bandName, rockLevel = nil, nil;
     local pUnits = pPlayer.GetUnits and pPlayer:GetUnits() or nil;
     local pUnit = pUnits and pUnits:FindID(unitID) or nil;
-    if pUnit ~= nil and pUnit.GetName then bandName = pUnit:GetName(); end
-    RaiseLive(rockBandOpts(bandName, totalTourism), "/InGame/RockBandMoviePopup");
+    if pUnit ~= nil then
+        if pUnit.GetName then bandName = pUnit:GetName(); end
+        local pRockBand = pUnit.GetRockBand and pUnit:GetRockBand() or nil;
+        if pRockBand ~= nil and pRockBand.GetRockBandLevel then
+            rockLevel = pRockBand:GetRockBandLevel();
+        end
+    end
+    if ROCKBAND_DELAY_CINEMATIC then
+        -- Sean-Bean gate: defer a frame so the vanilla shows + starts its
+        -- cinematic, then stop it + layer our modal; Enter replays the concert.
+        m_rb = {
+            owner = ownerID, unit = unitID, x = unitX, y = unitY, played = false,
+            opts  = rockBandOpts(bandName, rockLevel, totalTourism),
+        };
+        rbRaiseGate();
+    else
+        -- Safe fallback: the vanilla popup owns the cinematic, its event hold, and
+        -- Escape-to-close; we only speak. No dequeue -> no soft-lock.
+        RevealPopupAccess.AnnounceOnly(rockBandOpts(bandName, rockLevel, totalTourism));
+    end
 end
 
 -- Era: PlayerEraChanged fires a volley at game load (before the view is up);
@@ -453,11 +634,18 @@ LuaEvents.CivViAccess_DebugRaisePopup.Add(function(name, arg2)
         ShowReveal(heroOpts(cls, "Hero discovered"), nil);
     elseif name == "SecretSociety" then
         local kDef = GameInfo.SecretSocieties["SECRETSOCIETY_OWLS_OF_MINERVA"] or firstRow("SecretSocieties");
-        if kDef ~= nil then ShowReveal(societyOpts(kDef, "Secret society discovered", kDef.DiscoveryText), nil); end
+        if kDef ~= nil then
+            -- arg2 "joined" exercises the membership-text path; default = discovery.
+            local joined = (arg2 == "joined");
+            local leadIn = joined and "Secret society joined" or "Secret society discovered";
+            ShowReveal(societyOpts(kDef, leadIn, societyGameplay(kDef, joined, true, nil)), nil);
+        end
     elseif name == "NaturalDisaster" then
         ShowReveal(disasterOpts(firstRow("RandomEvents"), 0), nil);
     elseif name == "RockBand" then
-        ShowReveal(rockBandOpts("The Debug Band", 42), nil);
+        -- RockBand ships announce-only (see OnRockBandConcert), so the debug
+        -- raise SPEAKS the same announce rather than opening a modal.
+        RevealPopupAccess.AnnounceOnly(rockBandOpts("The Debug Band", 2, 42));
     elseif name == "EraComplete" then
         local eras = (Game.GetEras ~= nil) and Game.GetEras() or nil;
         local cur = eras and eras:GetCurrentEra() or 0;
@@ -532,6 +720,253 @@ LuaEvents.CivViAccess_DebugTriggerReal.Add(function(name, arg2)
 end);
 
 -- ===========================================================================
+--  DEBUG: PERFORM a rock-band concert from THIS (UI) VM.
+--  SPLIT-VM (root-caused 2026-05-31): unit CREATION (InitUnit*) lives only in
+--  the GameCore VM; operation REQUESTS (RequestOperation/UnitOperationTypes)
+--  live only HERE (this UI VM — the same calls UnitMovement.lua uses for
+--  MOVE_TO). So the two halves are split: DebugConcert.lua (gameplay VM) spawns
+--  a UNIT_ROCK_BAND if none exists; THIS hook performs the concert. No cross-VM
+--  messaging — the band gameplay spawns on turn N is findable here on turn N+1.
+--  Valid target plots come from the rock band's own GetActivationHighlightPlots
+--  (the same source the vanilla SelectedUnit_Expansion2 highlights for the
+--  player). Latches after one concert is requested. Debug-only.
+-- ===========================================================================
+local m_concertDone = false;
+
+-- Operation / param hash WITHOUT the UnitOperationTypes enum. That enum is
+-- absent in THIS context (the warn fired 2026-05-31 although RequestOperation
+-- exists here — UnitMovement.lua has the enum because it runs in a DIFFERENT UI
+-- context, HexCursorAddin; bindings are per-context). Three fallbacks, most
+-- reliable first:
+--   1. GameInfo.UnitOperations[name].Hash — GameInfo is confirmed present here
+--      (we use GameInfo.Units in this file). UnitPanel.lua:232 uses exactly this.
+--      (operations only; PARAM_* are not GameInfo rows.)
+--   2. the UnitOperationTypes enum, if this context happens to have it.
+--   3. DB.MakeHash(name) — how the base game hashes names (ActionPanel.lua).
+-- RequestOperation accepts a raw hash, so any of these works.
+local function opHash(name, enumKey, gameInfoTable)
+    if gameInfoTable ~= nil and GameInfo ~= nil and GameInfo[gameInfoTable] ~= nil then
+        local row = GameInfo[gameInfoTable][name];
+        if row ~= nil and row.Hash ~= nil then return row.Hash; end
+    end
+    if UnitOperationTypes ~= nil and UnitOperationTypes[enumKey] ~= nil then
+        return UnitOperationTypes[enumKey];
+    end
+    if DB ~= nil and DB.MakeHash ~= nil then
+        return DB.MakeHash(name);
+    end
+    return nil;
+end
+
+-- ALL rock bands the player owns (the old spawn-every-turn bug scattered several
+-- at varying distances; we must check each for a valid concert target, not just
+-- the first). Type resolved via GetUnitType OR GetType (varies by VM).
+local function dbgFindRockBands(pPlayer)
+    local out = {};
+    if pPlayer == nil or pPlayer.GetUnits == nil then return out; end
+    local pUnits = pPlayer:GetUnits();
+    if pUnits == nil then return out; end
+    for _, u in pUnits:Members() do
+        if u ~= nil then
+            local t = (u.GetUnitType and u:GetUnitType()) or (u.GetType and u:GetType());
+            local row = (t ~= nil and GameInfo ~= nil and GameInfo.Units) and GameInfo.Units[t] or nil;
+            if row ~= nil and row.UnitType == "UNIT_ROCK_BAND" then out[#out + 1] = u; end
+        end
+    end
+    return out;
+end
+
+-- First activation (concert-target) plot for a band; nil if it has none (not
+-- adjacent to a valid foreign city). Returns (x, y, count).
+local function bandActivationPlot(band)
+    local rb = band.GetRockBand and band:GetRockBand() or nil;
+    if rb == nil or rb.GetActivationHighlightPlots == nil then return nil, nil, nil; end
+    local plots = rb:GetActivationHighlightPlots();
+    local n = (plots ~= nil) and #plots or 0;
+    if n > 0 and Map ~= nil and Map.GetPlotByIndex ~= nil then
+        local p = Map.GetPlotByIndex(plots[1]);
+        if p ~= nil then return p:GetX(), p:GetY(), n; end
+    end
+    return nil, nil, n;
+end
+
+-- Nearest city NOT owned by lp, to (bx,by). Returns (cx,cy) or nil. Gameplay
+-- API sees through fog. Used by the auto-walk fallback.
+local function uiNearestForeignCity(lp, bx, by)
+    local bestX, bestY, bestD = nil, nil, nil;
+    for i = 0, 63 do
+        local p = Players ~= nil and Players[i] or nil;
+        if p ~= nil and i ~= lp and (p.IsAlive == nil or p:IsAlive()) and p.GetCities ~= nil then
+            local cs = p:GetCities();
+            if cs ~= nil then
+                for _, c in cs:Members() do
+                    if c ~= nil then
+                        local cx, cy = c:GetX(), c:GetY();
+                        local d = (Map ~= nil and Map.GetPlotDistance)
+                                  and Map.GetPlotDistance(bx, by, cx, cy)
+                                  or (math.abs(cx - bx) + math.abs(cy - by));
+                        if bestD == nil or d < bestD then bestX, bestY, bestD = cx, cy, d; end
+                    end
+                end
+            end
+        end
+    end
+    return bestX, bestY;
+end
+
+-- A passable land hex adjacent to city (cx,cy), nearest to (fromX,fromY) so the
+-- walk path is shortest. Can't MOVE_TO the city center (foreign tile, no-ops);
+-- a band must stand ADJACENT to concert anyway. Returns (x,y) or nil.
+local function uiAdjacentPassableHex(cx, cy, fromX, fromY)
+    if Map == nil or Map.GetAdjacentPlot == nil then return nil; end
+    local ndir = (DirectionTypes ~= nil and DirectionTypes.NUM_DIRECTION_TYPES) or 6;
+    local bestX, bestY, bestD = nil, nil, nil;
+    for dir = 0, ndir - 1 do
+        local p = Map.GetAdjacentPlot(cx, cy, dir);
+        if p ~= nil then
+            local water = (p.IsWater ~= nil) and p:IsWater() or false;
+            local impassable = (p.IsImpassable ~= nil) and p:IsImpassable() or false;
+            if not water and not impassable then
+                local px, py = p:GetX(), p:GetY();
+                local d = (Map.GetPlotDistance ~= nil)
+                          and Map.GetPlotDistance(px, py, fromX, fromY)
+                          or (math.abs(px - fromX) + math.abs(py - fromY));
+                if bestD == nil or d < bestD then bestX, bestY, bestD = px, py, d; end
+            end
+        end
+    end
+    return bestX, bestY;
+end
+
+-- OFF by default (2026-05-31): this debug hook hunts for ANY rock band on every
+-- turn-begin and would hijack a REAL rock band during normal play. The concert
+-- pipeline is engine-validated (CanStartOperation=true); flip both this and
+-- DebugConcert.lua's DEBUG_CONCERT_ENABLED to true (then relaunch) to re-run the
+-- test rig. Paired with DebugConcert's gameplay-side spawn.
+local DEBUG_CONCERT_PERFORM = false;
+
+local function dbgPerformConcert()
+    if not DEBUG_CONCERT_PERFORM then return; end
+    if m_concertDone then return; end
+    -- One decisive diagnostic line: which pieces exist in THIS context.
+    Log.info("concert UI: ReqOp=" .. tostring(UnitManager ~= nil and UnitManager.RequestOperation ~= nil)
+        .. " UOT=" .. tostring(UnitOperationTypes ~= nil)
+        .. " DB.MakeHash=" .. tostring(DB ~= nil and DB.MakeHash ~= nil));
+    if UnitManager == nil or UnitManager.RequestOperation == nil then
+        Log.warn("concert UI: UnitManager.RequestOperation unavailable in this context"); return;
+    end
+    local hOp = opHash("UNITOPERATION_TOURISM_BOMB", "TOURISM_BOMB", "UnitOperations");
+    local hX  = opHash("PARAM_X", "PARAM_X", nil);   -- params: GameInfo has no row, use enum/MakeHash
+    local hY  = opHash("PARAM_Y", "PARAM_Y", nil);
+    if hOp == nil or hX == nil or hY == nil then
+        Log.warn("concert UI: cannot resolve hashes (hOp=" .. tostring(hOp)
+                 .. " hX=" .. tostring(hX) .. " hY=" .. tostring(hY) .. ")"); return;
+    end
+
+    local lp = localPlayer();
+    local pPlayer = Players ~= nil and Players[lp] or nil;
+    if pPlayer == nil then return; end
+    local bands = dbgFindRockBands(pPlayer);
+    if #bands == 0 then
+        Log.info("concert UI: no rock band yet (gameplay spawns one; will retry next turn-begin)"); return;
+    end
+    Log.info("concert UI: " .. #bands .. " rock band(s) owned; scanning for one with a valid concert target");
+
+    -- Pick the first band that actually has an activation (concert-target) plot.
+    local band, tx, ty = nil, nil, nil;
+    for _, b in ipairs(bands) do
+        local x, y, n = bandActivationPlot(b);
+        Log.info("concert UI:   band id=" .. tostring(b:GetID()) .. " at (" .. b:GetX() .. "," .. b:GetY()
+                 .. ") activationPlots=" .. tostring(n));
+        if x ~= nil then band, tx, ty = b, x, y; break; end
+    end
+    if band == nil then
+        -- DECISIVE DIAGNOSTIC (2026-05-31): no band has activation plots yet.
+        -- Single driver now (gameplay hands off). Log moves + exact distance to
+        -- the nearest foreign city, then either WAIT (adjacent, capture why plots
+        -- are 0) or WALK (not adjacent, only if it has moves).
+        local b = bands[1];
+        local bx, by = b:GetX(), b:GetY();
+        local moves = (b.GetMovesRemaining and b:GetMovesRemaining()) or -1;
+        local cx, cy = uiNearestForeignCity(lp, bx, by);
+        if cx == nil then Log.warn("concert UI: no foreign city to walk toward"); return; end
+        local distToCity = (Map ~= nil and Map.GetPlotDistance)
+                           and Map.GetPlotDistance(bx, by, cx, cy)
+                           or (math.abs(cx - bx) + math.abs(cy - by));
+        Log.info("concert UI: DIAG band (" .. bx .. "," .. by .. ") moves=" .. tostring(moves)
+                 .. " nearestCity (" .. cx .. "," .. cy .. ") distToCity=" .. tostring(distToCity));
+
+        -- ADJACENT to the city (dist 1): the band is in position. Capture WHY the
+        -- concert won't fire — moves, CanStartOperation verdict, raw plot count.
+        if distToCity <= 1 then
+            local rawN = -1;
+            pcall(function()
+                local rb = b.GetRockBand and b:GetRockBand() or nil;
+                if rb ~= nil and rb.GetActivationHighlightPlots ~= nil then
+                    local pl = rb:GetActivationHighlightPlots();
+                    rawN = (pl ~= nil) and #pl or -2;
+                end
+            end);
+            local hOp2 = opHash("UNITOPERATION_TOURISM_BOMB", "TOURISM_BOMB", "UnitOperations");
+            local canDo = "n/a";
+            if UnitManager.CanStartOperation ~= nil and hOp2 ~= nil then
+                pcall(function()
+                    canDo = tostring(UnitManager.CanStartOperation(b, hOp2, nil, true));
+                end);
+            end
+            Log.info("concert UI: DIAG ADJACENT — rawActivationPlots=" .. tostring(rawN)
+                     .. " CanStartOperation(TOURISM_BOMB)=" .. canDo .. " moves=" .. tostring(moves));
+            -- Try performing AT the city center directly (the activation target is
+            -- the city tile). If CanStart says yes OR we just try anyway:
+            if hOp2 ~= nil then
+                local tp = {}; tp[hX] = cx; tp[hY] = cy;
+                UnitManager.RequestOperation(b, hOp2, tp);
+                Log.info("concert UI: DIAG attempted TOURISM_BOMB at city (" .. cx .. "," .. cy
+                         .. ") directly — watch for PostTourismBomb");
+            end
+            return;
+        end
+
+        -- NOT adjacent. Only walk if it has moves; else wait (out of moves =
+        -- can't move OR perform this turn; fresh moves next turn-begin).
+        if moves ~= nil and moves <= 0 then
+            Log.info("concert UI: band out of moves (=" .. tostring(moves) .. "), waiting for next turn");
+            return;
+        end
+        local dgx, dgy = uiAdjacentPassableHex(cx, cy, bx, by);
+        if dgx == nil then Log.warn("concert UI: no passable hex adjacent to city (" .. cx .. "," .. cy .. ")"); return; end
+        local hMove = opHash("UNITOPERATION_MOVE_TO", "MOVE_TO", "UnitOperations");
+        if hMove == nil then Log.warn("concert UI: MOVE_TO hash unavailable"); return; end
+        local mp = {}; mp[hX] = dgx; mp[hY] = dgy;
+        if UnitOperationMoveModifiers ~= nil and UnitOperationMoveModifiers.NONE ~= nil then
+            local hMod = opHash("PARAM_MODIFIERS", "PARAM_MODIFIERS", nil);
+            if hMod ~= nil then mp[hMod] = UnitOperationMoveModifiers.NONE; end
+        end
+        UnitManager.RequestOperation(b, hMove, mp);
+        Log.info("concert UI: auto-walk MOVE_TO city-adjacent (" .. dgx .. "," .. dgy
+                 .. ") from (" .. bx .. "," .. by .. "); city (" .. cx .. "," .. cy .. ")");
+        if Speech ~= nil and Speech.emit ~= nil then
+            Speech.emit("Rock band moving toward city", "event");
+        end
+        return;
+    end
+    Log.info("concert UI: using band id=" .. tostring(band:GetID()) .. ", concert target (" .. tx .. "," .. ty .. ")");
+
+    if UnitManager.CanStartOperation ~= nil then
+        pcall(function()
+            Log.info("concert UI: CanStartOperation(TOURISM_BOMB)="
+                     .. tostring(UnitManager.CanStartOperation(band, hOp, nil, true)));
+        end);
+    end
+    local tParameters = {};
+    tParameters[hX] = tx;
+    tParameters[hY] = ty;
+    UnitManager.RequestOperation(band, hOp, tParameters);
+    m_concertDone = true;
+    Log.info("concert UI: requested TOURISM_BOMB at (" .. tx .. "," .. ty .. ") — watch for PostTourismBomb / the gate");
+end
+
+-- ===========================================================================
 --  Init
 -- ===========================================================================
 function Initialize()
@@ -554,6 +989,11 @@ function Initialize()
         if Events.PostTourismBomb ~= nil then Events.PostTourismBomb.Add(OnRockBandConcert); end
         if Events.PlayerEraChanged ~= nil then Events.PlayerEraChanged.Add(OnPlayerEraChanged); end
         if Events.LoadGameViewStateDone ~= nil then Events.LoadGameViewStateDone.Add(OnLoadGameViewStateDone); end
+        -- DEBUG concert-perform hook (UI VM half of the split-VM rock-band test).
+        if Events.LocalPlayerTurnBegin ~= nil then
+            Events.LocalPlayerTurnBegin.Add(dbgPerformConcert);
+            Log.info("RevealListeners: debug concert-perform armed on LocalPlayerTurnBegin (UI VM)");
+        end
     end
     Log.info("RevealListeners.lua: loaded; modal reveal window + event subscriptions ready");
 end

@@ -130,6 +130,10 @@
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
       <File priority="10001">Assets/UI/Accessibility/TurnAnnouncements.lua</File>
       <File priority="10001">Assets/UI/Accessibility/WorldInteractiveAnnounce.lua</File>
+      <!-- Debug-only: manufacture a rock-band concert on demand
+           (LuaEvents.CivViAccess_DebugGenerateConcert) to test the RockBand
+           reveal gate. Gameplay VM (needs UnitManager.InitUnit*). Strip before release. -->
+      <File priority="10001">Assets/UI/Accessibility/DebugConcert.lua</File>
       <!-- Notifications.lua deliberately NOT in AddGameplayScripts.
            Civ VI's gameplay + UI contexts are SEPARATE Lua VMs (each
            has its own globals table, its own Events subscriptions,
@@ -236,6 +240,7 @@
     <File>Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
     <File>Assets/UI/Accessibility/TurnAnnouncements.lua</File>
     <File>Assets/UI/Accessibility/WorldInteractiveAnnounce.lua</File>
+    <File>Assets/UI/Accessibility/DebugConcert.lua</File>
     <File>Assets/UI/Accessibility/Notifications.lua</File>
     <File>Assets/UI/Accessibility/AdvisorPopupAccess.lua</File>
     <File>Assets/UI/Popups/AdvisorPopup.lua</File>
