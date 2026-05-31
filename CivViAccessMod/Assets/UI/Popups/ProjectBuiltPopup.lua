@@ -168,7 +168,26 @@ function Close()
 		LuaEvents.ProjectBuiltPopup_Closed();	-- Signal other systems (e.g., bulk hide UI)
 		UI.SetInterfaceMode(InterfaceModeTypes.SELECTION);
 		UILens.RestoreActiveLens();
-		m_kPopupMgr:Unlock();
+		-- begin ScreenReaderAccess mod change
+		-- A synthetic debug-harness raise reaches the popup via QueuePopup
+		-- directly, bypassing m_kPopupMgr:Lock — so Unlock() indexes a nil
+		-- internal (PopupManager.lua:90) and throws an unhandled runtime error
+		-- on dismiss. In real gameplay the engine event Locks first and this
+		-- is a no-op. pcall-guard so harness testing can dismiss cleanly.
+		local ok, err = pcall(function() m_kPopupMgr:Unlock(); end);
+		if not ok then
+			print("[CivViAccess][WARN ] ProjectBuiltPopup.Close: Unlock skipped (no active lock; likely debug-harness raise): " .. tostring(err));
+			-- Unlock normally does DequeuePopup + PopContext; since it failed,
+			-- the InputContext.Reveal + QueuePopup the debug harness pushed are
+			-- left dangling and soft-lock input (Esc swallowed, Enter leaks to
+			-- World). Undo them directly, pcall-guarded. Dead code in real play
+			-- (real Lock succeeds, so this whole branch never runs).
+			pcall(function()
+				if UIManager ~= nil and ContextPtr ~= nil then UIManager:DequeuePopup(ContextPtr); end
+				if Input ~= nil and Input.PopContext ~= nil then Input.PopContext(); end
+			end);
+		end
+		-- end ScreenReaderAccess mod change
 	end
 end
 

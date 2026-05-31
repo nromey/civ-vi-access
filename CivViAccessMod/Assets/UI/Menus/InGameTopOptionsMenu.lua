@@ -860,7 +860,44 @@ function RefreshModsInUse()
 end
 
 -- ===========================================================================
+-- begin ScreenReaderAccess mod change
+-- The DLC reveal popups (Heroes / SecretSociety / NaturalDisaster / RockBand /
+-- EraComplete) are vanilla PopupPriority.Low contexts we announce via the
+-- RevealListeners addin. They only dismiss on Escape via their own handler,
+-- but our Escape->pause binding wins the key, trapping a keyboard user
+-- (confirmed Lua.log 2026-05-29: Escape opened this menu over a live Hercules
+-- popup). So when the pause menu is asked to open WHILE one of those popups is
+-- visible, treat Escape as "dismiss that popup" instead: dequeue it and bail.
+-- If the lookup misses (wrong path / nothing visible) we fall through to the
+-- normal pause menu, so this can only ADD a dismiss, never break the menu.
+local REVEAL_POPUP_CONTEXTS = {
+	"HeroesPopup", "SecretSocietyPopup", "NaturalDisasterPopup",
+	"RockBandMoviePopup", "EraCompletePopup",
+};
+local function dismissVisibleRevealPopup()
+	if ContextPtr == nil or ContextPtr.LookUpControl == nil then return false; end
+	for _, name in ipairs(REVEAL_POPUP_CONTEXTS) do
+		for _, prefix in ipairs({ "/InGame/", "/" }) do
+			local ok, ctx = pcall(function() return ContextPtr:LookUpControl(prefix .. name); end);
+			if ok and ctx ~= nil and ctx.IsHidden ~= nil and not ctx:IsHidden() then
+				Log.info("InGameTopOptionsMenu: Escape dismissing reveal popup '" .. name
+					.. "' (" .. prefix .. name .. ") instead of opening pause.");
+				if UIManager ~= nil and UIManager.DequeuePopup ~= nil then
+					pcall(function() UIManager:DequeuePopup(ctx); end);
+				end
+				return true;
+			end
+		end
+	end
+	return false;
+end
+-- end ScreenReaderAccess mod change
+
+-- ===========================================================================
 function OnOpenInGameOptionsMenu()
+	-- begin ScreenReaderAccess mod change
+	if dismissVisibleRevealPopup() then return; end
+	-- end ScreenReaderAccess mod change
 	-- Don't show pause menu if the player has retired (forfeit) from the game - fixes TTP 20129
 	if not m_isRetired then
 		UIManager:QueuePopup( ContextPtr, PopupPriority.InGameTopOptionsMenu, { AlwaysVisibleInQueue = true } );

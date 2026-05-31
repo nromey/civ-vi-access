@@ -219,6 +219,25 @@
          Name="LOC_CIVVIACCESS_HOTKEY_RECENTER_ON_UNIT"
          Description="LOC_CIVVIACCESS_HOTKEY_RECENTER_ON_UNIT_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- Mod-wide "say again": re-speak the last announcement (Ctrl+T). Works
+         over vanilla DLC reveal popups too — engine actions fire while those
+         PopupPriority.Low popups are up (that's how Escape reached the pause
+         menu). Cross-VM last-spoken is tracked in HexCursorAddin via the
+         CivViAccess_SpeechEmitted event. Base reveal popups consume bare-T /
+         Ctrl+T in their own raw handler first, so no double-read there. -->
+    <Row ActionId="CIVVIACCESS_RepeatAnnounce"
+         Name="LOC_CIVVIACCESS_HOTKEY_REPEAT_ANNOUNCE"
+         Description="LOC_CIVVIACCESS_HOTKEY_REPEAT_ANNOUNCE_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- Shift+I: read the full (long) visual description of the last reveal
+         popup (hero / secret society). The short description is spoken inline
+         in the announce; this is the deferred "Press I" long description,
+         delivered via an engine action since the listener can't own the
+         vanilla popup's input. Cinematic reveals have no long desc. -->
+    <Row ActionId="CIVVIACCESS_RevealLongDesc"
+         Name="LOC_CIVVIACCESS_HOTKEY_REVEAL_LONG_DESC"
+         Description="LOC_CIVVIACCESS_HOTKEY_REVEAL_LONG_DESC_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
     <!-- Cycle ALL units (ignores ready-to-select filter). Engine's
          . / , skip units that already have orders; once all units have
          moved, both go silent. Ctrl+. / Ctrl+, walk the full unit list.
@@ -379,6 +398,16 @@
          GestureData="LOC_OPTIONS_KEY_SLASH"/>
     <Row ActionId="CIVVIACCESS_RecenterOnUnit" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_SLASH"/>
+    <!-- Shift+T, NOT Ctrl+T: Ctrl+T never fired (NVDA grabs Ctrl to stop
+         speech and appears to eat the combo — id 112 registered but no
+         InputActionTriggered). Shift+letter is proven in this mod (the
+         Shift+QAZEDC unit moves work via this same Row mechanism) and Shift
+         isn't screen-reader-claimed. Confirmed dead Ctrl+T via Lua.log
+         2026-05-29. -->
+    <Row ActionId="CIVVIACCESS_RepeatAnnounce" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_T"/>
+    <Row ActionId="CIVVIACCESS_RevealLongDesc" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_I"/>
     <!-- Cycle-all bindings: Shift+. for next-all, Shift+, for prev-all.
          Round 8 mnemonic 2026-05-24: paired with the engine's bare
          period/comma (NextUnit/PrevUnit). Bare = "next unit needing

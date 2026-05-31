@@ -105,9 +105,11 @@ function ShowPopup( kData:table )
 		UI.DataError("The field 'Quote' has not been initialized for "..GameInfo.Buildings[buildingIndex].BuildingType);
 	end
 
-	if(GameInfo.Buildings[buildingIndex].QuoteAudio ~= nil) then
-		UI.PlaySound(GameInfo.Buildings[buildingIndex].QuoteAudio);
-	end
+	-- begin ScreenReaderAccess mod change: voiced quote (QuoteAudio) deferred
+	-- behind Enter (playCinematic in the NotifyShow opts below) so it doesn't
+	-- talk over our announce — Sean-Bean pattern. Nothing voices on show now.
+	-- (The wonder music/movie still plays; that's music under speech, fine.)
+	-- end ScreenReaderAccess mod change
 
 	UI.LookAtPlot(locX, locY);
 
@@ -122,16 +124,18 @@ function ShowPopup( kData:table )
 	-- from the wonder-describer pipeline (WorldWonderDescriptions.xml) and get
 	-- wired in once generated.
 	local kBuilding:table = GameInfo.Buildings[buildingIndex];
-	local wname, gameplay;
+	local wname, gameplay, hasAudio, quoteText;
 	if kBuilding ~= nil then
-		wname    = (kBuilding.Name ~= nil) and Locale.Lookup(kBuilding.Name) or nil;
-		gameplay = (kBuilding.Description ~= nil) and Locale.Lookup(kBuilding.Description) or nil;
-		local hasAudio = (kBuilding.QuoteAudio ~= nil and kBuilding.QuoteAudio ~= "");
-		if not hasAudio and kBuilding.Quote ~= nil then
-			local q = Locale.Lookup(kBuilding.Quote);
-			if q ~= nil and q ~= "" then
-				gameplay = (gameplay ~= nil and gameplay ~= "") and (gameplay .. ". " .. q) or q;
-			end
+		wname     = (kBuilding.Name ~= nil) and Locale.Lookup(kBuilding.Name) or nil;
+		gameplay  = (kBuilding.Description ~= nil) and Locale.Lookup(kBuilding.Description) or nil;
+		hasAudio  = (kBuilding.QuoteAudio ~= nil and kBuilding.QuoteAudio ~= "");
+		quoteText = (kBuilding.Quote ~= nil) and Locale.Lookup(kBuilding.Quote) or nil;
+		if quoteText == "" then quoteText = nil; end
+		-- No voiced quote → fold the silent quote text into gameplay (don't lose
+		-- it). With audio, the quote rides the voice (deferred to Enter) and its
+		-- TEXT rides the S key, so it's not folded here.
+		if not hasAudio and quoteText ~= nil then
+			gameplay = (gameplay ~= nil and gameplay ~= "") and (gameplay .. ". " .. quoteText) or quoteText;
 		end
 	end
 	-- Visual descriptions keyed by BuildingType (wonder-describer →
@@ -145,6 +149,11 @@ function ShowPopup( kData:table )
 		short    = wwKey and RevealPopupAccess.locOrNil(wwKey .. "_SHORT") or nil,
 		long     = wwKey and RevealPopupAccess.locOrNil(wwKey .. "_LONG") or nil,
 		typeNoun = "world wonder",
+		-- Voiced quote deferred behind Enter (Sean-Bean); its text rides S.
+		playCinematic   = hasAudio and function() UI.PlaySound(kBuilding.QuoteAudio); end or nil,
+		cinematicHint   = hasAudio and "Enter to play the wonder's audio quote" or nil,
+		transcript      = hasAudio and quoteText or nil,
+		transcriptLabel = "the quote",
 		onClose  = function() Close() end,
 		kind     = "critical",
 	});

@@ -303,10 +303,20 @@ function RealizeNextPopup()
 
 		for i, v in ipairs(m_kPopupData) do
 			m_kCurrentData = v;
-			table.remove(m_kPopupData, i);		
+			table.remove(m_kPopupData, i);
 			break;
 		end
 	end
+
+	-- begin ScreenReaderAccess mod change
+	-- The engine original calls Close() on empty data but does NOT return,
+	-- so it falls through and indexes m_kCurrentData.tech on a nil value
+	-- (crash seen via the debug harness when raised with no queued data;
+	-- also a latent guard for real empty-queue reshows). Bail if still nil.
+	if m_kCurrentData == nil then
+		return;
+	end
+	-- end ScreenReaderAccess mod change
 
 	m_isCivicData = (m_kCurrentData.tech == nil);
 	if m_isCivicData then		

@@ -87,6 +87,7 @@
       <File priority="10001">Assets/UI/Additions/TechPickerAddin.lua</File>
       <File priority="10001">Assets/UI/Additions/CivicPickerAddin.lua</File>
       <File priority="10001">Assets/UI/Additions/HelpAddin.lua</File>
+      <File priority="10001">Assets/UI/Additions/RevealListeners.lua</File>
       <File priority="10001">Assets/UI/Menus/InGameTopOptionsMenu.lua</File>
       <File priority="10001">Assets/UI/Panels/StatusMessagePanel.lua</File>
       <File priority="10001">Assets/UI/Panels/NotificationPanel.lua</File>
@@ -96,11 +97,10 @@
       <File priority="10001">Assets/UI/Popups/BoostUnlockedPopup.lua</File>
       <File priority="10001">Assets/UI/Popups/ProjectBuiltPopup.lua</File>
       <File priority="10001">Assets/UI/Popups/WonderBuiltPopup.lua</File>
-      <File priority="10001">Assets/UI/Additions/HeroesPopup.lua</File>
-      <File priority="10001">Assets/UI/Additions/SecretSocietyPopup.lua</File>
-      <File priority="10001">Assets/UI/Additions/NaturalDisasterPopup.lua</File>
-      <File priority="10001">Assets/UI/Additions/RockBandMoviePopup.lua</File>
-      <File priority="10001">Assets/UI/Additions/EraCompletePopup.lua</File>
+      <!-- HeroesPopup / SecretSocietyPopup / NaturalDisasterPopup /
+           RockBandMoviePopup / EraCompletePopup are DLC-provided contexts we
+           CANNOT shadow (user mods apply before the DLC creates them). We
+           announce them via the RevealListeners addin (InGameActions) instead. -->
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
       <File priority="10001">Assets/UI/Accessibility/OptionsAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/AdvisorPopupAccess.lua</File>
@@ -174,10 +174,28 @@
       </Properties>
       <File>Assets/UI/Additions/HelpAddin.xml</File>
     </AddUserInterfaces>
+    <!-- The DLC reveal popups (Heroes / SecretSociety / NaturalDisaster /
+         RockBand / EraComplete) CANNOT be shadowed: they're added by their
+         expansion/mode pack as named UI Contexts, and user mods apply as a
+         block BEFORE all official DLC (confirmed via Modding.log apply-order
+         2026-05-29), so ReplaceUIScript / ImportFiles / LoadOrder can't win.
+         Instead RevealListeners is a headless addin that subscribes to the
+         same trigger events and announces; the vanilla popup still shows and
+         handles its own dismiss. Loads in the early user-mod phase like the
+         other addins, so no replacement / criteria / load-order tricks. -->
+    <AddUserInterfaces id="SRAccess_RevealListeners">
+      <Properties>
+        <Context>InGame</Context>
+      </Properties>
+      <File>Assets/UI/Additions/RevealListeners.xml</File>
+    </AddUserInterfaces>
     <UpdateText id="SRAccess_IG_Text">
       <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
       <File>Assets/Text/en_US/LeaderDescriptions.xml</File>
       <File>Assets/Text/en_US/NaturalWonderDescriptions.xml</File>
+      <File>Assets/Text/en_US/WorldWonderDescriptions.xml</File>
+      <File>Assets/Text/en_US/HeroDescriptions.xml</File>
+      <File>Assets/Text/en_US/SecretSocietyDescriptions.xml</File>
     </UpdateText>
     <!-- RemapForHexCursor is intentionally only registered in
          FrontEndActions. InputActionDefaultGestures lives in the
@@ -210,6 +228,8 @@
     <File>Assets/UI/Additions/CivicPickerAddin.lua</File>
     <File>Assets/UI/Additions/HelpAddin.xml</File>
     <File>Assets/UI/Additions/HelpAddin.lua</File>
+    <File>Assets/UI/Additions/RevealListeners.xml</File>
+    <File>Assets/UI/Additions/RevealListeners.lua</File>
     <File>Assets/UI/Menus/InGameTopOptionsMenu.lua</File>
     <File>Assets/UI/Accessibility/ScreenReader.lua</File>
     <File>Assets/UI/Accessibility/ScreenReaderEventHandlers.lua</File>
@@ -252,16 +272,14 @@
     <File>Assets/UI/Popups/BoostUnlockedPopup.lua</File>
     <File>Assets/UI/Popups/ProjectBuiltPopup.lua</File>
     <File>Assets/UI/Popups/WonderBuiltPopup.lua</File>
-    <File>Assets/UI/Additions/HeroesPopup.lua</File>
-    <File>Assets/UI/Additions/SecretSocietyPopup.lua</File>
-    <File>Assets/UI/Additions/NaturalDisasterPopup.lua</File>
-    <File>Assets/UI/Additions/RockBandMoviePopup.lua</File>
-    <File>Assets/UI/Additions/EraCompletePopup.lua</File>
     <File>Assets/UI/Accessibility/RevealPopupAccess.lua</File>
     <File>Assets/UI/ToolTips/PlotToolTip.lua</File>
     <File>Assets/Data/RemapForHexCursor.xml</File>
     <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
     <File>Assets/Text/en_US/LeaderDescriptions.xml</File>
     <File>Assets/Text/en_US/NaturalWonderDescriptions.xml</File>
+    <File>Assets/Text/en_US/WorldWonderDescriptions.xml</File>
+    <File>Assets/Text/en_US/HeroDescriptions.xml</File>
+    <File>Assets/Text/en_US/SecretSocietyDescriptions.xml</File>
   </Files>
 </Mod>

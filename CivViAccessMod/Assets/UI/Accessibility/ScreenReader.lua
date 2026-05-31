@@ -133,6 +133,8 @@ function stripIconTags(text)
         return "";
     end
     text = string.gsub(text, "%[ICON_[^%]]*%]", "");
+    text = string.gsub(text, "%[COLOR[^%]]*%]", "");   -- [COLOR:Civ6Yellow] / [COLOR_Red] etc.
+    text = string.gsub(text, "%[ENDCOLOR%]", "");
     text = string.gsub(text, "%s+", " ");
     text = string.gsub(text, "^%s+", "");
     text = string.gsub(text, "%s+$", "");
@@ -161,6 +163,17 @@ function Speech.emit(message, kind)
 
     local body = stripIconTags(tostring(message));
     if body == "" then return; end
+
+    -- Broadcast the clean text cross-VM for the mod-wide "say again" key
+    -- (Ctrl+T). Each Lua VM has its own Speech state, so the repeat handler
+    -- (in HexCursorAddin's VM) can't see an announce emitted from another VM
+    -- (e.g. a reveal popup from the RevealListeners VM) without this. Fire
+    -- BEFORE the %-escape below so the stored copy is literal. Cheap: one
+    -- string per emit; the only subscriber just records it.
+    if LuaEvents ~= nil and LuaEvents.CivViAccess_SpeechEmitted ~= nil then
+        LuaEvents.CivViAccess_SpeechEmitted(body, kind);
+    end
+
     body = body:gsub("%%", "%%%%");
 
     local now = timeNow();

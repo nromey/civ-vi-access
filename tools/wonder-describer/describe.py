@@ -105,14 +105,30 @@ def describe_one(client, model: str, prompt: str, image_path: Path) -> dict:
         ".webp": "image/webp",
     }[image_path.suffix.lower()]
 
-    response = client.models.generate_content(
-        model=model,
-        contents=[
-            types.Part.from_bytes(data=image_bytes, mime_type=mime),
-            prompt,
-        ],
-        config={"response_mime_type": "application/json"},
-    )
+    # Gemini returns transient 503 (UNAVAILABLE) / 429 (rate limit) under
+    # load. Retry with exponential backoff so a busy run self-heals instead
+    # of leaving gaps to re-run by hand.
+    last_err = None
+    for attempt in range(6):
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=[
+                    types.Part.from_bytes(data=image_bytes, mime_type=mime),
+                    prompt,
+                ],
+                config={"response_mime_type": "application/json"},
+            )
+            break
+        except Exception as e:  # noqa: BLE001 - inspect message for retryable codes
+            msg = str(e)
+            if any(code in msg for code in ("503", "UNAVAILABLE", "429", "RESOURCE_EXHAUSTED")):
+                last_err = e
+                time.sleep(min(2 ** attempt, 32))
+                continue
+            raise
+    else:
+        raise RuntimeError(f"exhausted retries (last: {last_err})")
 
     text = response.text or ""
     try:

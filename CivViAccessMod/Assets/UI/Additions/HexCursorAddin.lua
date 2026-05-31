@@ -173,6 +173,20 @@ local _postFoundCityCapture = 0;
 -- captured by Q/E/A/D/Z/C cursor handlers.
 local _helpOpen = false;
 
+-- Mod-wide "say again" (Ctrl+T): the last clean text any VM emitted via
+-- Speech.emit, received over the cross-VM CivViAccess_SpeechEmitted event.
+-- Lets the repeat key re-speak announces that originated in OTHER VMs (e.g. a
+-- reveal-popup announce from the RevealListeners VM), which this VM's own
+-- Speech state would never see. Updated on every emit; re-speaking just
+-- re-stamps the same text, so no feedback loop.
+local _lastSpoken = nil;
+
+-- The LONG visual description of the most recent reveal popup (hero / secret
+-- society), published by the RevealListeners addin over CivViAccess_RevealLongDesc.
+-- Spoken on demand by Shift+I. Empty string = current reveal has no long desc
+-- (cinematic/abstract reveals), so Shift+I reports "no description".
+local _lastRevealLong = nil;
+
 local function OnInputActionTriggered(actionId)
     if _helpOpen then return; end
     local name = _idToName[actionId] or ("ActionID " .. tostring(actionId));
@@ -482,6 +496,38 @@ local function Initialize()
         local on = Verbosity.toggle();
         Speech.emit(on and "Verbose on" or "Verbose off", "event");
     end);
+
+    -- Mod-wide "say again" (Ctrl+T): re-speak the last announcement from ANY
+    -- VM. Works over the vanilla DLC reveal popups (engine actions fire while
+    -- those Low-priority popups are up). _lastSpoken is fed by the cross-VM
+    -- CivViAccess_SpeechEmitted broadcast (subscribed just below).
+    lookupAction("CIVVIACCESS_RepeatAnnounce", function()
+        if _lastSpoken == nil or _lastSpoken == "" then
+            Speech.emit("Nothing to repeat", "meta");
+            return;
+        end
+        Speech.emit(_lastSpoken, "selection");
+    end);
+    if LuaEvents.CivViAccess_SpeechEmitted ~= nil then
+        LuaEvents.CivViAccess_SpeechEmitted.Add(function(text, kind)
+            if text ~= nil and text ~= "" then _lastSpoken = text; end
+        end);
+    end
+
+    -- Shift+I: read the full (long) visual description of the last reveal
+    -- popup. Fed by the RevealListeners addin via CivViAccess_RevealLongDesc.
+    lookupAction("CIVVIACCESS_RevealLongDesc", function()
+        if _lastRevealLong == nil or _lastRevealLong == "" then
+            Speech.emit("No full description available", "meta");
+            return;
+        end
+        Speech.emit(_lastRevealLong, "selection");
+    end);
+    if LuaEvents.CivViAccess_RevealLongDesc ~= nil then
+        LuaEvents.CivViAccess_RevealLongDesc.Add(function(text)
+            _lastRevealLong = text;  -- "" clears it for no-long reveals
+        end);
+    end
 
     -- 0.5.2 notifications center: bare [ / ] walk pending, Alt+N
     -- toggles the idle reminder. Notifications module is loaded via

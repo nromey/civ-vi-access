@@ -101,9 +101,11 @@ function ShowPopup( kData:table )
 
 	UI.OnNaturalWonderRevealed(kData.plotx, kData.ploty);
 
-	if(kData.QuoteAudio) then
-		UI.PlaySound(kData.QuoteAudio);
-	end
+	-- begin ScreenReaderAccess mod change: the voiced quote (QuoteAudio) is
+	-- deferred behind Enter (playCinematic in the NotifyShow opts below) so it
+	-- doesn't talk over our announce — the Sean-Bean pattern. Nothing voices on
+	-- show now.
+	-- end ScreenReaderAccess mod change
 
 	Controls.WonderName:SetText( kData.Name );
 	Controls.WonderQuoteContainer:SetHide( kData.Quote == nil );
@@ -128,9 +130,12 @@ function ShowPopup( kData:table )
 	-- so we DON'T duplicate it (avoids double-speak; Noel's option 1). If a
 	-- feature has no QuoteAudio the quote is silent text, so we fold it in
 	-- after the gameplay effects rather than lose it.
+	local hasAudio = kData.QuoteAudio ~= nil and kData.QuoteAudio ~= "";
 	local gameplay = kData.Description;
-	if (kData.QuoteAudio == nil or kData.QuoteAudio == "")
-			and kData.Quote ~= nil and kData.Quote ~= "" then
+	-- No voiced quote → the quote is silent text, so fold it into gameplay
+	-- (don't lose it). With audio, the quote rides the voice (deferred to Enter)
+	-- and its TEXT rides the S key, so it's not folded here.
+	if not hasAudio and kData.Quote ~= nil and kData.Quote ~= "" then
 		if gameplay ~= nil and gameplay ~= "" then
 			gameplay = gameplay .. ". " .. kData.Quote;
 		else
@@ -149,6 +154,11 @@ function ShowPopup( kData:table )
 		short    = RevealPopupAccess.locOrNil(nwKey .. "_SHORT"),
 		long     = RevealPopupAccess.locOrNil(nwKey .. "_LONG"),
 		typeNoun = "natural wonder",
+		-- Voiced quote deferred behind Enter (Sean-Bean); its text rides S.
+		playCinematic   = hasAudio and function() UI.PlaySound(kData.QuoteAudio); end or nil,
+		cinematicHint   = hasAudio and "Enter to play the wonder's audio quote" or nil,
+		transcript      = hasAudio and kData.Quote or nil,
+		transcriptLabel = "the quote",
 		onClose  = function() Close() end,
 		kind     = "critical",
 	});

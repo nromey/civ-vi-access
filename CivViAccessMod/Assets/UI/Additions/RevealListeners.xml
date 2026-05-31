@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  RevealListeners UI Context. A headless InGame addin (no visible controls)
+  whose only job is to run RevealListeners.lua, which subscribes to the DLC
+  reveal-popup trigger events (hero discovered, secret society discovered/
+  joined, natural disaster, rock band concert, era change) and speaks them
+  through the screen reader. Loaded via AddUserInterfaces (Context InGame),
+  the same mechanism as HexCursorAddin — which works, unlike ReplaceUIScript
+  for DLC-provided popup contexts.
+-->
+<Context Name="RevealListeners" Hidden="1">
+  <Grid ID="Root" Size="1,1" Anchor="C,C"/>
+</Context>

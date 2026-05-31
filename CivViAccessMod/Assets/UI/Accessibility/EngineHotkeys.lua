@@ -37,6 +37,8 @@ HandlerStack.registerCommonHelpEntry({ keyLabel = "F4",        description = "Op
 HandlerStack.registerCommonHelpEntry({ keyLabel = "F9",        description = "Open Civilopedia" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "End",       description = "Open full-screen map" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Ctrl+F",    description = "Open map search (in-game only)" });
+HandlerStack.registerCommonHelpEntry({ keyLabel = "Shift+T",   description = "Say again (repeat the last announcement)" });
+HandlerStack.registerCommonHelpEntry({ keyLabel = "Shift+I",   description = "Read the full visual description of the last reveal popup (hero / society)" });
 
 -- ----------------------------------------------------------------------
 -- UNIT category — actions on the selected unit
