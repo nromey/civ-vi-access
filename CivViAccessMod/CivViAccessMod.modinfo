@@ -71,6 +71,7 @@
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
       <File priority="10001">Assets/UI/Accessibility/Help.lua</File>
       <File priority="10001">Assets/UI/Accessibility/RevealPopupAccess.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ChoosePopupAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexGeom.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexCursor.lua</File>
       <File priority="10001">Assets/UI/Accessibility/UnitMovement.lua</File>
@@ -97,6 +98,9 @@
       <File priority="10001">Assets/UI/Popups/BoostUnlockedPopup.lua</File>
       <File priority="10001">Assets/UI/Popups/ProjectBuiltPopup.lua</File>
       <File priority="10001">Assets/UI/Popups/WonderBuiltPopup.lua</File>
+      <!-- Group B: CHOICE popups (navigate + select), via ChoosePopupAccess.
+           PantheonChooser is base-game + shadowable like the Group A popups. -->
+      <File priority="10001">Assets/UI/Choosers/PantheonChooser.lua</File>
       <!-- HeroesPopup / SecretSocietyPopup / NaturalDisasterPopup /
            RockBandMoviePopup / EraCompletePopup are DLC-provided contexts we
            CANNOT shadow (user mods apply before the DLC creates them). We
@@ -277,7 +281,9 @@
     <File>Assets/UI/Popups/BoostUnlockedPopup.lua</File>
     <File>Assets/UI/Popups/ProjectBuiltPopup.lua</File>
     <File>Assets/UI/Popups/WonderBuiltPopup.lua</File>
+    <File>Assets/UI/Choosers/PantheonChooser.lua</File>
     <File>Assets/UI/Accessibility/RevealPopupAccess.lua</File>
+    <File>Assets/UI/Accessibility/ChoosePopupAccess.lua</File>
     <File>Assets/UI/ToolTips/PlotToolTip.lua</File>
     <File>Assets/Data/RemapForHexCursor.xml</File>
     <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
