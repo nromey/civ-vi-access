@@ -23,7 +23,8 @@
 -- ===========================================================================
 include("InputSupport");        -- InputContext table (GameOptions) for the input-context push
 include("RevealPopupAccess");   -- NotifyShow / HandleKey / locOrNil (pulls in ScreenReader/Speech)
-include("ChoosePopupAccess");   -- navigate+select helper that drives the dedication chooser
+include("ChoosePopupAccess");   -- navigate+select helper that drives the dedication + government choosers
+include("PolicyWizard");        -- slot-by-slot policy-card arranger (the Government policies tab)
 include("Log");
 
 -- HeroesSupport (Babylon DLC) gives us GetHeroUnitStats +
@@ -72,6 +73,12 @@ local m_pending     = nil;   -- {opts, vanillaPath} awaiting the deferred show
 -- below. Declared up here so onInput (defined before that section) can see them.
 local m_dedicationOpen = false;
 local m_pendingDed     = nil;   -- {options, cap, onCommit} awaiting deferred show
+
+-- Government family state. m_govMode routes input to the right sub-handler
+-- (hub / government-type chooser / policy wizard). govHandleKey is assigned in
+-- the GOVERNMENT section below; forward-declared here so onInput can see it.
+local m_govMode    = nil;       -- nil | "hub" | "chooser" | "wizard"
+local govHandleKey = nil;
 
 -- RockBand delayed-cinematic gate. Default ON so the debug concert generator
 -- exercises it; set false to fall back to the safe announce-only path (the
@@ -176,6 +183,11 @@ local function RaiseLive(opts, vanillaPath)
 end
 
 local function onInput(pInputStruct)
+    -- A government interaction (hub / chooser / policy wizard) owns input when up.
+    if m_govMode ~= nil then
+        if govHandleKey ~= nil and govHandleKey(pInputStruct) then return true; end
+        return false;
+    end
     -- A dedication (choice) chooser takes priority when open: route to
     -- ChoosePopupAccess, which owns navigate / toggle / confirm / cancel.
     if m_dedicationOpen then
@@ -781,6 +793,354 @@ local function OnMakeDedication(prevEraIndex, newEraIndex)
 end
 
 -- ===========================================================================
+--  GOVERNMENT — type chooser + policy-slot wizard + manual-open hub.
+--  The Gathering Storm GovernmentScreen is a DLC replacement (loads AFTER us =
+--  the hard engine wall), so this is the Dedication intercept pattern, not a
+--  shadow: subscribe to the same open events the vanilla screen uses, defer a
+--  frame so it shows + becomes modal, dequeue it, own the keyboard via the
+--  GameOptions input-context push, and drive our own flow. Three entry points
+--  (mirroring which vanilla tab each event opens):
+--    * "Open Governments" (LaunchBar / new-government notification / tech-civic)
+--        -> government-TYPE chooser (single-select ChoosePopupAccess). Commit =
+--        pCulture:RequestChangeGovernment(hash); each option's T-detail speaks
+--        the inherent + accumulated bonus and the anarchy cost.
+--    * "Open Policies" (fill-slot notification / tech-civic completion)
+--        -> POLICY WIZARD (PolicyWizard, slot-by-slot card arranger). Commit =
+--        pCulture:RequestPolicyChanges (full clear-and-reapply, our Pass-4 path).
+--    * "Open My Government" (the LaunchBar button's default tab)
+--        -> HUB: announce current government, G -> type chooser, P -> policies.
+--        (Needed so the manual open can still reach "change government", which
+--        on the vanilla screen lives behind a tab we don't navigate to.)
+--  Government change is async (a queued player op), so we do NOT chain the
+--  policy wizard after it in the same frame (the new slots aren't applied yet) —
+--  the game's own fill-slot notification brings policies up when ready.
+-- ===========================================================================
+local GOVERNMENT_VANILLA_PATH = "/InGame/GovernmentScreen";
+local m_govPendingShow = nil;   -- deferred show fn for the gov family
+
+local SLOT_LABELS = {
+    SLOT_MILITARY     = "Military",
+    SLOT_ECONOMIC     = "Economic",
+    SLOT_DIPLOMATIC   = "Diplomatic",
+    SLOT_WILDCARD     = "Wildcard",
+    SLOT_GREAT_PERSON = "Great Person",
+};
+
+local function govSpeak(text, kind)
+    if text == nil or text == "" then return; end
+    if Speech ~= nil and Speech.emit ~= nil then Speech.emit(text, kind or "selection"); end
+end
+
+-- Unhide + queue our context + push GameOptions so we own the keyboard. The
+-- push is guarded against double-push, so it's safe to call on every Show* (hub
+-- -> chooser / wizard transitions reuse the same already-pushed context).
+local function govOpenContext()
+    dequeueVanilla(GOVERNMENT_VANILLA_PATH);
+    pcall(function() if ContextPtr ~= nil and ContextPtr.SetHide ~= nil then ContextPtr:SetHide(false); end end);
+    pcall(function()
+        if UIManager ~= nil and UIManager.QueuePopup ~= nil then
+            UIManager:QueuePopup(ContextPtr, PopupPriority.Current);
+        end
+    end);
+    pcall(function()
+        if Input ~= nil and Input.PushActiveContext ~= nil
+           and InputContext ~= nil and InputContext.GameOptions ~= nil
+           and (Input.GetActiveContext == nil or Input.GetActiveContext() ~= InputContext.GameOptions) then
+            Input.PushActiveContext(InputContext.GameOptions);
+        end
+    end);
+end
+
+local function govCloseContext()
+    m_govMode = nil;
+    pcall(function() ChoosePopupAccess.NotifyClose(); end);
+    pcall(function() PolicyWizard.NotifyClose(); end);
+    pcall(function() if UIManager ~= nil and UIManager.DequeuePopup ~= nil then UIManager:DequeuePopup(ContextPtr); end end);
+    pcall(function()
+        if Input ~= nil and Input.PopContext ~= nil
+           and InputContext ~= nil and InputContext.GameOptions ~= nil
+           and Input.GetActiveContext ~= nil
+           and Input.GetActiveContext() == InputContext.GameOptions then
+            Input.PopContext();
+        end
+    end);
+    pcall(function() if ContextPtr ~= nil and ContextPtr.SetHide ~= nil then ContextPtr:SetHide(true); end end);
+    dequeueVanilla(GOVERNMENT_VANILLA_PATH);
+end
+
+-- ---- Government-TYPE chooser -------------------------------------------------
+local function playerCulture()
+    local pPlayer = Players and Players[localPlayer()] or nil;
+    return pPlayer and pPlayer.GetCulture and pPlayer:GetCulture() or nil;
+end
+
+-- Anarchy-cost line for the option detail. govIndex = GameInfo.Governments[].Index.
+local function governmentAnarchyLine(govIndex)
+    local pCulture = playerCulture();
+    if pCulture == nil or pCulture.GetAnarchyTurns == nil or govIndex == nil then return nil; end
+    local ok, n = pcall(function() return pCulture:GetAnarchyTurns(govIndex); end);
+    if not ok or n == nil then return nil; end
+    if n > 0 then return "Switching costs " .. tostring(n) .. " turns of anarchy"; end
+    return "No anarchy";
+end
+
+local function buildGovernmentOptions(lp)
+    local options = {};
+    if GameInfo == nil or GameInfo.Governments == nil then return options; end
+    local pCulture = playerCulture();
+    for row in GameInfo.Governments() do
+        local typeRow = GameInfo.Types and GameInfo.Types[row.GovernmentType] or nil;
+        local hash = typeRow and typeRow.Hash or nil;
+        local unlocked = true;
+        if pCulture ~= nil and pCulture.IsGovernmentUnlocked ~= nil and hash ~= nil then
+            local ok, u = pcall(function() return pCulture:IsGovernmentUnlocked(hash); end);
+            unlocked = ok and u or false;
+        end
+        if hash ~= nil and unlocked then
+            local descParts = {};
+            local inh = L(row.InherentBonusDesc);
+            local acc = L(row.AccumulatedBonusShortDesc);
+            if inh ~= nil then descParts[#descParts + 1] = inh; end
+            if acc ~= nil then descParts[#descParts + 1] = acc; end
+            local anarchy = governmentAnarchyLine(row.Index);
+            if anarchy ~= nil then descParts[#descParts + 1] = anarchy; end
+            options[#options + 1] = {
+                name        = L(row.Name) or row.GovernmentType,
+                description = (#descParts > 0) and table.concat(descParts, ". ") or nil,
+                data        = hash,
+            };
+        end
+    end
+    return options;
+end
+
+local function CommitGovernment(hash)
+    local pCulture = playerCulture();
+    if pCulture ~= nil and pCulture.RequestChangeGovernment ~= nil and hash ~= nil then
+        pcall(function() pCulture:RequestChangeGovernment(hash); end);
+    end
+    pcall(function() UI.PlaySound("Confirm_Government"); end);
+    govCloseContext();
+end
+
+local function ShowGovernmentChooser(options, onCommit)
+    govOpenContext();
+    m_govMode = "chooser";
+    ChoosePopupAccess.Open({
+        title    = L("LOC_GOVERNMENT_PICKER_TITLE") or "Choose a government",
+        options  = options,
+        typeNoun = "government",
+        onCommit = onCommit or function(opt) CommitGovernment(opt.data); end,
+        onCancel = function() govCloseContext(); end,
+    });
+end
+
+-- ---- Policy-slot wizard ------------------------------------------------------
+local function govSlotTypeString(pCulture, i)
+    local iSlotType = pCulture:GetSlotType(i);
+    local row = (iSlotType ~= nil and GameInfo.GovernmentSlots ~= nil) and GameInfo.GovernmentSlots[iSlotType] or nil;
+    return row and row.GovernmentSlotType or nil;
+end
+
+local function govPolicyFitsSlot(policySlotType, strSlotType)
+    if strSlotType == "SLOT_WILDCARD" or strSlotType == "SLOT_GREAT_PERSON" then return true; end
+    return policySlotType == strSlotType;
+end
+
+local function buildPolicySlots(pCulture)
+    local slots = {};
+    if pCulture == nil or pCulture.GetNumPolicySlots == nil then return slots; end
+    local total = pCulture:GetNumPolicySlots();
+    local perType = {};
+    for i = 0, total - 1 do
+        local strSlotType = govSlotTypeString(pCulture, i);
+        local base = SLOT_LABELS[strSlotType] or "Policy";
+        perType[base] = (perType[base] or 0) + 1;
+        local cur = pCulture:GetSlotPolicy(i);   -- policy row index, -1 if empty
+        local curName, curHash = nil, nil;
+        if cur ~= nil and cur >= 0 and GameInfo.Policies[cur] ~= nil then
+            local prow = GameInfo.Policies[cur];
+            curName = L(prow.Name);
+            local typeRow = GameInfo.Types and GameInfo.Types[prow.PolicyType] or nil;
+            curHash = typeRow and typeRow.Hash or nil;
+        end
+        slots[#slots + 1] = {
+            index       = i,
+            label       = base .. " slot " .. tostring(perType[base]),
+            slotType    = strSlotType,
+            currentName = curName,
+            currentHash = curHash,
+        };
+    end
+    return slots;
+end
+
+-- Candidate cards legal for a slot, excluding any already staged in an earlier
+-- slot. Legality mirrors the vanilla IsPolicyAvailable (not banned, slottable,
+-- not obsolete); falls back to unlocked/not-obsolete/not-active when the newer
+-- CanPolicyBeSlotted API is absent (matches our CityProduction Pass-4 path). A
+-- slot's CURRENT card is active -> excluded here -> retained via Shift+Enter.
+local function buildCandidatesForSlot(pCulture, slot, stagedHashes)
+    local cands = {};
+    if pCulture ~= nil and GameInfo ~= nil and GameInfo.Policies ~= nil then
+        for row in GameInfo.Policies() do
+            local typeRow = GameInfo.Types and GameInfo.Types[row.PolicyType] or nil;
+            local hash = typeRow and typeRow.Hash or nil;
+            if hash ~= nil and not stagedHashes[hash]
+               and govPolicyFitsSlot(row.GovernmentSlotType, slot.slotType) then
+                local legal;
+                if pCulture.CanPolicyBeSlotted ~= nil then
+                    local ok, v = pcall(function() return pCulture:CanPolicyBeSlotted(hash); end);
+                    legal = ok and v or false;
+                    if legal and pCulture.IsPolicyBanned ~= nil then
+                        local okb, banned = pcall(function() return pCulture:IsPolicyBanned(hash); end);
+                        if okb and banned then legal = false; end
+                    end
+                    if legal and pCulture.IsPolicyObsolete ~= nil then
+                        local oko, obs = pcall(function() return pCulture:IsPolicyObsolete(hash); end);
+                        if oko and obs then legal = false; end
+                    end
+                else
+                    local unlocked = (pCulture.IsPolicyUnlocked == nil) or pCulture:IsPolicyUnlocked(hash);
+                    local obsolete = (pCulture.IsPolicyObsolete ~= nil) and pCulture:IsPolicyObsolete(hash);
+                    local active   = (pCulture.IsPolicyActive ~= nil) and pCulture:IsPolicyActive(hash);
+                    legal = unlocked and not obsolete and not active;
+                end
+                if legal then
+                    cands[#cands + 1] = {
+                        name        = L(row.Name) or row.PolicyType,
+                        description = L(row.Description),
+                        hash        = hash,
+                    };
+                end
+            end
+        end
+    end
+    cands[#cands + 1] = { name = "Leave empty", empty = true };
+    return cands;
+end
+
+local function applyPolicyDecisions(pCulture, decisions)
+    if pCulture == nil or pCulture.RequestPolicyChanges == nil or decisions == nil then return; end
+    -- Full clear-and-reapply (GovernmentScreen OnConfirmPolicies / our Pass 4):
+    -- clearList = every slot index; addList[i] = hash for keep/set, omit empty.
+    local clearList = {};
+    local addList   = {};
+    for _, d in ipairs(decisions) do
+        clearList[#clearList + 1] = d.index;
+        if (d.action == "keep" or d.action == "set") and d.hash ~= nil then
+            addList[d.index] = d.hash;
+        end
+    end
+    local ok, err = pcall(function() pCulture:RequestPolicyChanges(clearList, addList); end);
+    if not ok then Log.warn("RevealListeners: RequestPolicyChanges failed: " .. tostring(err)); end
+    pcall(function() UI.PlaySound("Confirm_Policy"); end);
+end
+
+local function ShowPolicyWizard(slots, pCulture, onCommit, onCancel)
+    govOpenContext();
+    m_govMode = "wizard";
+    PolicyWizard.Open({
+        slots           = slots,
+        buildCandidates = function(slot, staged) return buildCandidatesForSlot(pCulture, slot, staged); end,
+        onCommit        = onCommit or function(decisions) applyPolicyDecisions(pCulture, decisions); govCloseContext(); end,
+        onCancel        = onCancel or function() govCloseContext(); end,
+    });
+end
+
+-- ---- Manual-open hub ---------------------------------------------------------
+local function currentGovernmentName(pCulture)
+    if pCulture == nil or pCulture.GetCurrentGovernment == nil then return nil; end
+    -- GetCurrentGovernment returns a GameInfo.Governments row id (-1 = none) —
+    -- the exact accessor the vanilla GovernmentScreen uses (line 2250). Earlier
+    -- guessed GetGovernmentIndex, which doesn't exist -> always "none".
+    local ok, rowId = pcall(function() return pCulture:GetCurrentGovernment(); end);
+    if not ok or rowId == nil or rowId < 0 then return nil; end
+    local row = GameInfo.Governments[rowId];
+    return row and L(row.Name) or nil;
+end
+
+local function ShowGovernmentHub()
+    govOpenContext();
+    m_govMode = "hub";
+    local govName = currentGovernmentName(playerCulture());
+    govSpeak("Government: " .. (govName or "none")
+        .. ". Press G to change government, P to arrange policies, Escape to close.", "critical");
+end
+
+local function govHubHandleKey(p)
+    if p == nil or p.GetMessageType == nil then return false; end
+    if p:GetMessageType() ~= (KeyEvents and KeyEvents.KeyUp or 1) then return false; end
+    local key  = p:GetKey();
+    local KG   = (Keys and Keys.G) or 0x47;
+    local KP   = (Keys and Keys.P) or 0x50;
+    local KESC = (Keys and Keys.VK_ESCAPE) or 0x1B;
+    if key == KG then
+        local options = buildGovernmentOptions(localPlayer());
+        if #options == 0 then govSpeak("No governments available.", "selection"); return true; end
+        ShowGovernmentChooser(options, nil);
+        return true;
+    elseif key == KP then
+        local pCulture = playerCulture();
+        local slots = buildPolicySlots(pCulture);
+        if #slots == 0 then govSpeak("No policy slots.", "selection"); return true; end
+        ShowPolicyWizard(slots, pCulture, nil, nil);
+        return true;
+    elseif key == KESC then
+        govCloseContext();
+        return true;
+    end
+    return true;   -- hub is modal: swallow everything else
+end
+
+-- Dispatch input by mode (assigned to the forward-declared upvalue).
+govHandleKey = function(p)
+    if m_govMode == "hub" then
+        return govHubHandleKey(p);
+    elseif m_govMode == "chooser" then
+        return ChoosePopupAccess.HandleKey(p);
+    elseif m_govMode == "wizard" then
+        return PolicyWizard.HandleKey(p);
+    end
+    return false;
+end
+
+-- ---- Deferred raise + live event handlers -----------------------------------
+local function OnGovDeferred()
+    if ContextPtr ~= nil and ContextPtr.ClearUpdate ~= nil then ContextPtr:ClearUpdate(); end
+    local fn = m_govPendingShow;
+    m_govPendingShow = nil;
+    if fn ~= nil then fn(); end
+end
+
+local function govRaise(showFn)
+    m_govPendingShow = showFn;
+    if ContextPtr ~= nil and ContextPtr.SetUpdate ~= nil then
+        if ContextPtr.SetHide ~= nil then ContextPtr:SetHide(false); end   -- hidden contexts get no tick
+        ContextPtr:SetUpdate(OnGovDeferred);
+    else
+        showFn();
+    end
+end
+
+local function OnOpenGovChooser()
+    local options = buildGovernmentOptions(localPlayer());
+    if #options == 0 then return; end
+    govRaise(function() ShowGovernmentChooser(options, nil); end);
+end
+
+local function OnOpenPolicyWizard()
+    local pCulture = playerCulture();
+    local slots = buildPolicySlots(pCulture);
+    if #slots == 0 then return; end
+    govRaise(function() ShowPolicyWizard(slots, pCulture, nil, nil); end);
+end
+
+local function OnOpenGovHub()
+    govRaise(function() ShowGovernmentHub(); end);
+end
+
+-- ===========================================================================
 --  Debug raisers — same FireTuner commands; no vanilla popup exists, so show
 --  immediately (no defer / teardown). Use REAL GameInfo lookups so the name +
 --  description-key path is exercised.
@@ -842,6 +1202,64 @@ LuaEvents.CivViAccess_DebugRaisePopup.Add(function(name, arg2)
             end
             CloseDedication();
         end);
+    elseif name == "Government" then
+        -- Synthetic government chooser (all governments, ignore unlock filter).
+        -- Commit just SPEAKS — don't actually change government in a debug raise.
+        local options = {};
+        if GameInfo ~= nil and GameInfo.Governments ~= nil then
+            for row in GameInfo.Governments() do
+                local typeRow = GameInfo.Types and GameInfo.Types[row.GovernmentType] or nil;
+                options[#options + 1] = {
+                    name        = L(row.Name) or row.GovernmentType,
+                    description = L(row.InherentBonusDesc),
+                    data        = typeRow and typeRow.Hash or 0,
+                };
+            end
+        end
+        ShowGovernmentChooser(options, function(opt)
+            govSpeak("Debug: would adopt " .. (opt.name or "?"), "selection");
+            govCloseContext();
+        end);
+    elseif name == "Policies" then
+        -- Synthetic policy wizard: fake slots + candidates so the slot-walk,
+        -- Space-stage, Shift+Enter-keep, Enter-apply, Escape-cancel interaction
+        -- is testable in ANY game state. Commit just SPEAKS the decisions.
+        local slots = {
+            { index = 0, label = "Military slot 1",  slotType = "SLOT_MILITARY", currentName = "Discipline", currentHash = 1 },
+            { index = 1, label = "Economic slot 1",  slotType = "SLOT_ECONOMIC", currentName = nil,          currentHash = nil },
+            { index = 2, label = "Wildcard slot 1",  slotType = "SLOT_WILDCARD", currentName = "Survey",     currentHash = 2 },
+        };
+        local fake = {
+            SLOT_MILITARY = { { name = "Maneuver",      description = "Plus 100 percent production toward light cavalry.", hash = 11 },
+                              { name = "Conscription",  description = "Unit maintenance reduced.",                         hash = 12 } },
+            SLOT_ECONOMIC = { { name = "Urban Planning", description = "Plus 1 production in all cities.",                 hash = 21 },
+                              { name = "God King",       description = "Plus 1 faith and gold in the Capital.",            hash = 22 } },
+            SLOT_WILDCARD = { { name = "Strategos",      description = "Plus 2 great general points.",                     hash = 31 } },
+        };
+        m_govMode = "wizard";
+        govOpenContext();
+        PolicyWizard.Open({
+            slots = slots,
+            buildCandidates = function(slot, staged)
+                local out = {};
+                for _, c in ipairs(fake[slot.slotType] or {}) do
+                    if not staged[c.hash] then out[#out + 1] = c; end
+                end
+                out[#out + 1] = { name = "Leave empty", empty = true };
+                return out;
+            end,
+            onCommit = function(decisions)
+                local parts = {};
+                for _, d in ipairs(decisions) do
+                    parts[#parts + 1] = d.action .. (d.hash and (" " .. tostring(d.hash)) or "");
+                end
+                govSpeak("Debug: would commit " .. table.concat(parts, ", "), "selection");
+                govCloseContext();
+            end,
+            onCancel = function() govCloseContext(); end,
+        });
+    elseif name == "GovHub" then
+        ShowGovernmentHub();
     end
 end);
 
@@ -1177,6 +1595,15 @@ function Initialize()
         if LuaEvents.NotificationPanel_SecretSocietyJoined ~= nil then LuaEvents.NotificationPanel_SecretSocietyJoined.Add(OnSecretSocietyJoined); end
         -- Dedication (commemoration) chooser — first un-shadowable CHOICE popup.
         if LuaEvents.EraReviewPopup_MakeDedication ~= nil then LuaEvents.EraReviewPopup_MakeDedication.Add(OnMakeDedication); end
+        -- Government: type chooser (Open Governments), policy wizard (Open
+        -- Policies), and the manual-open hub (Open My Government). Same events
+        -- the vanilla GovernmentScreen uses; we subscribe first and intercept.
+        if LuaEvents.LaunchBar_GovernmentOpenGovernments ~= nil then LuaEvents.LaunchBar_GovernmentOpenGovernments.Add(OnOpenGovChooser); end
+        if LuaEvents.NotificationPanel_GovernmentOpenGovernments ~= nil then LuaEvents.NotificationPanel_GovernmentOpenGovernments.Add(OnOpenGovChooser); end
+        if LuaEvents.TechCivicCompletedPopup_GovernmentOpenGovernments ~= nil then LuaEvents.TechCivicCompletedPopup_GovernmentOpenGovernments.Add(OnOpenGovChooser); end
+        if LuaEvents.NotificationPanel_GovernmentOpenPolicies ~= nil then LuaEvents.NotificationPanel_GovernmentOpenPolicies.Add(OnOpenPolicyWizard); end
+        if LuaEvents.TechCivicCompletedPopup_GovernmentOpenPolicies ~= nil then LuaEvents.TechCivicCompletedPopup_GovernmentOpenPolicies.Add(OnOpenPolicyWizard); end
+        if LuaEvents.LaunchBar_GovernmentOpenMyGovernment ~= nil then LuaEvents.LaunchBar_GovernmentOpenMyGovernment.Add(OnOpenGovHub); end
     end
     if Events ~= nil then
         if Events.RandomEventOccurred ~= nil then Events.RandomEventOccurred.Add(OnRandomEventOccurred); end

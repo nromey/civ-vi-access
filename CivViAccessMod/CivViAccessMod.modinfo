@@ -72,6 +72,7 @@
       <File priority="10001">Assets/UI/Accessibility/Help.lua</File>
       <File priority="10001">Assets/UI/Accessibility/RevealPopupAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ChoosePopupAccess.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/PolicyWizard.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexGeom.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexCursor.lua</File>
       <File priority="10001">Assets/UI/Accessibility/UnitMovement.lua</File>
@@ -284,6 +285,7 @@
     <File>Assets/UI/Choosers/PantheonChooser.lua</File>
     <File>Assets/UI/Accessibility/RevealPopupAccess.lua</File>
     <File>Assets/UI/Accessibility/ChoosePopupAccess.lua</File>
+    <File>Assets/UI/Accessibility/PolicyWizard.lua</File>
     <File>Assets/UI/ToolTips/PlotToolTip.lua</File>
     <File>Assets/Data/RemapForHexCursor.xml</File>
     <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>
