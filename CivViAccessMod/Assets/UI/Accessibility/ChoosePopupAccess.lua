@@ -17,6 +17,10 @@
 --                      default is label only; detail on demand)
 --   Enter / Space      commit the current option (fires opts.onCommit(option))
 --   Escape             cancel (fires opts.onCancel)
+-- MULTI-SELECT: pass opts.maxSelect > 1 and the idiom changes — Space TOGGLES
+-- the current option in/out of the set, Enter CONFIRMS once exactly maxSelect
+-- are chosen, and opts.onCommit receives the ARRAY of chosen options. maxSelect
+-- omitted or 1 keeps the single-select behavior above (Enter/Space both commit).
 -- Arrow/letter keys are bare (no modifier) — the popup owns the keyboard while
 -- open (the shadow's OnInputHandler routes here first), so there's no conflict
 -- with world/engine bindings.
@@ -68,12 +72,17 @@ local _state = nil;   -- nil = closed; else {options, index, onCommit, onCancel,
 
 -- Strip icon/color tags is handled downstream by Speech.emit's stripIconTags.
 
--- Build the spoken line for the option at index i: "Name. position N of M."
+-- Build the spoken line for the option at index i: "Name. [selected.] N of M."
+-- In multi-select mode the chosen state is spoken so the player hears which
+-- options are already selected as they arrow through.
 local function optionAnnounce(i)
     local opt = _state.options[i];
     if opt == nil then return ""; end
     local parts = {};
     if opt.name ~= nil and opt.name ~= "" then parts[#parts + 1] = opt.name; end
+    if _state.maxSelect ~= nil and _state.maxSelect > 1 and _state.selected[i] then
+        parts[#parts + 1] = "selected";
+    end
     parts[#parts + 1] = tostring(i) .. " of " .. tostring(#_state.options);
     return table.concat(parts, ". ");
 end
@@ -114,6 +123,13 @@ function ChoosePopupAccess.Open(opts)
         onCommit = opts.onCommit,
         onCancel = opts.onCancel,
         typeNoun = opts.typeNoun,
+        -- Multi-select: maxSelect > 1 turns Space into "toggle" and Enter into
+        -- "confirm the set". maxSelect omitted or 1 (the default) keeps the
+        -- single-select behavior, so existing adopters (PantheonChooser) are
+        -- unaffected.
+        maxSelect     = opts.maxSelect or 1,
+        selected      = {},   -- map: option index -> true (multi-select only)
+        selectedCount = 0,
     };
 
     -- Open announce: title + count + first option + key hint.
@@ -129,7 +145,12 @@ function ChoosePopupAccess.Open(opts)
     local nounPlural = (n == 1) and noun or (noun .. "s");
     parts[#parts + 1] = tostring(n) .. " " .. nounPlural;
     parts[#parts + 1] = optionAnnounce(1);
-    parts[#parts + 1] = "Use up and down arrows to choose, T for details, Enter to confirm, Escape to cancel";
+    if _state.maxSelect > 1 then
+        parts[#parts + 1] = "Choose " .. tostring(_state.maxSelect)
+            .. ". Use up and down arrows, Space to select, T for details, Enter to confirm, Escape to cancel";
+    else
+        parts[#parts + 1] = "Use up and down arrows to choose, T for details, Enter to confirm, Escape to cancel";
+    end
     speak(table.concat(parts, ". "), opts.kind or "critical");
 end
 
@@ -157,6 +178,70 @@ local function moveTo(i)
     if _state == nil or #_state.options == 0 then return; end
     _state.index = math.max(1, math.min(#_state.options, i));
     announceCurrent("selection");
+end
+
+-- Name of the option at index i (for selection-count announcements).
+local function optName(i)
+    local opt = _state and _state.options[i];
+    return (opt ~= nil and opt.name) or "selection";
+end
+
+-- Multi-select: toggle the current option in/out of the chosen set. Blocks
+-- adding past maxSelect (clearer for a screen-reader than the vanilla's silent
+-- clear-and-restart); the player deselects one to free a slot.
+local function toggleCurrent()
+    if _state == nil then return; end
+    local i = _state.index;
+    if _state.selected[i] then
+        _state.selected[i] = nil;
+        _state.selectedCount = _state.selectedCount - 1;
+        speak(optName(i) .. " deselected. " .. _state.selectedCount .. " of " .. _state.maxSelect .. " chosen.", "selection");
+    else
+        if _state.selectedCount >= _state.maxSelect then
+            speak("Already chose " .. _state.maxSelect .. ". Deselect one first.", "selection");
+            return;
+        end
+        _state.selected[i] = true;
+        _state.selectedCount = _state.selectedCount + 1;
+        speak(optName(i) .. " selected. " .. _state.selectedCount .. " of " .. _state.maxSelect .. " chosen.", "selection");
+    end
+end
+
+-- Commit the single current option (single-select mode). Clears state first so
+-- the shadow's Close (which calls NotifyClose) doesn't double-clear.
+local function commitCurrent()
+    local opt = _state.options[_state.index];
+    local onCommit = _state.onCommit;
+    if opt == nil then return; end
+    speak("Confirming " .. (opt.name or "selection"), "selection");
+    _state = nil;
+    if onCommit ~= nil then
+        local ok, err = pcall(onCommit, opt);
+        if not ok then Log.warn("ChoosePopupAccess commit failed: " .. tostring(err)); end
+    end
+end
+
+-- Commit the chosen SET (multi-select mode). Requires exactly maxSelect chosen
+-- (parity with the vanilla Confirm button, disabled until the count matches).
+-- onCommit receives the ARRAY of selected options.
+local function commitSelected()
+    if _state.selectedCount ~= _state.maxSelect then
+        speak("Choose " .. _state.maxSelect .. ". " .. _state.selectedCount .. " chosen so far.", "selection");
+        return;
+    end
+    local selOpts = {};
+    for i = 1, #_state.options do
+        if _state.selected[i] then selOpts[#selOpts + 1] = _state.options[i]; end
+    end
+    local onCommit = _state.onCommit;
+    local names = {};
+    for _, o in ipairs(selOpts) do names[#names + 1] = o.name or "selection"; end
+    speak("Confirming " .. table.concat(names, ", "), "selection");
+    _state = nil;
+    if onCommit ~= nil then
+        local ok, err = pcall(onCommit, selOpts);
+        if not ok then Log.warn("ChoosePopupAccess commit failed: " .. tostring(err)); end
+    end
 end
 
 -- Returns true if the key was consumed. Shadow's input handler should
@@ -190,19 +275,15 @@ function ChoosePopupAccess.HandleKey(pInputStruct)
         return true;
     end
 
-    -- Enter / Space: commit the current option.
-    if key == VK_RETURN or key == VK_SPACE then
-        local opt = _state.options[_state.index];
-        local onCommit = _state.onCommit;
-        if opt == nil then return true; end
-        speak("Confirming " .. (opt.name or "selection"), "selection");
-        -- Clear state BEFORE firing commit so the shadow's Close (which calls
-        -- NotifyClose) doesn't double-clear, and a re-open builds fresh.
-        _state = nil;
-        if onCommit ~= nil then
-            local ok, err = pcall(onCommit, opt);
-            if not ok then Log.warn("ChoosePopupAccess commit failed: " .. tostring(err)); end
-        end
+    -- Space: toggle (multi-select) or commit the current (single-select).
+    if key == VK_SPACE then
+        if _state.maxSelect > 1 then toggleCurrent(); else commitCurrent(); end
+        return true;
+    end
+
+    -- Enter: confirm the set (multi-select) or commit the current (single-select).
+    if key == VK_RETURN then
+        if _state.maxSelect > 1 then commitSelected(); else commitCurrent(); end
         return true;
     end
 

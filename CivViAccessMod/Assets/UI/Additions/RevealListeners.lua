@@ -23,6 +23,7 @@
 -- ===========================================================================
 include("InputSupport");        -- InputContext table (GameOptions) for the input-context push
 include("RevealPopupAccess");   -- NotifyShow / HandleKey / locOrNil (pulls in ScreenReader/Speech)
+include("ChoosePopupAccess");   -- navigate+select helper that drives the dedication chooser
 include("Log");
 
 -- HeroesSupport (Babylon DLC) gives us GetHeroUnitStats +
@@ -66,6 +67,11 @@ end
 local m_open        = false;
 local m_vanillaPath = nil;   -- "/InGame/HeroesPopup" etc. — torn down on close
 local m_pending     = nil;   -- {opts, vanillaPath} awaiting the deferred show
+
+-- Dedication (commemoration) CHOICE chooser state — see the DEDICATION section
+-- below. Declared up here so onInput (defined before that section) can see them.
+local m_dedicationOpen = false;
+local m_pendingDed     = nil;   -- {options, cap, onCommit} awaiting deferred show
 
 -- RockBand delayed-cinematic gate. Default ON so the debug concert generator
 -- exercises it; set false to fall back to the safe announce-only path (the
@@ -170,6 +176,12 @@ local function RaiseLive(opts, vanillaPath)
 end
 
 local function onInput(pInputStruct)
+    -- A dedication (choice) chooser takes priority when open: route to
+    -- ChoosePopupAccess, which owns navigate / toggle / confirm / cancel.
+    if m_dedicationOpen then
+        if ChoosePopupAccess.HandleKey(pInputStruct) then return true; end
+        return false;
+    end
     if not m_open then return false; end
     if RevealPopupAccess.HandleKey(pInputStruct) then return true; end
     return false;   -- swallow nothing else; let the engine have unrelated keys
@@ -613,6 +625,162 @@ local function OnPlayerEraChanged(player, era)
 end
 
 -- ===========================================================================
+--  DEDICATION (commemoration) chooser — the first un-shadowable CHOICE popup.
+--  Same intercept pattern as the reveals: the DLC DedicationPopup is a modal we
+--  can't shadow, so we listen to the SAME trigger (EraReviewPopup_MakeDedication,
+--  a cross-VM LuaEvent the era-review flow fires), defer a frame so the vanilla
+--  shows, dequeue it, and drive ChoosePopupAccess over our own input-owning
+--  context. Commit fires COMMEMORATE directly (the same op the vanilla OnConfirm
+--  makes), so we don't depend on its mouse-driven checkboxes. Unlike RockBand,
+--  the vanilla DedicationPopup holds NO gamecore event (its Close is a plain
+--  DequeuePopup), so dequeuing it is clean — exactly the Hero/SecretSociety case.
+--  MULTI-SELECT: a Heroic age lets you choose several commemorations, so this is
+--  the first user of ChoosePopupAccess's maxSelect mode.
+-- ===========================================================================
+local DEDICATION_VANILLA_PATH = "/InGame/DedicationPopup";
+
+-- Age-appropriate bonus text for a commemoration, mirroring the vanilla
+-- CreateCommemoration: Golden uses the golden bonus (plus the normal bonus for
+-- always-allowed-quest civs), Dark uses the dark bonus, else the normal bonus.
+local function commemorationDesc(info, gameEras, lp)
+    if info == nil then return nil; end
+    if gameEras ~= nil and gameEras.HasGoldenAge ~= nil and gameEras:HasGoldenAge(lp) then
+        local t = L(info.GoldenAgeBonusDescription);
+        if gameEras.IsPlayerAlwaysAllowedCommemorationQuest ~= nil
+           and gameEras:IsPlayerAlwaysAllowedCommemorationQuest(lp) then
+            local n = L(info.NormalAgeBonusDescription);
+            if t ~= nil and n ~= nil then t = t .. " " .. n; elseif n ~= nil then t = n; end
+        end
+        return t;
+    elseif gameEras ~= nil and gameEras.HasDarkAge ~= nil and gameEras:HasDarkAge(lp) then
+        return L(info.DarkAgeBonusDescription);
+    end
+    return L(info.NormalAgeBonusDescription);
+end
+
+-- Build the option list from the SAME source the vanilla popup uses:
+-- GetPlayerCommemorateChoices -> GameInfo.CommemorationTypes. data = the
+-- commemoration index (what COMMEMORATE's PARAM_COMMEMORATION_TYPE wants).
+local function buildDedicationOptions(lp, gameEras)
+    local options = {};
+    if gameEras == nil or gameEras.GetPlayerCommemorateChoices == nil then return options; end
+    local choices = gameEras:GetPlayerCommemorateChoices(lp);
+    if choices == nil then return options; end
+    for _, cType in ipairs(choices) do
+        local info = (GameInfo ~= nil and GameInfo.CommemorationTypes ~= nil) and GameInfo.CommemorationTypes[cType] or nil;
+        if info ~= nil then
+            options[#options + 1] = {
+                name        = L(info.CategoryDescription) or L(info.Name) or info.CommemorationType,
+                description = commemorationDesc(info, gameEras, lp),
+                data        = cType,
+            };
+        end
+    end
+    return options;
+end
+
+-- Close ONLY our chooser: dequeue our context, drop the input-context push,
+-- hide, and tear down the (already-dequeued) vanilla for good measure.
+function CloseDedication()
+    if not m_dedicationOpen then return; end
+    m_dedicationOpen = false;
+    ChoosePopupAccess.NotifyClose();
+    pcall(function() if UIManager ~= nil and UIManager.DequeuePopup ~= nil then UIManager:DequeuePopup(ContextPtr); end end);
+    pcall(function()
+        if Input ~= nil and Input.PopContext ~= nil
+           and InputContext ~= nil and InputContext.GameOptions ~= nil
+           and Input.GetActiveContext ~= nil
+           and Input.GetActiveContext() == InputContext.GameOptions then
+            Input.PopContext();
+        end
+    end);
+    pcall(function() if ContextPtr ~= nil and ContextPtr.SetHide ~= nil then ContextPtr:SetHide(true); end end);
+    dequeueVanilla(DEDICATION_VANILLA_PATH);
+end
+
+-- Fire COMMEMORATE for each chosen commemoration (the same op the vanilla
+-- OnConfirm makes), play the confirm sound, then close.
+function CommitDedications(selOpts)
+    local lp = localPlayer();
+    if PlayerOperations ~= nil and PlayerOperations.COMMEMORATE ~= nil and selOpts ~= nil then
+        for _, opt in ipairs(selOpts) do
+            local kParameters = {};
+            kParameters[PlayerOperations.PARAM_COMMEMORATION_TYPE] = opt.data;
+            UI.RequestPlayerOperation(lp, PlayerOperations.COMMEMORATE, kParameters);
+        end
+    end
+    pcall(function() UI.PlaySound("Confirm_Dedication"); end);
+    CloseDedication();
+end
+
+-- Raise our chooser NOW (vanilla already shown by the deferred path; dequeue it
+-- so only we own input). onCommit defaults to the real COMMEMORATE commit.
+local function ShowDedication(options, cap, onCommit)
+    m_dedicationOpen = true;
+    dequeueVanilla(DEDICATION_VANILLA_PATH);
+    pcall(function() if ContextPtr ~= nil and ContextPtr.SetHide ~= nil then ContextPtr:SetHide(false); end end);
+    pcall(function()
+        if UIManager ~= nil and UIManager.QueuePopup ~= nil then
+            UIManager:QueuePopup(ContextPtr, PopupPriority.Current);
+        end
+    end);
+    pcall(function()
+        if Input ~= nil and Input.PushActiveContext ~= nil
+           and InputContext ~= nil and InputContext.GameOptions ~= nil
+           and (Input.GetActiveContext == nil or Input.GetActiveContext() ~= InputContext.GameOptions) then
+            Input.PushActiveContext(InputContext.GameOptions);
+        end
+    end);
+    ChoosePopupAccess.Open({
+        title     = L("LOC_ERA_COMMEMORATION_POPUP_DEDICATION_HEADER") or "Choose a dedication",
+        options   = options,
+        typeNoun  = "dedication",
+        maxSelect = cap,
+        onCommit  = onCommit or function(sel) CommitDedications(sel); end,
+        onCancel  = function() CloseDedication(); end,
+    });
+end
+
+-- Live trigger fires before the vanilla's handler (we subscribe first), so defer
+-- a frame: the vanilla shows + becomes modal, then we dequeue it and raise ours.
+local function OnDeferredDedication()
+    if ContextPtr ~= nil and ContextPtr.ClearUpdate ~= nil then ContextPtr:ClearUpdate(); end
+    local p = m_pendingDed;
+    m_pendingDed = nil;
+    if p ~= nil then ShowDedication(p.options, p.cap, p.onCommit); end
+end
+
+local function RaiseDedication(options, cap, onCommit)
+    if options == nil or #options == 0 or cap == nil or cap <= 0 then return; end
+    m_pendingDed = { options = options, cap = cap, onCommit = onCommit };
+    if ContextPtr ~= nil and ContextPtr.SetUpdate ~= nil then
+        if ContextPtr.SetHide ~= nil then ContextPtr:SetHide(false); end   -- hidden contexts get no tick
+        ContextPtr:SetUpdate(OnDeferredDedication);
+    else
+        ShowDedication(options, cap, onCommit);
+    end
+end
+
+-- EraReviewPopup_MakeDedication(prevEraIndex, newEraIndex): the era-review flow's
+-- handoff to the dedication choice (the same event the vanilla DedicationPopup
+-- listens to). Build options + cap from live game state; bail if there's nothing
+-- to choose (mirrors the vanilla's "allocatedInstances > 0 and allowed > 0" gate).
+local function OnMakeDedication(prevEraIndex, newEraIndex)
+    local lp = localPlayer();
+    if lp < 0 then return; end
+    if newEraIndex == nil or newEraIndex <= 0 then return; end
+    if Game.GetEras == nil then return; end
+    local gameEras = Game.GetEras();
+    if gameEras == nil then return; end
+    local cap = (gameEras.GetPlayerNumAllowedCommemorations ~= nil)
+                and gameEras:GetPlayerNumAllowedCommemorations(lp) or 0;
+    if cap <= 0 then return; end
+    local options = buildDedicationOptions(lp, gameEras);
+    if #options == 0 then return; end
+    RaiseDedication(options, cap, nil);
+end
+
+-- ===========================================================================
 --  Debug raisers — same FireTuner commands; no vanilla popup exists, so show
 --  immediately (no defer / teardown). Use REAL GameInfo lookups so the name +
 --  description-key path is exercised.
@@ -650,6 +818,30 @@ LuaEvents.CivViAccess_DebugRaisePopup.Add(function(name, arg2)
         local eras = (Game.GetEras ~= nil) and Game.GetEras() or nil;
         local cur = eras and eras:GetCurrentEra() or 0;
         ShowReveal(eraOpts(cur, localPlayer(), eras), nil);
+    elseif name == "Dedication" then
+        -- Synthetic smoke test (any game state): first few commemorations, cap 2.
+        -- Commit just SPEAKS — these aren't real choices, so don't fire COMMEMORATE.
+        local opts = {};
+        if GameInfo ~= nil and GameInfo.CommemorationTypes ~= nil then
+            local cnt = 0;
+            for row in GameInfo.CommemorationTypes() do
+                opts[#opts + 1] = {
+                    name        = L(row.CategoryDescription) or row.CommemorationType,
+                    description = L(row.NormalAgeBonusDescription),
+                    data        = row.Index,
+                };
+                cnt = cnt + 1;
+                if cnt >= 5 then break; end
+            end
+        end
+        ShowDedication(opts, 2, function(sel)
+            local names = {};
+            for _, o in ipairs(sel) do names[#names + 1] = o.name or "?"; end
+            if Speech ~= nil and Speech.emit ~= nil then
+                Speech.emit("Debug: would commemorate " .. table.concat(names, ", "), "selection");
+            end
+            CloseDedication();
+        end);
     end
 end);
 
@@ -983,6 +1175,8 @@ function Initialize()
         if LuaEvents.NotificationPanel_HeroExpired ~= nil then LuaEvents.NotificationPanel_HeroExpired.Add(OnHeroExpired); end
         if LuaEvents.NotificationPanel_SecretSocietyDiscovered ~= nil then LuaEvents.NotificationPanel_SecretSocietyDiscovered.Add(OnSecretSocietyDiscovered); end
         if LuaEvents.NotificationPanel_SecretSocietyJoined ~= nil then LuaEvents.NotificationPanel_SecretSocietyJoined.Add(OnSecretSocietyJoined); end
+        -- Dedication (commemoration) chooser — first un-shadowable CHOICE popup.
+        if LuaEvents.EraReviewPopup_MakeDedication ~= nil then LuaEvents.EraReviewPopup_MakeDedication.Add(OnMakeDedication); end
     end
     if Events ~= nil then
         if Events.RandomEventOccurred ~= nil then Events.RandomEventOccurred.Add(OnRandomEventOccurred); end
