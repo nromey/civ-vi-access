@@ -68,11 +68,17 @@
       <File priority="10001">Assets/UI/Accessibility/InputRouter.lua</File>
       <File priority="10001">Assets/UI/Accessibility/EngineHotkeys.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScreenReader.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/Report.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/EmpireStatus.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/EotReport.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
       <File priority="10001">Assets/UI/Accessibility/Help.lua</File>
       <File priority="10001">Assets/UI/Accessibility/RevealPopupAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ChoosePopupAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/PolicyWizard.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/RevealAnnounce.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/GoodyHutAnnounce.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/BoardQueryProbe.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexGeom.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexCursor.lua</File>
       <File priority="10001">Assets/UI/Accessibility/UnitMovement.lua</File>
@@ -84,8 +90,12 @@
       <File priority="10001">Assets/UI/Accessibility/Verbosity.lua</File>
       <File priority="10001">Assets/UI/Accessibility/Diagnostics.lua</File>
       <File priority="10001">Assets/UI/Accessibility/SuppressFirstTurnAdvisor.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/LeaderMoodExpressions.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/LeaderMeetAnnounce.lua</File>
       <File priority="10001">Assets/UI/Additions/HexCursorAddin.lua</File>
       <File priority="10001">Assets/UI/Additions/ProductionPickerAddin.lua</File>
+      <File priority="10001">Assets/UI/Additions/BuildImprovementPicker.lua</File>
+      <File priority="10001">Assets/UI/Additions/DiplomacyAccess.lua</File>
       <File priority="10001">Assets/UI/Additions/TechPickerAddin.lua</File>
       <File priority="10001">Assets/UI/Additions/CivicPickerAddin.lua</File>
       <File priority="10001">Assets/UI/Additions/HelpAddin.lua</File>
@@ -165,6 +175,18 @@
       </Properties>
       <File>Assets/UI/Additions/ProductionPickerAddin.xml</File>
     </AddUserInterfaces>
+    <AddUserInterfaces id="SRAccess_BuildImprovementPicker">
+      <Properties>
+        <Context>InGame</Context>
+      </Properties>
+      <File>Assets/UI/Additions/BuildImprovementPicker.xml</File>
+    </AddUserInterfaces>
+    <AddUserInterfaces id="SRAccess_DiplomacyAccess">
+      <Properties>
+        <Context>InGame</Context>
+      </Properties>
+      <File>Assets/UI/Additions/DiplomacyAccess.xml</File>
+    </AddUserInterfaces>
     <AddUserInterfaces id="SRAccess_TechPickerAddin">
       <Properties>
         <Context>InGame</Context>
@@ -222,6 +244,8 @@
     <File>Assets/UI/Accessibility/HexGeom.lua</File>
     <File>Assets/UI/Accessibility/HexCursor.lua</File>
     <File>Assets/UI/Accessibility/UnitMovement.lua</File>
+    <File>Assets/UI/Accessibility/LeaderMoodExpressions.lua</File>
+    <File>Assets/UI/Accessibility/LeaderMeetAnnounce.lua</File>
     <File>Assets/UI/Accessibility/UnitInfo.lua</File>
     <File>Assets/UI/Accessibility/CityProduction.lua</File>
     <File>Assets/UI/Accessibility/Diagnostics.lua</File>
@@ -231,6 +255,10 @@
     <File>Assets/UI/Additions/HexCursorAddin.lua</File>
     <File>Assets/UI/Additions/ProductionPickerAddin.xml</File>
     <File>Assets/UI/Additions/ProductionPickerAddin.lua</File>
+    <File>Assets/UI/Additions/BuildImprovementPicker.xml</File>
+    <File>Assets/UI/Additions/BuildImprovementPicker.lua</File>
+    <File>Assets/UI/Additions/DiplomacyAccess.xml</File>
+    <File>Assets/UI/Additions/DiplomacyAccess.lua</File>
     <File>Assets/UI/Additions/TechPickerAddin.xml</File>
     <File>Assets/UI/Additions/TechPickerAddin.lua</File>
     <File>Assets/UI/Additions/CivicPickerAddin.xml</File>
@@ -241,6 +269,9 @@
     <File>Assets/UI/Additions/RevealListeners.lua</File>
     <File>Assets/UI/Menus/InGameTopOptionsMenu.lua</File>
     <File>Assets/UI/Accessibility/ScreenReader.lua</File>
+    <File>Assets/UI/Accessibility/Report.lua</File>
+    <File>Assets/UI/Accessibility/EmpireStatus.lua</File>
+    <File>Assets/UI/Accessibility/EotReport.lua</File>
     <File>Assets/UI/Accessibility/ScreenReaderEventHandlers.lua</File>
     <File>Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
     <File>Assets/UI/Accessibility/TurnAnnouncements.lua</File>
@@ -286,6 +317,9 @@
     <File>Assets/UI/Accessibility/RevealPopupAccess.lua</File>
     <File>Assets/UI/Accessibility/ChoosePopupAccess.lua</File>
     <File>Assets/UI/Accessibility/PolicyWizard.lua</File>
+    <File>Assets/UI/Accessibility/RevealAnnounce.lua</File>
+    <File>Assets/UI/Accessibility/GoodyHutAnnounce.lua</File>
+    <File>Assets/UI/Accessibility/BoardQueryProbe.lua</File>
     <File>Assets/UI/ToolTips/PlotToolTip.lua</File>
     <File>Assets/Data/RemapForHexCursor.xml</File>
     <File>Assets/Text/en_US/CivVIAccessStrings.xml</File>

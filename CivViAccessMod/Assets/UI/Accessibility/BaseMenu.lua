@@ -942,6 +942,8 @@ function BaseMenu.install(ContextPtr, spec)
         -- the user "heard the difference," but that doubled the work per
         -- press and made rapid toggling feel laggy. The mode utterance
         -- alone is fast enough to toggle in quick succession.
+        -- Alt+V everywhere (world view + menus). Verbosity.toggle()
+        -- broadcasts so the change propagates to every Context.
         if altDown and key == Keys.V and Verbosity ~= nil then
             local on = Verbosity.toggle()
             speak(on and "Verbose on" or "Verbose off", false)

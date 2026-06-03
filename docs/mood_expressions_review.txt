@@ -1,0 +1,81 @@
+CIV VI ACCESS - LEADER MOOD EXPRESSIONS (for review)
+
+These replace the flat mood label (like "Guarded") with the leader's expression,
+so the diplomacy screen describes the leader's FACE instead of reading a stat.
+
+Spoken form: <Leader> of <Civ> + the phrase.
+Example: "Tokugawa of Japan watches you warily. Press Escape to continue."
+
+The mod picks one of the five per encounter so it doesn't repeat.
+This file matches the code exactly. Tell me which to change, cut, or reword -
+line by line is fine (e.g. "guarded 4" or "war 5").
+
+Note on which moods actually fire: in plain vanilla Civ VI the diplomatic states
+cover ALLIED, FRIENDLY, NEUTRAL, UNFRIENDLY, HOSTILE (denounced), and WAR.
+GUARDED, AFRAID, and DECEPTIVE have no direct vanilla trigger yet - they're
+written and waiting, but won't be heard until we find a signal for them. They're
+included below so you can review the wording now.
+
+
+ALLIED  (declared friend or ally - the warmest)
+1. greets you like an old friend
+2. clasps your hand warmly
+3. welcomes you like family
+4. beams at the sight of you
+5. greets you with unguarded warmth
+
+FRIENDLY
+1. smiles warmly
+2. greets you with an easy smile
+3. looks genuinely glad to see you
+4. gives you a warm, open nod
+5. brightens as you approach
+
+NEUTRAL
+1. gives you a measured look
+2. regards you evenly
+3. studies you without expression
+4. greets you with a cool, polite nod
+5. meets your eyes, unreadable
+
+GUARDED  (no vanilla trigger yet)
+1. watches you warily
+2. eyes you with quiet caution
+3. keeps you at arm's length
+4. weighs every word before answering
+5. regards you carefully, giving nothing away
+
+UNFRIENDLY
+1. frowns
+2. eyes you coldly
+3. greets you with a thin, joyless smile
+4. looks faintly disappointed in you
+5. barely bothers to hide their distaste
+
+HOSTILE  (denounced)
+1. glares at you
+2. scowls openly
+3. fixes you with a hard, furious stare
+4. looks ready to have you thrown out
+5. can barely contain their contempt
+
+AFRAID  (no vanilla trigger yet)
+1. eyes you nervously
+2. shifts uneasily as you speak
+3. can't quite hide their unease
+4. watches you the way one watches a circling wolf
+5. forces a smile that doesn't reach their eyes
+
+DECEPTIVE  (no vanilla trigger yet - the sneaky one)
+1. smiles a little too smoothly
+2. grins slyly, as if at a private joke
+3. offers a smile that never reaches their eyes
+4. watches you with a sly, calculating warmth
+5. smiles - but something underneath it doesn't
+
+WAR
+1. scowls, ready for a fight
+2. regards you like a problem to be solved
+3. meets you with cold, martial contempt
+4. looks at you with open, weary hatred
+5. squares up as if the war were already in the room

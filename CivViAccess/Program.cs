@@ -1,6 +1,14 @@
 using Camm;
 using CivVIAccess.Launcher;
+using CivVIAccess.Launcher.Report;
 using CivVIAccess.Launcher.Speech;
+
+// WebView2 report bridge. The mod streams HTML reports over the CAMM
+// log-tail as #SHOWREPORT marker lines; this observer reassembles them
+// and renders them in the launcher's ReportWindow. Constructed here so
+// it can be handed to the manifest as the LogLineObserver seam. All
+// report/WebView2 code lives in CivViAccess (Report\), not CAMM.
+var reportBridge = new ReportBridge();
 
 // Civ VI Access launcher entry point. Builds the CAMM manifest and
 // hands the whole launcher lifecycle to CammHost.RunAsync — apply-
@@ -37,6 +45,7 @@ return await CammHost.RunAsync(args, new CammModManifest
     TargetGameLauncherName = "Steam",
     Sanitizer = new CivViMessageSanitizer(),
     MarkerProtocol = new CivViScreenReaderMarkerProtocol(),
+    LogLineObserver = reportBridge.OnLogLine,
     GameInstance = new CivViGameInstance(),
     // The MarkerProtocol now applies per-kind shielding across all
     // Lua VMs via CivViSpeechShield. CAMM's coarse 3-second sticky

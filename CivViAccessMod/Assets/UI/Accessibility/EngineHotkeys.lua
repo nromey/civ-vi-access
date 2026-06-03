@@ -49,7 +49,8 @@ HandlerStack.registerCommonHelpEntry({ keyLabel = "F",         description = "Fo
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Delete",    description = "Delete selected unit" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Alt+A",     description = "Attack (rebound from A)" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "R",         description = "Ranged attack" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Alt+E",     description = "Auto-explore (rebound from E)" });
+HandlerStack.registerCommonHelpEntry({ keyLabel = "Alt+X",     description = "Auto-explore selected unit (eXplore)" });
+HandlerStack.registerCommonHelpEntry({ keyLabel = "Shift+B",   description = "Build recommended improvement (selected builder)" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "H",         description = "Fortify until healed" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Space",     description = "Skip turn for selected unit" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Alt+Z",     description = "Sleep selected unit (rebound from Z)" });

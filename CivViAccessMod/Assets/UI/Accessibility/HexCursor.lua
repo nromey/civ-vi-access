@@ -140,6 +140,15 @@ local function AnnouncePlot(plot)
     if feature ~= "" then parts[#parts + 1] = feature; end
     local resource = resourceName(plot);
     if resource ~= "" then parts[#parts + 1] = resource; end
+    -- River is an EDGE property, not a terrain type, so it never came through
+    -- terrainName() — a riverside grassland just read "Grassland" (Noel 2026-06-01:
+    -- nav says coast/ocean but never river). Mirror PlotToolTip's own line
+    -- (LOC_TOOLTIP_RIVER, inserted right after the resource) so the spoken tile
+    -- matches the sighted tooltip. In `parts` before the fog branch so a river you
+    -- already saw still reads under fog of war (static terrain memory).
+    if plot.IsRiver and plot:IsRiver() then
+        parts[#parts + 1] = Locale.Lookup("LOC_TOOLTIP_RIVER");
+    end
 
     if not isVisible then
         -- Fog of war: speak only the static terrain memory. Current units
@@ -161,11 +170,30 @@ local function AnnouncePlot(plot)
     -- military-only — confirmed via testing 2026-05-24 when cursor on
     -- a Settler's plot announced only "grasslands, rice" and missed
     -- the Settler entirely.
+    -- Selected-unit flag (Noel 2026-06-03): when the cursor sits on the tile
+    -- of the unit you currently command, say "(selected)" so you can tell
+    -- your builder from the barbarian sharing the neighbourhood.
+    local selUnit = (UI ~= nil and UI.GetHeadSelectedUnit ~= nil) and UI.GetHeadSelectedUnit() or nil;
     local units = Units.GetUnitsInPlotLayerID(x, y, MapLayers.ANY);
     if units ~= nil then
         for _, unit in ipairs(units) do
-            parts[#parts + 1] = StringifyUnit(unit);
+            local s = StringifyUnit(unit);
+            if selUnit ~= nil and unit ~= nil
+               and unit:GetID() == selUnit:GetID()
+               and unit:GetOwner() == selUnit:GetOwner() then
+                s = s .. " (selected)";
+            end
+            parts[#parts + 1] = s;
         end
+    end
+
+    -- Chatty mode: append the full tile mechanics (yields, water, defense,
+    -- appeal, movement, continent) so tile NAV reads the deep datasheet. Terse
+    -- (default) stops at the brief line above. This is THE verbosity gate for
+    -- world nav (Noel 2026-06-02: terse vs chatty must actually change what you
+    -- hear as you move; previously nav ignored the toggle entirely).
+    if Verbosity ~= nil and Verbosity.isOn() and HexCursor._mechanicsParts ~= nil then
+        for _, m in ipairs(HexCursor._mechanicsParts(plot)) do parts[#parts + 1] = m; end
     end
 
     if #parts == 0 then
@@ -176,6 +204,146 @@ local function AnnouncePlot(plot)
 end
 
 HexCursor.AnnouncePlot = AnnouncePlot;
+
+-- ── Verbose tile readout (Shift+T) ──────────────────────────────────────────
+-- The "full mechanics" layer the terse nav announce deliberately omits: yields,
+-- defense bonus, appeal, fresh-water status, movement cost, continent. Mirrors
+-- the sighted PlotToolTip (same LOC strings) so a blind player gets parity data
+-- on demand. Noel 2026-06-01: this is the content behind Shift+T — and what
+-- Alt+V will eventually fold into the default announce.
+
+-- "2 Food, 1 Production, 1 Gold" from per-yield plot values.
+local function yieldSummary(plot)
+    if plot == nil or plot.GetYield == nil then return nil; end
+    local out = {};
+    for row in GameInfo.Yields() do
+        local ok, y = pcall(function() return plot:GetYield(row.Index); end);
+        if ok and y ~= nil and y > 0 then
+            out[#out + 1] = y .. " " .. Locale.Lookup(row.Name);
+        end
+    end
+    if #out == 0 then return nil; end
+    return "Yields: " .. table.concat(out, ", ");
+end
+
+-- Appeal descriptor (Charming / Breathtaking / etc.) mirroring PlotToolTip: the
+-- first AppealHousingChanges threshold the appeal meets. Land tiles only.
+local function appealPhrase(plot)
+    if plot == nil or plot.GetAppeal == nil then return nil; end
+    if plot.IsWater and plot:IsWater() then return nil; end
+    local ok, appeal = pcall(function() return plot:GetAppeal(); end);
+    if not ok or appeal == nil then return nil; end
+    local desc = nil;
+    for row in GameInfo.AppealHousingChanges() do
+        if appeal >= row.MinimumValue then
+            desc = Locale.Lookup(row.Description);
+            break;
+        end
+    end
+    if desc == nil then return nil; end
+    return Locale.Lookup("LOC_TOOLTIP_APPEAL", desc, appeal);
+end
+
+-- Fresh-water status (the housing driver), ranked like the engine's own start
+-- logic. River is already its own line in the base parts, so skip it here.
+local function waterPhrase(plot)
+    if plot == nil then return nil; end
+    if plot.IsRiver and plot:IsRiver() then return nil; end
+    if plot.IsFreshWater and plot:IsFreshWater() then return "fresh water"; end
+    if plot.IsCoastalLand and plot:IsCoastalLand() then return "coastal"; end
+    return "no fresh water";
+end
+
+-- Shared "full mechanics" list (yields, water, defense, appeal, movement,
+-- continent) used by BOTH the Shift+T verbose readout and chatty-mode tile nav.
+-- Returns an array of strings (possibly empty). Exposed on the HexCursor table
+-- (not a local) so AnnouncePlot — defined earlier in the file — can reach it at
+-- runtime regardless of lexical order.
+function HexCursor._mechanicsParts(plot)
+    local out = {};
+    local function add(s) if s ~= nil and s ~= "" then out[#out + 1] = s; end end
+    if plot == nil then return out; end
+    add(yieldSummary(plot));
+    add(waterPhrase(plot));
+    if plot.GetDefenseModifier ~= nil then
+        local ok, dm = pcall(function() return plot:GetDefenseModifier(); end);
+        if ok and dm ~= nil and dm ~= 0 then
+            add(Locale.Lookup("LOC_TOOLTIP_DEFENSE_MODIFIER", dm));
+        end
+    end
+    add(appealPhrase(plot));
+    if (plot.IsImpassable == nil or not plot:IsImpassable()) and plot.GetMovementCost ~= nil then
+        local ok, mc = pcall(function() return plot:GetMovementCost(); end);
+        if ok and mc ~= nil and mc > 0 then
+            add(Locale.Lookup("LOC_TOOLTIP_MOVEMENT_COST", mc));
+        end
+    end
+    if plot.GetContinentType ~= nil then
+        local ct = plot:GetContinentType();
+        if ct ~= nil and ct ~= -1 and GameInfo.Continents[ct] ~= nil then
+            add(Locale.Lookup("LOC_TOOLTIP_CONTINENT", GameInfo.Continents[ct].Description));
+        end
+    end
+    return out;
+end
+
+-- Shift+T handler: speak the full readout for the hex under the cursor.
+function HexCursor.DescribeVerbose()
+    local plot = (_x ~= nil and _y ~= nil and Map ~= nil and Map.GetPlot ~= nil)
+                 and Map.GetPlot(_x, _y) or nil;
+    if plot == nil then Speech.emit("No tile under cursor", "meta"); return; end
+
+    local x, y = plot:GetX(), plot:GetY();
+
+    -- Fog gate (mirror AnnouncePlot): never describe an unexplored tile.
+    local localPlayer = (Game ~= nil and Game.GetLocalPlayer) and Game.GetLocalPlayer() or -1;
+    local pVis = (localPlayer >= 0 and PlayersVisibility ~= nil)
+                 and PlayersVisibility[localPlayer] or nil;
+    if pVis ~= nil and pVis.IsRevealed ~= nil then
+        local ok, rev = pcall(function() return pVis:IsRevealed(x, y); end);
+        if ok and rev ~= true then Speech.emit("Unexplored", "selection"); return; end
+    end
+
+    local parts = {};
+    local function add(s) if s ~= nil and s ~= "" then parts[#parts + 1] = s; end end
+
+    -- Order (Noel 2026-06-01): identity first, then the decision trio
+    -- (yields / water / defense), then secondary detail, with movement cost +
+    -- continent pushed to the TAIL so the settle-relevant facts land before the
+    -- firehose and the listener can stop early.
+    add(terrainName(plot));
+    add(featureName(plot));
+    if plot.IsRiver and plot:IsRiver() then add(Locale.Lookup("LOC_TOOLTIP_RIVER")); end
+
+    add(yieldSummary(plot));
+    add(waterPhrase(plot));
+    if plot.GetDefenseModifier ~= nil then
+        local ok, dm = pcall(function() return plot:GetDefenseModifier(); end);
+        if ok and dm ~= nil and dm ~= 0 then
+            add(Locale.Lookup("LOC_TOOLTIP_DEFENSE_MODIFIER", dm));
+        end
+    end
+
+    add(resourceName(plot));
+    add(appealPhrase(plot));
+
+    -- Tail: least decision-critical, spoken last.
+    if (plot.IsImpassable == nil or not plot:IsImpassable()) and plot.GetMovementCost ~= nil then
+        local ok, mc = pcall(function() return plot:GetMovementCost(); end);
+        if ok and mc ~= nil and mc > 0 then
+            add(Locale.Lookup("LOC_TOOLTIP_MOVEMENT_COST", mc));
+        end
+    end
+    if plot.GetContinentType ~= nil then
+        local ct = plot:GetContinentType();
+        if ct ~= nil and ct ~= -1 and GameInfo.Continents[ct] ~= nil then
+            add(Locale.Lookup("LOC_TOOLTIP_CONTINENT", GameInfo.Continents[ct].Description));
+        end
+    end
+
+    if #parts == 0 then Speech.emit("No tile data", "meta"); return; end
+    Speech.emit(table.concat(parts, ". "), "selection");
+end
 
 local function setCursor(plot)
     if plot == nil then return; end
@@ -308,6 +476,18 @@ function HexCursor.jumpTo(x, y)
     setCursor(plot);
 end
 
+-- "selected French Builder" for the head-selected unit, or nil if nothing is
+-- selected. The cursor is free-roam, so the selected unit can be anywhere — the
+-- where-am-I reads name it so you always know what you're commanding (Noel
+-- 2026-06-03). StringifyUnit is a global from ScreenReaderPlotUtils.
+local function selectedUnitPhrase()
+    local sel = (UI ~= nil and UI.GetHeadSelectedUnit ~= nil) and UI.GetHeadSelectedUnit() or nil;
+    if sel == nil then return nil; end
+    local name = StringifyUnit(sel);
+    if name == nil or name == "" then return nil; end
+    return "selected " .. name;
+end
+
 function HexCursor.speakWhereAmIAbs()
     if not _initialized then
         Speech.emit("Cursor not ready", "meta");
@@ -321,15 +501,73 @@ function HexCursor.speakWhereAmI()
         Speech.emit("Cursor not ready", "meta");
         return;
     end
+    -- Quick where-am-I: capital-relative bearing AND the absolute coords.
+    -- Noel 2026-06-02: the natural where-am-I keys (bare S / Shift+S) must
+    -- speak the numbers too — Alt+S as the only coords key was too easy to
+    -- forget. Coords go last so the bearing (the thing you usually want)
+    -- leads.
+    local coords = HexGeom.absoluteCoords(_x, _y);
     local rel = HexGeom.relativeToCapital(_x, _y);
-    if rel == nil then
-        -- No capital yet — fall back to absolute so the user always hears
-        -- something useful, not silence.
-        Speech.emit(HexGeom.absoluteCoords(_x, _y) .. ". No capital yet.",
-                    "status");
+    local base = (rel == nil) and (coords .. ". No capital yet.")
+                 or (rel .. ". " .. coords);
+    local sel = selectedUnitPhrase();
+    if sel ~= nil then base = base .. ". " .. sel; end
+    Speech.emit(base, "status");
+end
+
+-- Nearest of the local player's cities to (x,y): returns (name, directionString)
+-- or nil if the player has no cities yet. Direction is the city's bearing FROM
+-- the cursor ("5 east, 2 southeast").
+local function nearestOwnCity(x, y)
+    local lpid = (Game ~= nil and Game.GetLocalPlayer) and Game.GetLocalPlayer() or -1;
+    if lpid < 0 or Players == nil or Players[lpid] == nil then return nil; end
+    local p = Players[lpid];
+    local cities = (p.GetCities ~= nil) and p:GetCities() or nil;
+    if cities == nil then return nil; end
+    local best, bestDist, bx, by = nil, nil, nil, nil;
+    for _, c in cities:Members() do
+        if c ~= nil then
+            local cx, cy = c:GetX(), c:GetY();
+            local d = Map.GetPlotDistance(cx, cy, x, y);
+            if bestDist == nil or d < bestDist then
+                best, bestDist, bx, by = c, d, cx, cy;
+            end
+        end
+    end
+    if best == nil then return nil; end
+    return Locale.Lookup(best:GetName()), HexGeom.relativeDirection(x, y, bx, by);
+end
+
+-- Shift+S: the RICH locate ("survey"). Where you are (capital-relative), the
+-- terrain under the cursor, and your nearest city + its bearing. Bare S stays
+-- the quick where-am-I (speakWhereAmI). Noel 2026-06-01. Nearest-unexplored
+-- direction is a banked future addition.
+function HexCursor.speakSurvey()
+    if not _initialized then
+        Speech.emit("Cursor not ready", "meta");
         return;
     end
-    Speech.emit(rel, "status");
+    local parts = {};
+    local rel = HexGeom.relativeToCapital(_x, _y);
+    parts[#parts + 1] = rel or "no capital yet";
+    local plot = (Map ~= nil and Map.GetPlot ~= nil) and Map.GetPlot(_x, _y) or nil;
+    if plot ~= nil then
+        local terr = terrainName(plot);
+        if terr ~= "" then parts[#parts + 1] = "on " .. terr; end
+        if plot.IsRiver and plot:IsRiver() then parts[#parts + 1] = "by a river"; end
+    end
+    local cityName, cityDir = nearestOwnCity(_x, _y);
+    if cityName ~= nil then
+        local line = "nearest city " .. cityName;
+        if cityDir ~= nil then line = line .. ", " .. cityDir; end
+        parts[#parts + 1] = line;
+    end
+    local sel = selectedUnitPhrase();
+    if sel ~= nil then parts[#parts + 1] = sel; end
+    -- Coords last (Noel 2026-06-02): the survey now always ends with the
+    -- absolute X, Y so any where-am-I key carries the numbers.
+    parts[#parts + 1] = HexGeom.absoluteCoords(_x, _y);
+    Speech.emit(table.concat(parts, ". "), "status");
 end
 
 -- Forward declaration. cursorHandler is fully populated below; declared
@@ -370,13 +608,14 @@ local CURSOR_HELP_ENTRIES = {
     { keyLabel = "Z",       description = "Move cursor southwest" },
     { keyLabel = "C",       description = "Move cursor southeast" },
 
-    -- Unit one-hex move (Alt + cursor key)
-    { keyLabel = "Alt+Q",   description = "Move selected unit northwest one hex" },
-    { keyLabel = "Alt+E",   description = "Move selected unit northeast one hex" },
-    { keyLabel = "Alt+A",   description = "Move selected unit west one hex" },
-    { keyLabel = "Alt+D",   description = "Move selected unit east one hex" },
-    { keyLabel = "Alt+Z",   description = "Move selected unit southwest one hex" },
-    { keyLabel = "Alt+C",   description = "Move selected unit southeast one hex" },
+    -- Unit one-hex move (Shift + cursor key) — bare letters move the cursor,
+    -- Shift commits a unit move. (Help previously mislabeled these Alt.)
+    { keyLabel = "Shift+Q", description = "Move selected unit northwest one hex" },
+    { keyLabel = "Shift+E", description = "Move selected unit northeast one hex" },
+    { keyLabel = "Shift+A", description = "Move selected unit west one hex" },
+    { keyLabel = "Shift+D", description = "Move selected unit east one hex" },
+    { keyLabel = "Shift+Z", description = "Move selected unit southwest one hex" },
+    { keyLabel = "Shift+C", description = "Move selected unit southeast one hex" },
 
     -- Unit actions
     { keyLabel = "B",       description = "Found city with selected Settler" },
@@ -386,8 +625,8 @@ local CURSOR_HELP_ENTRIES = {
     -- Unit cycle
     { keyLabel = "Period",  description = "Cycle to next unit needing orders" },
     { keyLabel = "Comma",   description = "Cycle to previous unit needing orders" },
-    { keyLabel = "Ctrl+Period", description = "Cycle to next unit (any state, including done units)" },
-    { keyLabel = "Ctrl+Comma",  description = "Cycle to previous unit (any state)" },
+    { keyLabel = "Shift+Period", description = "Cycle to next unit, any state including sleeping / done" },
+    { keyLabel = "Shift+Comma",  description = "Cycle to previous unit, any state" },
 
     -- Unit info
     { keyLabel = "Slash",   description = "Speak selected unit's stats" },
@@ -405,8 +644,9 @@ local CURSOR_HELP_ENTRIES = {
     { keyLabel = "Alt+N",   description = "Toggle idle notification reminder on / off" },
 
     -- Coordinates + verbosity
-    { keyLabel = "Shift+S", description = "Speak cursor position relative to capital" },
-    { keyLabel = "Alt+S",   description = "Speak absolute X, Y coordinates" },
+    { keyLabel = "S",       description = "Where am I — bearing from capital and coordinates" },
+    { keyLabel = "Shift+S", description = "Survey — bearing from capital, terrain, nearest city, and coordinates" },
+    { keyLabel = "Alt+S",   description = "Speak absolute X, Y coordinates only" },
     { keyLabel = "Alt+V",   description = "Toggle verbose / terse announce mode" },
 
     -- Help itself

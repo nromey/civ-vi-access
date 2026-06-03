@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DiplomacyAccess UI Context. Registered via <AddUserInterfaces context="InGame">
+  in CivViAccessMod.modinfo. A screen-reader modal that layers OVER the vanilla
+  DiplomacyActionView when it opens (LuaEvents.DiploScene_SceneOpened): it reads
+  the leader you're meeting and the available diplomatic options (extracted via
+  DiplomacySupport_ExtractStatement in our own VM — GetStatementHandler is not
+  reachable cross-VM, but the support helpers are), lets you arrow through them,
+  and commits the chosen one with DiplomacyManager.RequestSession. Audio-only,
+  Hidden="1", opened via UIManager:QueuePopup so the engine routes raw keyboard
+  to ContextPtr:SetInputHandler (the proven world-view picker shell). The 1x1
+  Grid is just a layout root.
+-->
+<Context Name="DiplomacyAccess" Hidden="1">
+  <Grid ID="Root" Size="1,1" Anchor="C,C"/>
+</Context>

@@ -361,6 +361,12 @@
         <Row Tag="LOC_CIVVIACCESS_LOAD_STARTING">
             <Text>Creating game.</Text>
         </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_STARTING_LOAD">
+            <Text>Loading game.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_LOAD_STARTING_TUTORIAL">
+            <Text>Loading tutorial.</Text>
+        </Row>
         <Row Tag="LOC_CIVVIACCESS_LOAD_COMPLETE_READY">
             <Text>Loading complete. Press Enter or Escape to begin the game.</Text>
         </Row>

@@ -11,6 +11,7 @@
 
 include("ScreenReader");
 include("ScreenReaderPlotUtils");
+include("Verbosity");   -- gate the plot read: terse = brief, chatty = full
 
 
 -- ===========================================================================
@@ -635,22 +636,40 @@ function View( data:table )
 		local plotHeadline = Controls.PlotName:GetText() ..
 							" (" .. data.X ..
 							" " .. data.Y .. ")";
-		table.insert(details, 1, plotHeadline);
-		
-		-- read out units in plot
-		for i, unit in ipairs(Units.GetUnitsInPlot(data.X, data.Y)) do
-			table.insert(details, 2, StringifyUnit(unit));
-		end
 
-		-- read out city center on plot
-		if Cities.GetCityInPlot(data.X, data.Y) ~= nil then
-			table.insert(details, 2, StringifyCity(Cities.GetCityInPlot(data.X, data.Y)));
-		end
+		if Verbosity ~= nil and not Verbosity.isOn() then
+			-- TERSE (default, 2026-06-02): terrain headline + notable occupants
+			-- (units, city) only. The full datasheet (movement cost, appeal,
+			-- continent, yields, buildings, worked-by) is too much to push on
+			-- every tile as you move; it stays available on demand via Describe
+			-- Tile (Shift+R / HexCursor.DescribeVerbose) and Ctrl+T. Gate the
+			-- shared Verbosity (Alt+B) so chatty restores the full read.
+			local brief = { plotHeadline };
+			for i, unit in ipairs(Units.GetUnitsInPlot(data.X, data.Y)) do
+				brief[#brief + 1] = StringifyUnit(unit);
+			end
+			if Cities.GetCityInPlot(data.X, data.Y) ~= nil then
+				brief[#brief + 1] = StringifyCity(Cities.GetCityInPlot(data.X, data.Y));
+			end
+			Speech.emit(table.concat(brief, "[NEWLINE]"), "status");
+		else
+			-- CHATTY (or Verbosity module unavailable): the full datasheet,
+			-- unchanged from the shipped behavior.
+			table.insert(details, 1, plotHeadline);
 
-		local description = table.concat(details, "[NEWLINE]");
-		-- status: tooltip text is user-asked plot detail (Ctrl+T). Queue
-		-- behind anything in flight rather than clobbering it.
-		Speech.emit(description, "status");
+			-- read out units in plot
+			for i, unit in ipairs(Units.GetUnitsInPlot(data.X, data.Y)) do
+				table.insert(details, 2, StringifyUnit(unit));
+			end
+
+			-- read out city center on plot
+			if Cities.GetCityInPlot(data.X, data.Y) ~= nil then
+				table.insert(details, 2, StringifyCity(Cities.GetCityInPlot(data.X, data.Y)));
+			end
+
+			-- status: queue behind anything in flight rather than clobbering it.
+			Speech.emit(table.concat(details, "[NEWLINE]"), "status");
+		end
 	end
 	-- End ScreenReaderAccess mod change
 end

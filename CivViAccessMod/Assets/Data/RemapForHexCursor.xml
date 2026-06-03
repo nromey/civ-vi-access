@@ -7,7 +7,9 @@
      letter, hold Alt.
 
        Q  ToggleResources    -> Alt+Q
-       E  AutoExplore        -> Alt+E
+       E  AutoExplore        -> Alt+E (parked, dormant; bare E intercepts Alt+E,
+                                 so accessible auto-explore lives on Alt+X via
+                                 CIVVIACCESS_AutoExplore — see note below)
        A  Attack             -> Alt+A
        Z  Sleep              -> Alt+Z
        C  ToggleCivicsTree   -> Alt+C
@@ -61,6 +63,16 @@
         <GestureData>LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_Q</GestureData>
       </Set>
     </Update>
+    <!-- AutoExplore: vanilla default is bare E, which we need free for the
+         HexCursor NE pan. The catch (confirmed live 2026-06-02): a bare-letter
+         gesture INTERCEPTS its Alt+ combo — pressing Alt+E fired the bare-E
+         CursorNE pan (id 80), NOT the Alt+E binding. So neither the engine
+         action nor ours can live on Alt+E. Accessible auto-explore therefore
+         moves to Alt+X (CIVVIACCESS_AutoExplore, below — X has no bare binding,
+         so Alt+X fires cleanly like Alt+K/M/V), issuing the op directly. We
+         still park the engine AutoExplore on Alt+E: off bare E (keeps the pan
+         clean) and harmlessly dormant (bare E intercepts Alt+E, so it never
+         fires and never dual-dispatches). -->
     <Update>
       <Where ActionId="AutoExplore" Index="0" GestureType="KBMouse"/>
       <Set>
@@ -175,6 +187,16 @@
          Name="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I_ABS"
          Description="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I_ABS_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- Where-am-I also on BARE S (2026-06-01): S is dead-center of the bare
+         Q/E/A/D/Z/C cursor-nav cluster, and blind-gaming convention puts the
+         "where am I" key in the center of the movement keys. Bare S is engine-
+         unbound (its only other binding is the briefing-screen transcript, which
+         is temporally separate). Same handler as Shift+S WhereAmI; Shift+S kept
+         too (center of the unit-move cluster). -->
+    <Row ActionId="CIVVIACCESS_WhereAmICenter"
+         Name="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I"
+         Description="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
     <Row ActionId="CIVVIACCESS_OpenHelp"
          Name="LOC_CIVVIACCESS_HOTKEY_OPEN_HELP"
          Description="LOC_CIVVIACCESS_HOTKEY_OPEN_HELP_HELP"
@@ -228,6 +250,15 @@
     <Row ActionId="CIVVIACCESS_RepeatAnnounce"
          Name="LOC_CIVVIACCESS_HOTKEY_REPEAT_ANNOUNCE"
          Description="LOC_CIVVIACCESS_HOTKEY_REPEAT_ANNOUNCE_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- Verbose tile readout (Shift+T). Full mechanics for the hex under the
+         cursor — yields, defense bonus, appeal, fresh water, movement cost,
+         continent — the deep layer the terse nav announce omits. Added
+         2026-06-01; repeat-announce moved off Shift+T to Shift+R to free the
+         "T = Tile" mnemonic. -->
+    <Row ActionId="CIVVIACCESS_DescribeTile"
+         Name="LOC_CIVVIACCESS_HOTKEY_DESCRIBE_TILE"
+         Description="LOC_CIVVIACCESS_HOTKEY_DESCRIBE_TILE_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
     <!-- Shift+I: read the full (long) visual description of the last reveal
          popup (hero / secret society). The short description is spoken inline
@@ -345,6 +376,57 @@
          Name="LOC_CIVVIACCESS_HOTKEY_VERBOSITY_TOGGLE"
          Description="LOC_CIVVIACCESS_HOTKEY_VERBOSITY_TOGGLE_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- WebView2 report bridge smoke test (Alt+K). Temporary trigger to
+         validate the Lua -> log -> launcher -> WebView2 pipe; the real
+         report-open hotkey (end-of-turn / empire status) is Noel's call
+         once the bridge is proven. K is in the unbound singleton set
+         (D/I/J/K/N/S/U/X) and Alt+K is otherwise unused. -->
+    <Row ActionId="CIVVIACCESS_ShowReportTest"
+         Name="LOC_CIVVIACCESS_HOTKEY_SHOW_REPORT_TEST"
+         Description="LOC_CIVVIACCESS_HOTKEY_SHOW_REPORT_TEST_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- Empire status report (bare U). First real consumer of the report
+         bridge: yields, research/civic ETA, cities, idle units, city-states,
+         and an end-turn "needs attention" checklist. Bare U is in the unbound
+         singleton set (D/I/J/K/N/S/U/X) — provisional key, Noel's to confirm/
+         rename alongside the eventual end-of-turn report. -->
+    <Row ActionId="CIVVIACCESS_EmpireStatus"
+         Name="LOC_CIVVIACCESS_HOTKEY_EMPIRE_STATUS"
+         Description="LOC_CIVVIACCESS_HOTKEY_EMPIRE_STATUS_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- End-of-turn report (bare N, mnemonic "eNd of turn"). Second real
+         consumer of the report bridge: what happened last turn (techs/civics
+         completed, eurekas/inspirations, production, founded cities, treasury
+         change, empire deltas). Bare N is unbound in the engine (Alt+N is the
+         notification reminder toggle). Provisional — Noel's to confirm/rename. -->
+    <Row ActionId="CIVVIACCESS_EotReport"
+         Name="LOC_CIVVIACCESS_HOTKEY_EOT_REPORT"
+         Description="LOC_CIVVIACCESS_HOTKEY_EOT_REPORT_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- DEBUG: open diplomacy with the first met major civ to test the
+         leader-meet announce + lock in the greeting control path without
+         waiting for a natural first contact (Alt+M). Dev convenience over the
+         FireTuner CivViAccess_DebugMeetLeader line; remove/guard before a
+         public release. Alt+M (and bare M) is otherwise unused. -->
+    <Row ActionId="CIVVIACCESS_DebugMeetLeader"
+         Name="LOC_CIVVIACCESS_HOTKEY_DEBUG_MEET_LEADER"
+         Description="LOC_CIVVIACCESS_HOTKEY_DEBUG_MEET_LEADER_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- Accessible auto-explore (Alt+X). Issues UNITOPERATION_AUTOMATE_EXPLORE
+         directly on the selected unit; replaces the vanilla AutoExplore hotkey
+         (parked dormant on Alt+E above, intercepted by the bare-E cursor pan). -->
+    <Row ActionId="CIVVIACCESS_AutoExplore"
+         Name="LOC_CIVVIACCESS_HOTKEY_AUTO_EXPLORE"
+         Description="LOC_CIVVIACCESS_HOTKEY_AUTO_EXPLORE_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
+    <!-- Build improvement with the selected Builder (Shift+B). v1 builds the
+         engine-recommended improvement for the unit's tile + announces the
+         alternatives; a navigable choose-picker is v2. Shift+B is free (B is
+         not a HexCursor letter; Shift+letter is otherwise the move cluster). -->
+    <Row ActionId="CIVVIACCESS_BuildImprovement"
+         Name="LOC_CIVVIACCESS_HOTKEY_BUILD_IMPROVEMENT"
+         Description="LOC_CIVVIACCESS_HOTKEY_BUILD_IMPROVEMENT_HELP"
+         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
   </InputActions>
 
   <!-- ===================================================================
@@ -371,6 +453,8 @@
     <!-- Where-am-I absolute: Alt+S -->
     <Row ActionId="CIVVIACCESS_WhereAmIAbs" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_S"/>
+    <Row ActionId="CIVVIACCESS_WhereAmICenter" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_S"/>
     <!-- ? help: Shift+/ -->
     <Row ActionId="CIVVIACCESS_OpenHelp" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_SLASH"/>
@@ -398,13 +482,17 @@
          GestureData="LOC_OPTIONS_KEY_SLASH"/>
     <Row ActionId="CIVVIACCESS_RecenterOnUnit" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_CTRL+LOC_OPTIONS_KEY_SLASH"/>
-    <!-- Shift+T, NOT Ctrl+T: Ctrl+T never fired (NVDA grabs Ctrl to stop
-         speech and appears to eat the combo — id 112 registered but no
-         InputActionTriggered). Shift+letter is proven in this mod (the
-         Shift+QAZEDC unit moves work via this same Row mechanism) and Shift
-         isn't screen-reader-claimed. Confirmed dead Ctrl+T via Lua.log
-         2026-05-29. -->
+    <!-- Repeat-announce on Shift+R, verbose tile readout on Shift+T (2026-06-01).
+         Ctrl+T/Ctrl+R are dead — NVDA grabs Ctrl to stop speech and eats the
+         combo (id registered, no InputActionTriggered; confirmed Lua.log
+         2026-05-29). Bare T=ToggleTechTree, bare R=RangedAttack in the engine
+         (InputConfiguration.xml 147,168), so neither can be claimed without
+         dual-dispatch audio corruption. Shift+T / Shift+R are unbound in vanilla
+         and Shift isn't screen-reader-claimed — the proven rail (Shift+QAZEDC
+         moves use it). Mnemonics: Shift+R = Repeat, Shift+T = Tile. -->
     <Row ActionId="CIVVIACCESS_RepeatAnnounce" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_R"/>
+    <Row ActionId="CIVVIACCESS_DescribeTile" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_T"/>
     <Row ActionId="CIVVIACCESS_RevealLongDesc" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_I"/>
@@ -480,9 +568,33 @@
          (mnemonic: "law" / "legality"). Confirmed Noel 2026-05-27. -->
     <Row ActionId="CIVVIACCESS_OpenCivicPicker" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_L"/>
-    <!-- 0.5.4 verbosity toggle (chatty vs terse). Bare V is engine
-         Alert action, so Alt+V is the safe modifier shape. -->
+    <!-- Verbosity toggle (chatty vs terse) on Alt+V. Confirmed Noel 2026-06-02:
+         Alt+V toggles correctly in the world view. The bare-V engine Alert
+         unit-operation only intercepts it in the narrow window right after a
+         notification fires (then Alt+V spoke "Alert" id=3); that collision is
+         handled separately rather than by relocating the key. Menus match
+         (BaseMenu uses Keys.V too). -->
     <Row ActionId="CIVVIACCESS_VerbosityToggle" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_V"/>
+    <!-- Report bridge smoke test on Alt+K (see InputActions note above). -->
+    <Row ActionId="CIVVIACCESS_ShowReportTest" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_K"/>
+    <!-- Empire status report on bare U (unbound singleton; provisional). -->
+    <Row ActionId="CIVVIACCESS_EmpireStatus" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_U"/>
+    <!-- End-of-turn report on bare N ("eNd"; unbound singleton; provisional). -->
+    <Row ActionId="CIVVIACCESS_EotReport" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_N"/>
+    <!-- DEBUG meet-leader on Alt+M (see InputActions note above). -->
+    <Row ActionId="CIVVIACCESS_DebugMeetLeader" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_M"/>
+    <!-- Accessible auto-explore on Alt+X ("eXplore"). NOT Alt+E: bare E
+         (CursorNE pan) intercepts Alt+E (confirmed live 2026-06-02). X has no
+         bare binding, so Alt+X fires cleanly like Alt+K/M/V. -->
+    <Row ActionId="CIVVIACCESS_AutoExplore" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_X"/>
+    <!-- Build improvement with selected Builder on Shift+B (B is free). -->
+    <Row ActionId="CIVVIACCESS_BuildImprovement" Index="0" GestureType="KBMouse"
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_B"/>
   </InputActionDefaultGestures>
 </GameInfo>

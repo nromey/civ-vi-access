@@ -97,6 +97,28 @@
   </ItemGroup>
 
   <!--
+    Report window. The mod streams HTML reports over the CAMM log-tail
+    bridge (the #SHOWREPORT marker, handled in Report\ReportBridge.cs);
+    Report\ReportWindow.cs writes the assembled page to a file and opens
+    it in an isolated Microsoft Edge app-mode window (the "app" launch
+    flag), so the screen reader's browse-mode handles all the heading /
+    list / table / link navigation for free (and future civilopedia
+    hyperlinks).
+
+    NO WebView2 PackageReference: the in-process WebView2 control was
+    abandoned 2026-06-02 because it cannot activate under Native AOT.
+    WebView2's RCW-based COM activation needs built-in COM interop, which
+    AOT disables — CoreWebView2Environment.CreateAsync throws
+    NotSupportedException ("Built-in COM has been disabled via a feature
+    switch") at runtime even though ILC compiles the assembly. Known,
+    unresolved WebView2+NativeAOT gap (WebView2Feedback #4783 / #4800).
+    Driving the user's already-installed Edge keeps the launcher AOT, adds
+    zero NuGet/native deps, and needs no WebView2Loader.dll extraction.
+    Edge is present by default on Win10 20H2+/Win11; ReportWindow falls
+    back to the OS default browser if it can't be found.
+  -->
+
+  <!--
     Tolk DLLs are embedded as resources (logical name `tolk/<filename>`)
     so the launcher exe is genuinely standalone — drop the .exe anywhere
     and Camm.TolkBootstrap extracts the sidecars next to it on first

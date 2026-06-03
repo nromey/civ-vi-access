@@ -154,6 +154,14 @@ function ShowPopup( kData:table )
 		short    = RevealPopupAccess.locOrNil(nwKey .. "_SHORT"),
 		long     = RevealPopupAccess.locOrNil(nwKey .. "_LONG"),
 		typeNoun = "natural wonder",
+		-- T re-reads JUST the mechanical benefits (the yields) on demand — the
+		-- terse "what does it give me" that the full R announce buries under the
+		-- lead-in + visual + key menu. Noel hit this live 2026-06-01: played the
+		-- audio quote, then reached for T to re-hear "+2 Food, +2 Culture" and it
+		-- wasn't bound. Use Description directly (NOT the gameplay var, which may
+		-- have a silent quote folded in for no-audio wonders).
+		abilities      = kData.Description,
+		abilitiesLabel = "the benefits",
 		-- Voiced quote deferred behind Enter (Sean-Bean); its text rides S.
 		playCinematic   = hasAudio and function() UI.PlaySound(kData.QuoteAudio); end or nil,
 		cinematicHint   = hasAudio and "Enter to play the wonder's audio quote" or nil,

@@ -504,7 +504,38 @@ end
 -- was finishing. Per Noel 2026-05-23 ("Recommend speaking 'Creating
 -- game' until it starts reading").
 function LoadScreenAccess.NotifyShowing()
-    speak(safeLookup("LOC_CIVVIACCESS_LOAD_STARTING"), true);
+    -- Pick the phrase by what's actually happening rather than always saying
+    -- "Creating game" (the bug: every launch — new, load, or resume — said
+    -- Creating game). Noel 2026-06-03.
+    --   * GameConfiguration.IsSavedGame() is the reliable "this is a load"
+    --     signal — the engine's own LoadScreen uses it to label the button
+    --     LOC_CONTINUE_GAME. Resume (continue last save) and explicit Load are
+    --     indistinguishable at this layer (both are saved-game loads), so both
+    --     read "Loading game" for now; refining to "Resuming game" needs a
+    --     signal we don't have here yet.
+    --   * Tutorial wording is a FUTURE hook — the tutorial flow isn't coded yet,
+    --     so the branch is ready but its detection (IsTutorial, guarded) will be
+    --     confirmed when tutorial work lands.
+    local key = "LOC_CIVVIACCESS_LOAD_STARTING";  -- new game: "Creating game."
+    local isSaved, isTutorial = false, false;
+    if GameConfiguration ~= nil and GameConfiguration.IsSavedGame ~= nil then
+        local ok, v = pcall(function() return GameConfiguration.IsSavedGame(); end);
+        isSaved = ok and v == true;
+    end
+    if GameConfiguration ~= nil and GameConfiguration.IsTutorial ~= nil then
+        local ok, v = pcall(function() return GameConfiguration.IsTutorial(); end);
+        isTutorial = ok and v == true;
+    end
+    if isTutorial then
+        key = "LOC_CIVVIACCESS_LOAD_STARTING_TUTORIAL";
+    elseif isSaved then
+        key = "LOC_CIVVIACCESS_LOAD_STARTING_LOAD";
+    end
+    if Log ~= nil and Log.info ~= nil then
+        Log.info("LoadScreenAccess.NotifyShowing: isSaved=" .. tostring(isSaved)
+            .. " isTutorial=" .. tostring(isTutorial) .. " -> " .. key);
+    end
+    speak(safeLookup(key), true);
 end
 
 -- ===========================================================================

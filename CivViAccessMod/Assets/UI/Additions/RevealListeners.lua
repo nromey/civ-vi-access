@@ -25,6 +25,8 @@ include("InputSupport");        -- InputContext table (GameOptions) for the inpu
 include("RevealPopupAccess");   -- NotifyShow / HandleKey / locOrNil (pulls in ScreenReader/Speech)
 include("ChoosePopupAccess");   -- navigate+select helper that drives the dedication + government choosers
 include("PolicyWizard");        -- slot-by-slot policy-card arranger (the Government policies tab)
+include("RevealAnnounce");      -- tier-1 fog-reveal summary (hosted here for its live UI VM)
+include("BoardQueryProbe");     -- THROWAWAY spatial-design probe (strip before release)
 include("Log");
 
 -- HeroesSupport (Babylon DLC) gives us GetHeroUnitStats +
@@ -1615,6 +1617,18 @@ function Initialize()
             Events.LocalPlayerTurnBegin.Add(dbgPerformConcert);
             Log.info("RevealListeners: debug concert-perform armed on LocalPlayerTurnBegin (UI VM)");
         end
+    end
+    -- Tier-1 spatial awareness: fog-reveal summary. Hosted here because this is
+    -- the live InGame UI-VM addin and PlotVisibilityChanged is UI-side. Separate
+    -- module (RevealAnnounce.lua) for separation of concern; we just init it.
+    if RevealAnnounce ~= nil and RevealAnnounce.Initialize ~= nil then
+        local ok, err = pcall(RevealAnnounce.Initialize);
+        if not ok then Log.warn("RevealAnnounce.Initialize failed: " .. tostring(err)); end
+    end
+    -- THROWAWAY: spatial-design probe (strip before release).
+    if BoardQueryProbe ~= nil and BoardQueryProbe.Initialize ~= nil then
+        local ok, err = pcall(BoardQueryProbe.Initialize);
+        if not ok then Log.warn("BoardQueryProbe.Initialize failed: " .. tostring(err)); end
     end
     Log.info("RevealListeners.lua: loaded; modal reveal window + event subscriptions ready");
 end

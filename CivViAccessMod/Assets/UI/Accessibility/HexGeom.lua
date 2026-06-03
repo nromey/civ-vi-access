@@ -140,6 +140,24 @@ function HexGeom.absoluteCoords(x, y)
     return "X " .. tostring(x) .. ", Y " .. tostring(y);
 end
 
+-- Hex-direction decomposition of the vector FROM (fromX,fromY) TO (toX,toY),
+-- spoken as "5 east, 3 southeast" (no anchor suffix). Returns nil for the same
+-- tile. Shared by relativeToCapital and the cursor survey (nearest-city bearing).
+function HexGeom.relativeDirection(fromX, fromY, toX, toY)
+    if fromX == toX and fromY == toY then return nil; end
+    local twX, twY = nearestWrappedTo(fromX, fromY, toX, toY);
+    local fx, fy, fz = offsetToCube(fromX, fromY);
+    local tx, ty, tz = offsetToCube(twX, twY);
+    local counts = decomposeCube(tx - fx, ty - fy, tz - fz);
+    local parts = {};
+    for _, d in ipairs(OUTPUT_ORDER) do
+        local n = counts[d.dir];
+        if n > 0 then parts[#parts + 1] = tostring(n) .. " " .. d.name; end
+    end
+    if #parts == 0 then return nil; end
+    return table.concat(parts, ", ");
+end
+
 -- Direction-decomposed relative to the original capital, spoken as
 -- "5 east, 3 southeast of capital." Returns nil when the active player
 -- has no original capital yet — caller should fall back to absolute
@@ -147,25 +165,8 @@ end
 function HexGeom.relativeToCapital(x, y)
     local capX, capY = HexGeom.originalCapitalPlot();
     if capX == nil then return nil; end
-    if capX == x and capY == y then
-        return "at capital";
-    end
-    local toX, toY = nearestWrappedTo(capX, capY, x, y);
-    local cx, cy, cz = offsetToCube(capX, capY);
-    local tx, ty, tz = offsetToCube(toX, toY);
-    local counts = decomposeCube(tx - cx, ty - cy, tz - cz);
-    local parts = {};
-    for _, d in ipairs(OUTPUT_ORDER) do
-        local n = counts[d.dir];
-        if n > 0 then
-            parts[#parts + 1] = tostring(n) .. " " .. d.name;
-        end
-    end
-    if #parts == 0 then
-        -- Shouldn't happen given the x==capX/y==capY short-circuit above,
-        -- but defend against decomposeCube returning all-zero on an edge
-        -- case we haven't anticipated.
-        return "at capital";
-    end
-    return table.concat(parts, ", ") .. " of capital";
+    if capX == x and capY == y then return "at capital"; end
+    local dir = HexGeom.relativeDirection(capX, capY, x, y);
+    if dir == nil then return "at capital"; end
+    return dir .. " of capital";
 end

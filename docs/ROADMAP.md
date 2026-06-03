@@ -31,6 +31,40 @@ finishing earlier arcs perfectly — we ship, polish later.
 
 ---
 
+## Near-term reprioritization (2026-06-01 playthrough)
+
+Driven by [[project_playthrough_driven_fixes]] — Noel playing a **plain vanilla** game
+and fixing each wall live. This reorders the arc plan based on what a real basic turn
+actually needs:
+
+- **Delivery surface = WebView2 reader, NOT Lua speech** (Noel 2026-06-01, per
+  [[project_pickers_and_reader_plan]]): the status + EOT readouts are the **WebView2
+  ReportWindow over the CAMM bridge** so they can carry **Civilopedia hyperlinks** (unit /
+  tech / term → its pedia entry) once that's reachable. The FOUNDATIONAL batch is the
+  bridge itself (game Lua → WebView2 host); status / EOT / pedia-linked content / pickers-
+  as-reports all stack on it. Do NOT ship a throwaway pure-speech version of these.
+- **Pull forward from 0.6.x into the near-term** (felt in *basic* play, not just deep
+  inspection):
+  - **Empire-status reader** (≈0.6.3 World Tracker, broadened): on-demand status of your
+    UNITS (idle/sleeping/fortified/needs-orders), CITIES (production + growth), CITY-STATES
+    met / suzerain, current research+civic ETA, yields. Noel's "status on units/cities/
+    city-states attached to us." Self-contained → good NAP-BATCH candidate.
+  - **End-of-turn summary** + **message buffer** (≈0.6.4): "what happened / what needs
+    attention" before ending a turn. Noel's "I'm missing things when turns end."
+- **Already shipped this session, ahead of schedule**: verbose tile readout (was 0.6.2
+  Ctrl+T plot deep-dive) lives on **Shift+T** now; plus river-in-nav, blocked-move reasons,
+  keep-selected-after-move, where-am-I on bare S + rich Shift+S survey.
+- **Diplomacy first-meet announce** prepped ahead of 0.8.1 (scaffolding researched
+  [[civ-v-diplomacy-architecture]] + mood-expression phrases built
+  LeaderMoodExpressions.lua) — pulled forward because first contact is hit constantly.
+- **Vanilla gate**: defer all R&F/GS-gated items (Governors, loyalty, era/dedication,
+  climate, World Congress) — not testable in the current game. See `EXPANSION_BACKLOG.md`.
+
+**Working model**: LIVE loop (Noel playing) = small ear-verified gap-fixes; NAP batch
+(Noel away) = one self-contained feature built whole + syntax-validated, tested on waking.
+
+---
+
 ## Arc 0.5: Playable Basics (in flight)
 
 **Goal**: peaceful builder game playable end-to-end.

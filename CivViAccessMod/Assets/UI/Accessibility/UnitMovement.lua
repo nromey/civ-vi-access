@@ -35,6 +35,11 @@ local DIR_NAMES = {
 -- processing), so the playerID + unitID filter is required.
 local _pending = nil;
 
+-- Unit to re-grab after the engine auto-deselects it post-move. Set in
+-- resolveAndSpeak when the moved unit can still act; consumed (one-shot) by the
+-- addin's selection handler. nil = let the engine's deselect stand.
+local _keepSel = nil;
+
 local function selectedUnit()
     if UI == nil or UI.GetHeadSelectedUnit == nil then return nil; end
     return UI.GetHeadSelectedUnit();
@@ -55,11 +60,52 @@ local function enemyAt(plot, localPlayerID)
     return nil;
 end
 
+-- True if any enemy unit sits on a hex ADJACENT to (x,y) — the usual cause of a
+-- move that passes pre-validation but then doesn't budge (zone of control).
+local function enemyAdjacent(x, y, localPlayerID)
+    for dir = 0, (DirectionTypes.NUM_DIRECTION_TYPES or 6) - 1 do
+        local adj = Map.GetAdjacentPlot(x, y, dir);
+        if adj ~= nil and enemyAt(adj, localPlayerID) ~= nil then return true; end
+    end
+    return false;
+end
+
 local function unitTypeName(unit)
     if unit == nil then return "enemy unit"; end
     local info = GameInfo.Units[unit:GetUnitType()];
     if info == nil or info.Name == nil then return "enemy unit"; end
     return Locale.Lookup(info.Name);
+end
+
+-- Best-effort reason a one-hex move was refused, by inspecting the target hex
+-- (and the shared edge for cliffs). Returns nil when no concrete cause is found
+-- so the caller falls back to the bare "Cannot move <dir>". Noel 2026-06-01:
+-- "tell me WHY I can't go that way" — ocean / mountain / cliff / impassable.
+local function blockedReason(fromPlot, toPlot, direction)
+    if toPlot == nil then return "edge of map"; end
+    if toPlot.IsWater and toPlot:IsWater() then
+        local terr = GameInfo.Terrains[toPlot:GetTerrainType()];
+        if terr ~= nil and terr.TerrainType == "TERRAIN_OCEAN" then return "ocean"; end
+        return "water";
+    end
+    if toPlot.IsMountain and toPlot:IsMountain() then return "mountain"; end
+    -- Cliffs sit on hex EDGES. A plot stores cliffs on its NW/W/NE edges; the
+    -- SE/E/SW edges live on the neighbour as ITS NW/W/NE. Map the move direction
+    -- to whichever plot owns that shared edge.
+    local DT = DirectionTypes;
+    local cliff = false;
+    pcall(function()
+        if     direction == DT.DIRECTION_NORTHWEST then cliff = fromPlot:IsNWOfCliff();
+        elseif direction == DT.DIRECTION_WEST      then cliff = fromPlot:IsWOfCliff();
+        elseif direction == DT.DIRECTION_NORTHEAST then cliff = fromPlot:IsNEOfCliff();
+        elseif direction == DT.DIRECTION_SOUTHEAST then cliff = toPlot:IsNWOfCliff();
+        elseif direction == DT.DIRECTION_EAST      then cliff = toPlot:IsWOfCliff();
+        elseif direction == DT.DIRECTION_SOUTHWEST then cliff = toPlot:IsNEOfCliff();
+        end
+    end);
+    if cliff then return "cliff"; end
+    if toPlot.IsImpassable and toPlot:IsImpassable() then return "impassable terrain"; end
+    return nil;
 end
 
 local function formatMovesRemaining(mp)
@@ -73,6 +119,7 @@ local function formatMovesRemaining(mp)
 end
 
 function UnitMovement.directMove(direction)
+    _keepSel = nil;   -- reset each attempt; resolveAndSpeak re-sets it if moves remain
     local pUnit = selectedUnit();
     if pUnit == nil then
         Speech.emit("No unit selected", "meta");
@@ -117,7 +164,13 @@ function UnitMovement.directMove(direction)
     tParameters[UnitOperationTypes.PARAM_Y] = ty;
     if not UnitManager.CanStartOperation(pUnit, UnitOperationTypes.MOVE_TO,
                                          nil, tParameters) then
-        Speech.emit("Cannot move " .. DIR_NAMES[direction], "meta");
+        -- Enrich the refusal with WHY (Noel 2026-06-01): unit type + direction
+        -- + concrete cause when we can name one ("Cannot move Settler southwest,
+        -- cliff"). Falls back to bare direction when the cause is opaque.
+        local reason = blockedReason(Map.GetPlot(sx, sy), target, direction);
+        local msg = "Cannot move " .. unitTypeName(pUnit) .. " " .. DIR_NAMES[direction];
+        if reason ~= nil then msg = msg .. ", " .. reason; end
+        Speech.emit(msg, "meta");
         return;
     end
     -- Stash before commit so the UnitMoveComplete listener has the
@@ -160,12 +213,30 @@ local function resolveAndSpeak()
     local pUnit = pPlayer:GetUnits():FindID(snap.unitID);
     if pUnit == nil then return; end
     local x, y = pUnit:GetX(), pUnit:GetY();
+    -- Keep this unit selected if it can still act, so the engine's auto-deselect
+    -- after the move doesn't strand the user on "No unit selected" (Noel
+    -- 2026-06-01). Covers both moved and blocked-but-has-moves; out-of-moves
+    -- units fall through to the engine's normal cycle.
+    if pUnit:GetMovesRemaining() > 0 then
+        _keepSel = { playerID = snap.playerID, unitID = snap.unitID };
+    else
+        _keepSel = nil;
+    end
     -- If the unit didn't move (still at start), the engine refused the
     -- operation silently. Speak that explicitly rather than misleading
     -- "Moved" or "Stopped short" — both of which imply some motion.
     if x == snap.startX and y == snap.startY then
-        Speech.emit("Move blocked " .. (DIR_NAMES[snap.direction] or "?"),
-                    "move_result");
+        -- Passed the pre-check but didn't budge — almost always enemy zone of
+        -- control from an adjacent unit, sometimes a terrain edge. Name it
+        -- (Noel 2026-06-01: "blocked a few times without finding out why").
+        local why = blockedReason(Map.GetPlot(snap.startX, snap.startY),
+                                  Map.GetPlot(snap.targetX, snap.targetY), snap.direction);
+        if why == nil and enemyAdjacent(snap.startX, snap.startY, snap.playerID) then
+            why = "enemy zone of control";
+        end
+        local msg = "Move blocked " .. (DIR_NAMES[snap.direction] or "?");
+        if why ~= nil then msg = msg .. ", " .. why; end
+        Speech.emit(msg, "move_result");
         return;
     end
     local direction = DIR_NAMES[snap.direction] or "?";
@@ -202,6 +273,18 @@ function UnitMovement.onUnitOperationsCleared(playerID, unitID, hOp, iData1)
     if _pending == nil then return; end
     if playerID ~= _pending.playerID or unitID ~= _pending.unitID then return; end
     resolveAndSpeak();
+end
+
+-- Keep-selected coordination with the addin's selection handler. After a move
+-- leaves the unit able to act, the engine auto-deselects it; the addin re-grabs
+-- it iff this returns true, then calls clearKeepSelected (one-shot, loop-safe).
+function UnitMovement.shouldKeepSelected(playerID, unitID)
+    return _keepSel ~= nil
+       and _keepSel.playerID == playerID and _keepSel.unitID == unitID;
+end
+
+function UnitMovement.clearKeepSelected()
+    _keepSel = nil;
 end
 
 -- Civ V Access pattern: one "rest" key wraps both MISSION_FORTIFY
@@ -285,6 +368,154 @@ function UnitMovement.sleepStrict()
     else
         Speech.emit("Cannot sleep " .. unitTypeName(pUnit), "meta");
     end
+end
+
+-- Alt+X = auto-explore ("eXplore"). The vanilla engine "AutoExplore" hotkey is
+-- the C++ hotkey FOR UNITOPERATION_AUTOMATE_EXPLORE, and it can't be used: its
+-- key (E) is the HexCursor NE pan, and bare E intercepts Alt+E (pressing Alt+E
+-- fires CursorNE, not the Alt+E binding — Noel 2026-06-02). So auto-explore
+-- lives on Alt+X and we issue the operation directly, the same way
+-- rest()/sleepStrict() issue SLEEP/FORTIFY — reliable and VM-safe.
+function UnitMovement.autoExplore()
+    local pUnit = selectedUnit();
+    if pUnit == nil then
+        Speech.emit("No unit selected", "meta");
+        return;
+    end
+    local localPlayerID = Game.GetLocalPlayer();
+    if localPlayerID == -1 then return; end
+    if pUnit:GetOwner() ~= localPlayerID then
+        Speech.emit("Not your unit", "meta");
+        return;
+    end
+    -- Resolve the operation hash the way the ENGINE does: it iterates
+    -- GameInfo.UnitOperations and uses operationRow.Hash (UnitPanel.lua). The
+    -- convenience constant UnitOperationTypes.AUTOMATE_EXPLORE may be nil for
+    -- this op, which makes CanStartOperation(pUnit, nil, ...) silently return
+    -- false — the likely cause of "cannot auto-explore" on a full-move unit.
+    local row = GameInfo.UnitOperations
+                and GameInfo.UnitOperations["UNITOPERATION_AUTOMATE_EXPLORE"] or nil;
+    local op = (row ~= nil and row.Hash)
+            or (UnitOperationTypes ~= nil and UnitOperationTypes.AUTOMATE_EXPLORE) or nil;
+    Log.info("autoExplore: op=" .. tostring(op)
+        .. " GameInfo.Hash=" .. tostring(row and row.Hash)
+        .. " UnitOperationTypes.AUTOMATE_EXPLORE="
+        .. tostring(UnitOperationTypes and UnitOperationTypes.AUTOMATE_EXPLORE));
+    if op == nil then
+        Speech.emit("Auto-explore operation not found", "meta");
+        return;
+    end
+
+    -- Two-tier check, mirroring the base UnitPanel (VisibleInUI branch):
+    --   loose (nil,true)         = can this unit type EVER auto-explore?
+    --   real  (false,NO_TARGETS) = can it start RIGHT NOW? (when false, vanilla
+    --                              shows the button greyed/disabled, not absent.)
+    local everCan = UnitManager.CanStartOperation(pUnit, op, nil, true);
+    if not everCan then
+        Speech.emit(unitTypeName(pUnit) .. " can't auto-explore.", "meta");
+        return;
+    end
+    local canNow, tResults = UnitManager.CanStartOperation(
+        pUnit, op, nil, false, OperationResultsTypes.NO_TARGETS);
+    if canNow then
+        UnitManager.RequestOperation(pUnit, op, nil);
+        Speech.emit(unitTypeName(pUnit) .. " exploring", "event");
+        return;
+    end
+    -- Can't start this instant. Surface the engine's reason if it gave one.
+    local reason = nil;
+    if tResults ~= nil and UnitOperationResults ~= nil
+       and tResults[UnitOperationResults.FAILURE_REASONS] ~= nil then
+        local rs = tResults[UnitOperationResults.FAILURE_REASONS];
+        if rs[1] ~= nil then reason = Locale.Lookup(rs[1]); end
+    end
+    if reason ~= nil and reason ~= "" then
+        Speech.emit("Cannot auto-explore " .. unitTypeName(pUnit) .. " yet. " .. reason, "meta");
+    else
+        Speech.emit("Cannot auto-explore " .. unitTypeName(pUnit)
+            .. ". Check the log for the reason.", "meta");
+    end
+end
+
+-- Shift+B = build an improvement with the selected Builder.
+--
+-- v1 (2026-06-02): build the engine-RECOMMENDED improvement (BEST_IMPROVEMENT)
+-- for the unit's current tile and announce it plus the other valid options, so
+-- the player can improve tiles immediately and learns what else is buildable.
+--
+-- v2 design (Noel 2026-06-02): keep it ALL on Shift+B (no separate auto vs pick
+-- key). Shift+B opens a navigable list whose TOP entry is "Build recommended"
+-- (the v1 behavior here) with the specific improvements below it to choose from
+-- — progressive disclosure, recommended-default-first. Needs world-view list
+-- input (a HandlerStack picker handler), so build/validate it live.
+--
+-- Enumeration mirrors the base UnitPanel build branch: one CanStartOperation
+-- with PARAM_X/PARAM_Y returns tResults[IMPROVEMENTS] (valid improvements for
+-- the tile) + BEST_IMPROVEMENT; we set PARAM_IMPROVEMENT_TYPE and RequestOperation.
+function UnitMovement.buildImprovement()
+    local pUnit = selectedUnit();
+    if pUnit == nil then
+        Speech.emit("No unit selected", "meta");
+        return;
+    end
+    local localPlayerID = Game.GetLocalPlayer();
+    if localPlayerID == -1 then return; end
+    if pUnit:GetOwner() ~= localPlayerID then
+        Speech.emit("Not your unit", "meta");
+        return;
+    end
+
+    -- Resolve the BUILD_IMPROVEMENT hash (UnitOperationTypes may be nil for some
+    -- ops — see autoExplore — so fall back to the GameInfo row hash).
+    local row = GameInfo.UnitOperations
+                and GameInfo.UnitOperations["UNITOPERATION_BUILD_IMPROVEMENT"] or nil;
+    local op = (UnitOperationTypes ~= nil and UnitOperationTypes.BUILD_IMPROVEMENT)
+            or (row ~= nil and row.Hash) or nil;
+    if op == nil then
+        Speech.emit("Build operation not found", "meta");
+        return;
+    end
+
+    local tParameters = {};
+    tParameters[UnitOperationTypes.PARAM_X] = pUnit:GetX();
+    tParameters[UnitOperationTypes.PARAM_Y] = pUnit:GetY();
+
+    local bCanStart, tResults = UnitManager.CanStartOperation(pUnit, op, nil, tParameters, true);
+    local improvements = (bCanStart and tResults ~= nil)
+                         and tResults[UnitOperationResults.IMPROVEMENTS] or nil;
+    if improvements == nil or #improvements == 0 then
+        Speech.emit("Nothing to build on this tile with " .. unitTypeName(pUnit) .. ".", "meta");
+        return;
+    end
+
+    local best = tResults[UnitOperationResults.BEST_IMPROVEMENT];
+    local chosen = nil;
+    if best ~= nil and best ~= -1 then
+        for _, eImp in ipairs(improvements) do
+            if eImp == best then chosen = eImp; break; end
+        end
+    end
+    if chosen == nil then chosen = improvements[1]; end
+
+    local function impName(eImp)
+        local r = GameInfo.Improvements and GameInfo.Improvements[eImp] or nil;
+        return (r ~= nil and r.Name ~= nil) and Locale.Lookup(r.Name) or "an improvement";
+    end
+
+    tParameters[UnitOperationTypes.PARAM_IMPROVEMENT_TYPE] = chosen;
+    UnitManager.RequestOperation(pUnit, op, tParameters);
+
+    local msg = "Building " .. impName(chosen);
+    if #improvements > 1 then
+        local others = {};
+        for _, eImp in ipairs(improvements) do
+            if eImp ~= chosen then others[#others + 1] = impName(eImp); end
+        end
+        if #others > 0 then
+            msg = msg .. ". Also available here: " .. table.concat(others, ", ");
+        end
+    end
+    Speech.emit(msg .. ".", "event");
 end
 
 local function Initialize()

@@ -15,6 +15,10 @@ include("Log");
 include("HandlerStack");
 include("InputRouter");
 include("ScreenReader");
+include("Report");
+include("EmpireStatus");
+include("EotReport");
+include("GoodyHutAnnounce");
 include("ScreenReaderPlotUtils");
 include("Help");
 include("HexGeom");
@@ -23,6 +27,12 @@ include("UnitMovement");
 include("UnitInfo");
 include("CityProduction");
 include("Notifications");
+-- Verbosity drives the Alt+V toggle handler below. Without this include the
+-- module is nil in this VM and Alt+V reported "Verbosity unavailable" (Noel
+-- 2026-06-01). BaseMenu includes it for the menu screens; the world/cursor
+-- context needs its own include.
+include("Verbosity");
+include("LeaderMeetAnnounce");
 
 -- Flip to true to re-enable the verbose diagnostic speech (every action
 -- firing announced via Tolk + interface-mode changes + popup show/hide
@@ -193,6 +203,24 @@ local function OnInputActionTriggered(actionId)
     Log.info("HexCursorAddin: action fired id=" .. tostring(actionId) .. " name=" .. name);
     speak("Action " .. name);
 
+    -- DIAGNOSTIC 2026-06-03 (Alt+V -> "Alert" bug): in the post-notification
+    -- input context the engine resolves V to the bare Alert action (this fires
+    -- id 3 / "Alert") instead of our Alt+V binding (id 111 / "VerbosityToggle").
+    -- So the conflict is at gesture RESOLUTION, not context scope — promoting the
+    -- toggle to Universal would not help. The real fix is to intercept Alert when
+    -- Alt is held and redirect to Verbosity.toggle(), but that needs a RELIABLE
+    -- "is Alt down" query here (a false positive would hijack intentional bare-V
+    -- Alerts — a worse regression). Log-only probe of the candidate APIs so next
+    -- session can pick the one that actually reports Alt state in this event.
+    if name == "Alert" then
+        local function probe(fn) local ok, v = pcall(fn); return ok and tostring(v) or "n/a"; end
+        Log.info("HexCursorAddin: ALT-probe@Alert"
+            .. " Input.IsAltDown=" .. probe(function() return Input.IsAltDown(); end)
+            .. " Input.IsKeyDown(Keys.LALT)=" .. probe(function() return Input.IsKeyDown(Keys.LALT); end)
+            .. " Input.IsKeyDown(18)=" .. probe(function() return Input.IsKeyDown(18); end)
+            .. " UIManager:IsAltDown=" .. probe(function() return UIManager:IsAltDown(); end));
+    end
+
     -- Always-on audible confirmation for the small set of actions
     -- the user needs to know fired (Tab/Enter/B/etc.). This is the
     -- "did the engine see my keypress" signal — silence means the
@@ -290,8 +318,14 @@ local function OnLoadScreenClose()
     speak("Load screen closed");
 end
 
-local function OnShowLeaderScreen()
-    speak("Leader screen shown");
+local function OnShowLeaderScreen(leaderName, isLocalPlayer)
+    speak("Leader screen shown");   -- diagnostic (silenced unless DIAGNOSTIC_SPEECH)
+    -- Make the otherwise-silent leader screen readable: who + mood-as-expression
+    -- + Escape-to-leave (2026-06-01). Greeting text deferred to the full build.
+    if LeaderMeetAnnounce ~= nil and LeaderMeetAnnounce.OnLeaderScreen ~= nil then
+        local ok, err = pcall(LeaderMeetAnnounce.OnLeaderScreen, leaderName, isLocalPlayer);
+        if not ok then Log.warn("OnShowLeaderScreen: announce failed: " .. tostring(err)); end
+    end
 end
 
 local function OnHideLeaderScreen()
@@ -302,11 +336,38 @@ local function OnLocalPlayerTurnBegin()
     speakQueued("Your turn");
 end
 
+-- Set true just before a programmatic re-grab (UI.SelectUnit) so the resulting
+-- UnitSelectionChanged doesn't double-announce "Unit selected".
+local _suppressSelectAnnounce = false;
+
 local function OnUnitSelectionChanged(playerId, unitId, hexI, hexJ, hexK, isSelected, isEditable)
-    if Game ~= nil and playerId == Game.GetLocalPlayer() and isSelected then
-        speakQueued("Unit selected at " .. tostring(hexI) .. " " .. tostring(hexJ));
+    if Game == nil or playerId ~= Game.GetLocalPlayer() then return; end
+    if isSelected then
+        if _suppressSelectAnnounce then
+            _suppressSelectAnnounce = false;   -- silent re-grab after a move
+        else
+            speakQueued("Unit selected at " .. tostring(hexI) .. " " .. tostring(hexJ));
+        end
         -- Cycle succeeded — clear the pending cycle-to-self check.
         _cycleBatchesUntilCheck = 0;
+    else
+        -- The engine auto-deselects a unit after a move (even with moves left),
+        -- stranding a keyboard player on "No unit selected". If UnitMovement
+        -- flagged this unit as still-actionable, re-grab it. Clear the flag
+        -- FIRST so a second engine deselect can't loop us; suppress the
+        -- re-grab's own announce. (Noel 2026-06-01.)
+        if UnitMovement ~= nil and UnitMovement.shouldKeepSelected ~= nil
+           and UnitMovement.shouldKeepSelected(playerId, unitId) then
+            UnitMovement.clearKeepSelected();
+            local pPlayer = Players[playerId];
+            local pUnit = (pPlayer ~= nil and pPlayer.GetUnits ~= nil)
+                          and pPlayer:GetUnits():FindID(unitId) or nil;
+            if pUnit ~= nil and pUnit:GetMovesRemaining() > 0
+               and UI ~= nil and UI.SelectUnit ~= nil then
+                _suppressSelectAnnounce = true;
+                UI.SelectUnit(pUnit);
+            end
+        end
     end
 end
 
@@ -361,8 +422,12 @@ local function Initialize()
     lookupAction("CIVVIACCESS_CursorE",  function() HexCursor.move(DIR_E);  end);
     lookupAction("CIVVIACCESS_CursorSW", function() HexCursor.move(DIR_SW); end);
     lookupAction("CIVVIACCESS_CursorSE", function() HexCursor.move(DIR_SE); end);
-    lookupAction("CIVVIACCESS_WhereAmI",    HexCursor.speakWhereAmI);
-    lookupAction("CIVVIACCESS_WhereAmIAbs", HexCursor.speakWhereAmIAbs);
+    -- Shift+S = the RICH survey (position + terrain + nearest city); bare S
+    -- (WhereAmICenter, dead-center of the cursor cluster) = the QUICK where-am-I;
+    -- Alt+S = absolute coords. Noel 2026-06-01.
+    lookupAction("CIVVIACCESS_WhereAmI",       HexCursor.speakSurvey);
+    lookupAction("CIVVIACCESS_WhereAmIAbs",    HexCursor.speakWhereAmIAbs);
+    lookupAction("CIVVIACCESS_WhereAmICenter", HexCursor.speakWhereAmI);
     lookupAction("CIVVIACCESS_OpenHelp",    function()
         if HexCursor.openHelp ~= nil then HexCursor.openHelp(); end
     end);
@@ -395,6 +460,36 @@ local function Initialize()
     -- 0.5.2 strict Sleep (Alt+Z) = sleep-only with educational
     -- redirect to R for military units (Civ V muscle-memory catch).
     lookupAction("CIVVIACCESS_Sleep", UnitMovement.sleepStrict);
+    -- Auto-explore (Alt+X). Issues UNITOPERATION_AUTOMATE_EXPLORE directly;
+    -- can't use Alt+E (bare-E cursor pan intercepts it — see RemapForHexCursor).
+    lookupAction("CIVVIACCESS_AutoExplore", function()
+        if UnitMovement == nil or UnitMovement.autoExplore == nil then
+            Speech.emit("Auto explore unavailable", "meta");
+            return;
+        end
+        UnitMovement.autoExplore();
+    end);
+
+    -- Build improvement with selected Builder (Shift+B). Opens the navigable
+    -- BuildImprovementPicker (a separate modal Context) via LuaEvent — the
+    -- picker resolves the selected unit, lists the tile's improvements
+    -- recommended-first, and issues BUILD_IMPROVEMENT on commit. Cross-context
+    -- (sandboxed Lua states) so it's a LuaEvent fire, like the production picker.
+    -- (UnitMovement.buildImprovement remains as the v1 auto-build / enumeration
+    -- reference; not bound now that the picker supersedes it.)
+    lookupAction("CIVVIACCESS_BuildImprovement", function()
+        if LuaEvents == nil then
+            Speech.emit("LuaEvents unavailable", "meta");
+            return;
+        end
+        local ok, err = pcall(function()
+            LuaEvents.CivViAccess_OpenBuildPicker();
+        end);
+        if not ok then
+            Log.error("HexCursorAddin: build picker LuaEvent fire failed: " .. tostring(err));
+            Speech.emit("Build picker dispatch failed", "meta");
+        end
+    end);
 
     -- 0.5.1 production picker open (Shift+P). Stage-1 test hotkey;
     -- Stage 2 makes notification activation the canonical entry.
@@ -497,6 +592,55 @@ local function Initialize()
         Speech.emit(on and "Verbose on" or "Verbose off", "event");
     end);
 
+    -- WebView2 report bridge smoke test (Alt+K). Streams a sample HTML
+    -- report to the launcher's WebView2 window via Report.show. Temporary
+    -- trigger to prove the bridge end-to-end; the real report-open key is
+    -- Noel's call once it's validated.
+    lookupAction("CIVVIACCESS_ShowReportTest", function()
+        if Report == nil or Report.showTest == nil then
+            Speech.emit("Report bridge unavailable", "meta");
+            return;
+        end
+        Speech.emit("Opening test report", "meta");
+        Report.showTest();
+    end);
+
+    -- Empire status report (bare U). First real consumer of the report
+    -- bridge: yields, research/civic ETA, cities, idle units, city-states,
+    -- and an end-turn "needs attention" checklist, rendered in the WebView2
+    -- window. Provisional key — Noel confirms/renames alongside the EOT report.
+    lookupAction("CIVVIACCESS_EmpireStatus", function()
+        if EmpireStatus == nil or EmpireStatus.show == nil then
+            Speech.emit("Empire status unavailable", "meta");
+            return;
+        end
+        EmpireStatus.show();
+    end);
+
+    -- End-of-turn report (bare N). Second real consumer of the report bridge:
+    -- "what happened last turn" delta. Auto-announces availability at each
+    -- turn-begin; this key opens the report. Provisional key.
+    lookupAction("CIVVIACCESS_EotReport", function()
+        if EotReport == nil or EotReport.show == nil then
+            Speech.emit("End of turn report unavailable", "meta");
+            return;
+        end
+        EotReport.show();
+    end);
+
+    -- DEBUG meet-leader (Alt+M). Opens diplomacy with the first met major civ
+    -- so we can test the leader-meet announce + lock in the greeting control
+    -- path without waiting for a natural first contact. Dev convenience over
+    -- the FireTuner CivViAccess_DebugMeetLeader line; remove/guard before a
+    -- public release.
+    lookupAction("CIVVIACCESS_DebugMeetLeader", function()
+        if LeaderMeetAnnounce == nil or LeaderMeetAnnounce.DebugMeet == nil then
+            Speech.emit("Debug meet unavailable", "meta");
+            return;
+        end
+        LeaderMeetAnnounce.DebugMeet();
+    end);
+
     -- Mod-wide "say again" (Ctrl+T): re-speak the last announcement from ANY
     -- VM. Works over the vanilla DLC reveal popups (engine actions fire while
     -- those Low-priority popups are up). _lastSpoken is fed by the cross-VM
@@ -513,6 +657,18 @@ local function Initialize()
             if text ~= nil and text ~= "" then _lastSpoken = text; end
         end);
     end
+
+    -- Shift+T: verbose tile readout (full mechanics — yields, defense bonus,
+    -- appeal, fresh water, movement cost, continent) for the hex under the
+    -- cursor. The deep layer the terse nav announce omits. Repeat-announce
+    -- moved to Shift+R to free the "T = Tile" mnemonic (2026-06-01).
+    lookupAction("CIVVIACCESS_DescribeTile", function()
+        if HexCursor == nil or HexCursor.DescribeVerbose == nil then
+            Speech.emit("Tile readout unavailable", "meta");
+            return;
+        end
+        HexCursor.DescribeVerbose();
+    end);
 
     -- Shift+I: read the full (long) visual description of the last reveal
     -- popup. Fed by the RevealListeners addin via CivViAccess_RevealLongDesc.

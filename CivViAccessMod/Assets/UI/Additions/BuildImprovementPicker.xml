@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  BuildImprovementPicker UI Context. Registered via <AddUserInterfaces
+  context="InGame"> in CivViAccessMod.modinfo. A screen-reader modal
+  picker for choosing which improvement a selected Builder builds on its
+  current tile (Noel's "recommended on top, specifics below" design,
+  2026-06-02). Mirrors ProductionPickerAddin: no visible controls (the
+  picker is audio-only), Hidden="1", opened via UIManager:QueuePopup so
+  the engine makes us the active modal and routes raw keyboard input to
+  ContextPtr:SetInputHandler. The 1x1 Grid is just a layout root.
+-->
+<Context Name="BuildImprovementPickerAccess" Hidden="1">
+  <Grid ID="Root" Size="1,1" Anchor="C,C"/>
+</Context>
