@@ -203,24 +203,6 @@ local function OnInputActionTriggered(actionId)
     Log.info("HexCursorAddin: action fired id=" .. tostring(actionId) .. " name=" .. name);
     speak("Action " .. name);
 
-    -- DIAGNOSTIC 2026-06-03 (Alt+V -> "Alert" bug): in the post-notification
-    -- input context the engine resolves V to the bare Alert action (this fires
-    -- id 3 / "Alert") instead of our Alt+V binding (id 111 / "VerbosityToggle").
-    -- So the conflict is at gesture RESOLUTION, not context scope — promoting the
-    -- toggle to Universal would not help. The real fix is to intercept Alert when
-    -- Alt is held and redirect to Verbosity.toggle(), but that needs a RELIABLE
-    -- "is Alt down" query here (a false positive would hijack intentional bare-V
-    -- Alerts — a worse regression). Log-only probe of the candidate APIs so next
-    -- session can pick the one that actually reports Alt state in this event.
-    if name == "Alert" then
-        local function probe(fn) local ok, v = pcall(fn); return ok and tostring(v) or "n/a"; end
-        Log.info("HexCursorAddin: ALT-probe@Alert"
-            .. " Input.IsAltDown=" .. probe(function() return Input.IsAltDown(); end)
-            .. " Input.IsKeyDown(Keys.LALT)=" .. probe(function() return Input.IsKeyDown(Keys.LALT); end)
-            .. " Input.IsKeyDown(18)=" .. probe(function() return Input.IsKeyDown(18); end)
-            .. " UIManager:IsAltDown=" .. probe(function() return UIManager:IsAltDown(); end));
-    end
-
     -- Always-on audible confirmation for the small set of actions
     -- the user needs to know fired (Tab/Enter/B/etc.). This is the
     -- "did the engine see my keypress" signal — silence means the
@@ -426,7 +408,9 @@ local function Initialize()
     -- (WhereAmICenter, dead-center of the cursor cluster) = the QUICK where-am-I;
     -- Alt+S = absolute coords. Noel 2026-06-01.
     lookupAction("CIVVIACCESS_WhereAmI",       HexCursor.speakSurvey);
-    lookupAction("CIVVIACCESS_WhereAmIAbs",    HexCursor.speakWhereAmIAbs);
+    -- Alt+S (coords-only) dropped 2026-06-03: it collided with bare S (same
+    -- Alt-modifier drop as Alt+V), and coordinates already ride on bare S and
+    -- Shift+S, so the dedicated key was redundant.
     lookupAction("CIVVIACCESS_WhereAmICenter", HexCursor.speakWhereAmI);
     lookupAction("CIVVIACCESS_OpenHelp",    function()
         if HexCursor.openHelp ~= nil then HexCursor.openHelp(); end
@@ -580,9 +564,10 @@ local function Initialize()
         end
     end);
 
-    -- 0.5.4 verbosity toggle (Alt+V). BaseMenu screens already wire
-    -- this internally; this binding makes it work in the world /
-    -- cursor mode where no BaseMenu is on top of the stack.
+    -- Verbosity toggle (chatty / terse) on Shift+V — consistent with the menus
+    -- (BaseMenu uses Shift+V too). Shift+ doesn't collide with the bare-V engine
+    -- Alert the way Alt+V did (same proven rail as the Shift+QAZEDC moves), and
+    -- it sidesteps the menu type-ahead that bare V would trigger. Noel 2026-06-03.
     lookupAction("CIVVIACCESS_VerbosityToggle", function()
         if Verbosity == nil or Verbosity.toggle == nil then
             Speech.emit("Verbosity unavailable", "meta");

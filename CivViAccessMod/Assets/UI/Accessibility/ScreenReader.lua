@@ -135,6 +135,8 @@ function stripIconTags(text)
     text = string.gsub(text, "%[ICON_[^%]]*%]", "");
     text = string.gsub(text, "%[COLOR[^%]]*%]", "");   -- [COLOR:Civ6Yellow] / [COLOR_Red] etc.
     text = string.gsub(text, "%[ENDCOLOR%]", "");
+    text = string.gsub(text, "%[SIZE_[^%]]*%]", "");   -- [SIZE_16]/[SIZE_12] font markup (e.g. diplomacy option labels)
+    text = string.gsub(text, "%[NEWLINE%]", " ");      -- two-line button labels collapse to one spoken line
     text = string.gsub(text, "%s+", " ");
     text = string.gsub(text, "^%s+", "");
     text = string.gsub(text, "%s+$", "");

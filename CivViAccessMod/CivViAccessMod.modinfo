@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Mod id="49224623-c629-4e7a-a5cb-ad822828072e" version="1">
+<Mod id="49224623-c629-4e7a-a5cb-ad822828072e" version="3">
   <Properties>
     <Name>Screen Reader Access</Name>
     <Teaser>A mod that allows textual information from game to be output via a running screen reader, allowing blind and visually impaired</Teaser>
@@ -149,6 +149,11 @@
            (LuaEvents.CivViAccess_DebugGenerateConcert) to test the RockBand
            reveal gate. Gameplay VM (needs UnitManager.InitUnit*). Strip before release. -->
       <File priority="10001">Assets/UI/Accessibility/DebugConcert.lua</File>
+      <!-- Debug-only: force a REAL first contact each turn (SetHasMet) so the
+           accessible diplomacy screen is tested against a persistent session,
+           not the transient Alt+M overview (m_eventID 0). Gameplay VM — SetHasMet
+           is a state write. Flip DEBUG_FORCE_MEET / strip before release. -->
+      <File priority="10001">Assets/UI/Accessibility/DiploDebugMeet.lua</File>
       <!-- Notifications.lua deliberately NOT in AddGameplayScripts.
            Civ VI's gameplay + UI contexts are SEPARATE Lua VMs (each
            has its own globals table, its own Events subscriptions,
@@ -277,6 +282,7 @@
     <File>Assets/UI/Accessibility/TurnAnnouncements.lua</File>
     <File>Assets/UI/Accessibility/WorldInteractiveAnnounce.lua</File>
     <File>Assets/UI/Accessibility/DebugConcert.lua</File>
+    <File>Assets/UI/Accessibility/DiploDebugMeet.lua</File>
     <File>Assets/UI/Accessibility/Notifications.lua</File>
     <File>Assets/UI/Accessibility/AdvisorPopupAccess.lua</File>
     <File>Assets/UI/Popups/AdvisorPopup.lua</File>

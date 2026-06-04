@@ -183,10 +183,6 @@
          Name="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I"
          Description="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
-    <Row ActionId="CIVVIACCESS_WhereAmIAbs"
-         Name="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I_ABS"
-         Description="LOC_CIVVIACCESS_HOTKEY_WHERE_AM_I_ABS_HELP"
-         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
     <!-- Where-am-I also on BARE S (2026-06-01): S is dead-center of the bare
          Q/E/A/D/Z/C cursor-nav cluster, and blind-gaming convention puts the
          "where am I" key in the center of the movement keys. Bare S is engine-
@@ -371,7 +367,11 @@
          Name="LOC_CIVVIACCESS_HOTKEY_OPEN_CIVIC_PICKER"
          Description="LOC_CIVVIACCESS_HOTKEY_OPEN_CIVIC_PICKER_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
-    <!-- 0.5.4 verbosity toggle (Alt+V). -->
+    <!-- Verbosity toggle (chatty vs terse) on Shift+V — consistent with menus
+         (BaseMenu uses Shift+V too). Alt+V was unusable: bare V is the engine
+         Alert action and the gesture parser dropped the Alt, firing Alert. Shift+
+         doesn't collide with bare letters (proven by the Shift+QAZEDC moves) and
+         avoids the menu type-ahead that bare V triggers. Noel 2026-06-03. -->
     <Row ActionId="CIVVIACCESS_VerbosityToggle"
          Name="LOC_CIVVIACCESS_HOTKEY_VERBOSITY_TOGGLE"
          Description="LOC_CIVVIACCESS_HOTKEY_VERBOSITY_TOGGLE_HELP"
@@ -450,9 +450,6 @@
     <!-- Where-am-I (capital-relative): Shift+S -->
     <Row ActionId="CIVVIACCESS_WhereAmI" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_S"/>
-    <!-- Where-am-I absolute: Alt+S -->
-    <Row ActionId="CIVVIACCESS_WhereAmIAbs" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_S"/>
     <Row ActionId="CIVVIACCESS_WhereAmICenter" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_S"/>
     <!-- ? help: Shift+/ -->
@@ -568,14 +565,10 @@
          (mnemonic: "law" / "legality"). Confirmed Noel 2026-05-27. -->
     <Row ActionId="CIVVIACCESS_OpenCivicPicker" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_L"/>
-    <!-- Verbosity toggle (chatty vs terse) on Alt+V. Confirmed Noel 2026-06-02:
-         Alt+V toggles correctly in the world view. The bare-V engine Alert
-         unit-operation only intercepts it in the narrow window right after a
-         notification fires (then Alt+V spoke "Alert" id=3); that collision is
-         handled separately rather than by relocating the key. Menus match
-         (BaseMenu uses Keys.V too). -->
+    <!-- Verbosity toggle on Shift+V (consistent with menus; Shift avoids the
+         bare-V Alert collision and the menu type-ahead). Noel 2026-06-03. -->
     <Row ActionId="CIVVIACCESS_VerbosityToggle" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_V"/>
+         GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_V"/>
     <!-- Report bridge smoke test on Alt+K (see InputActions note above). -->
     <Row ActionId="CIVVIACCESS_ShowReportTest" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_K"/>

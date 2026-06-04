@@ -483,6 +483,34 @@ function LoadScreenAccess.NotifyContentReady(ctx)
     m_loadComplete     = false;
     m_seanBeanStarted  = false;
     buildBriefing(ctx);
+    -- Lead the briefing with the right game-state word. GameConfiguration.
+    -- IsSavedGame() reads false at OnShow even on a resume (so NotifyShowing
+    -- mislabeled saved-game loads "Creating game" — Noel 2026-06-03), but it's
+    -- settled by content-ready (the engine itself trusts it here, e.g. for save
+    -- metadata). New game = "Creating game"; any saved load, explicit OR resume,
+    -- = "Loading game"; tutorial gets its own line.
+    local stateKey = "LOC_CIVVIACCESS_LOAD_STARTING";
+    local isSaved, isTutorial = false, false;
+    if GameConfiguration ~= nil and GameConfiguration.IsSavedGame ~= nil then
+        local ok, v = pcall(function() return GameConfiguration.IsSavedGame(); end);
+        isSaved = ok and v == true;
+    end
+    if GameConfiguration ~= nil and GameConfiguration.IsTutorial ~= nil then
+        local ok, v = pcall(function() return GameConfiguration.IsTutorial(); end);
+        isTutorial = ok and v == true;
+    end
+    if isTutorial then stateKey = "LOC_CIVVIACCESS_LOAD_STARTING_TUTORIAL";
+    elseif isSaved then stateKey = "LOC_CIVVIACCESS_LOAD_STARTING_LOAD"; end
+    Log.info("LoadScreenAccess.NotifyContentReady: isSaved=" .. tostring(isSaved)
+        .. " isTutorial=" .. tostring(isTutorial) .. " -> " .. stateKey);
+    local stateWord = safeLookup(stateKey);
+    if stateWord ~= "" then
+        if #m_briefing.lines > 0 then
+            m_briefing.lines[1] = stateWord .. " " .. m_briefing.lines[1];
+        else
+            table.insert(m_briefing.lines, 1, stateWord);
+        end
+    end
     m_ready = true;
     speakBriefing();
     copyToClipboard(m_briefing.clipboardText);
@@ -504,38 +532,14 @@ end
 -- was finishing. Per Noel 2026-05-23 ("Recommend speaking 'Creating
 -- game' until it starts reading").
 function LoadScreenAccess.NotifyShowing()
-    -- Pick the phrase by what's actually happening rather than always saying
-    -- "Creating game" (the bug: every launch — new, load, or resume — said
-    -- Creating game). Noel 2026-06-03.
-    --   * GameConfiguration.IsSavedGame() is the reliable "this is a load"
-    --     signal — the engine's own LoadScreen uses it to label the button
-    --     LOC_CONTINUE_GAME. Resume (continue last save) and explicit Load are
-    --     indistinguishable at this layer (both are saved-game loads), so both
-    --     read "Loading game" for now; refining to "Resuming game" needs a
-    --     signal we don't have here yet.
-    --   * Tutorial wording is a FUTURE hook — the tutorial flow isn't coded yet,
-    --     so the branch is ready but its detection (IsTutorial, guarded) will be
-    --     confirmed when tutorial work lands.
-    local key = "LOC_CIVVIACCESS_LOAD_STARTING";  -- new game: "Creating game."
-    local isSaved, isTutorial = false, false;
-    if GameConfiguration ~= nil and GameConfiguration.IsSavedGame ~= nil then
-        local ok, v = pcall(function() return GameConfiguration.IsSavedGame(); end);
-        isSaved = ok and v == true;
-    end
-    if GameConfiguration ~= nil and GameConfiguration.IsTutorial ~= nil then
-        local ok, v = pcall(function() return GameConfiguration.IsTutorial(); end);
-        isTutorial = ok and v == true;
-    end
-    if isTutorial then
-        key = "LOC_CIVVIACCESS_LOAD_STARTING_TUTORIAL";
-    elseif isSaved then
-        key = "LOC_CIVVIACCESS_LOAD_STARTING_LOAD";
-    end
+    -- The "Creating game" / "Loading game" decision moved to NotifyContentReady
+    -- (2026-06-03): GameConfiguration.IsSavedGame() reads false here at OnShow
+    -- even on a resume, so a saved-game load was mislabeled "Creating game". The
+    -- word now leads the briefing at content-ready, where IsSavedGame() is
+    -- settled. Nothing to announce at show time.
     if Log ~= nil and Log.info ~= nil then
-        Log.info("LoadScreenAccess.NotifyShowing: isSaved=" .. tostring(isSaved)
-            .. " isTutorial=" .. tostring(isTutorial) .. " -> " .. key);
+        Log.info("LoadScreenAccess.NotifyShowing: load screen shown (wording deferred to content-ready)");
     end
-    speak(safeLookup(key), true);
 end
 
 -- ===========================================================================

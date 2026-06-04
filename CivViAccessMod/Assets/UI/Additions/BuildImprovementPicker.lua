@@ -137,15 +137,20 @@ end
 -- priority (it's the "what unlocks it" answer the user wants); otherwise a
 -- tile-type hint ("requires Hills") so they know where to move the builder.
 local function lockReason(impRow)
+    -- Terrain hint is appended to the tech/civic gate, not only used as a
+    -- fallback (Noel 2026-06-03: a water improvement like the Offshore Oil Rig
+    -- should still say "Coast or Ocean", not just the tech) — so you know both
+    -- what to research/adopt AND where the builder has to be.
+    local hint = terrainHint(impRow.ImprovementType);
+    local where = (hint ~= nil) and ("; requires " .. hint) or "";
     if impRow.PrereqTech ~= nil and not hasTech(impRow.PrereqTech) then
         local t = GameInfo.Technologies[impRow.PrereqTech];
-        return "needs " .. (t and Locale.Lookup(t.Name) or "a technology");
+        return "needs " .. (t and Locale.Lookup(t.Name) or "a technology") .. where;
     end
     if impRow.PrereqCivic ~= nil and not hasCivic(impRow.PrereqCivic) then
         local c = GameInfo.Civics[impRow.PrereqCivic];
-        return "needs civic " .. (c and Locale.Lookup(c.Name) or "");
+        return "needs civic " .. (c and Locale.Lookup(c.Name) or "") .. where;
     end
-    local hint = terrainHint(impRow.ImprovementType);
     if hint ~= nil then return "requires " .. hint; end
     return "not available on this tile";
 end

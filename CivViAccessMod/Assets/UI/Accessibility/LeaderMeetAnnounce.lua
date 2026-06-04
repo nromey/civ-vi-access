@@ -160,8 +160,12 @@ function LeaderMeetAnnounce.OnLeaderScreen(leaderName, isLocalPlayer)
     end
     local name = (cfg.GetLeaderName ~= nil) and Locale.Lookup(cfg:GetLeaderName())
                  or tostring(leaderName);
-    local civ  = (cfg.GetCivilizationDescription ~= nil)
-                 and Locale.Lookup(cfg:GetCivilizationDescription()) or nil;
+    -- Short description ("Japan") not full ("Japanese Empire"): the full form
+    -- needs an article ("the Japanese Empire") we'd have to special-case, and
+    -- the short form matches DiplomacyAccess so the civ isn't named two ways
+    -- (Noel 2026-06-03).
+    local civ  = (cfg.GetCivilizationShortDescription ~= nil)
+                 and Locale.Lookup(cfg:GetCivilizationShortDescription()) or nil;
     local line = name;
     if civ ~= nil and civ ~= "" then line = line .. " of " .. civ; end
     local expr = moodExpression(pid, localPlayerID);

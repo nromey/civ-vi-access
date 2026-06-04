@@ -66,6 +66,7 @@ local _index    = 1;
 local _localID  = -1;
 local _otherID  = -1;
 local _greeting = nil;    -- full greeting text for Ctrl+T re-read
+local _ignoreNextClose = false;  -- swallow the immediate SceneClosed echo (see OnSceneClosed)
 
 local function lp()
     if Game == nil or Game.GetLocalPlayer == nil then return -1; end
@@ -134,11 +135,11 @@ local function buildItems(kParsed)
     local sel = kParsed and kParsed.Selections or nil;
     if sel == nil then return items; end
     for _, s in ipairs(sel) do
-        local label = (s.Text ~= nil) and Locale.Lookup(s.Text) or (s.Key or "option");
+        local label = (s.Text ~= nil) and stripIconTags(Locale.Lookup(s.Text)) or (s.Key or "option");
         if s.IsDisabled then
             local reasons = {};
             if s.FailureReasons ~= nil then
-                for _, r in ipairs(s.FailureReasons) do reasons[#reasons + 1] = Locale.Lookup(r); end
+                for _, r in ipairs(s.FailureReasons) do reasons[#reasons + 1] = stripIconTags(Locale.Lookup(r)); end
             end
             label = label .. ", unavailable"
                     .. ((#reasons > 0) and (": " .. table.concat(reasons, "; ")) or "");
@@ -258,17 +259,37 @@ function DiplomacyAccess.open(otherID)
     end
 
     _open = true;
+    -- The vanilla DiplomacyActionView fires DiploScene_SceneClosed almost
+    -- immediately after open in some paths (the Alt+M debug meet / lite sessions
+    -- with no real m_eventID), which would tear our modal down a frame after we
+    -- announce option 1 — killing arrow nav (Noel 2026-06-03). We've already
+    -- extracted every option up-front and don't need the vanilla view alive, so
+    -- swallow that first close echo; from here the user drives close via Escape
+    -- or Enter.
+    _ignoreNextClose = true;
     if UIManager ~= nil and UIManager.QueuePopup ~= nil and PopupPriority ~= nil then
         UIManager:QueuePopup(ContextPtr, PopupPriority.Current);
     end
     HandlerStack.push(_handler);
-    Speech.emit("Diplomacy with " .. who .. ". " .. #_items .. " options.", "critical");
+    -- Leader name + mood + greeting are spoken by LeaderMeetAnnounce on
+    -- ShowLeaderScreen (fires first); we add just the option count so the
+    -- civ/leader isn't named twice (Noel 2026-06-03).
+    Speech.emit(#_items .. " options.", "critical");
     announceCurrent();
+    -- BASELINE (auto-focus paused 2026-06-04): while the vanilla diplo screen is
+    -- up its OnInputHandler eats keys, so the user presses Escape once to hand
+    -- input to this modal. Every auto-grab attempt (defer / re-queue / dequeue-
+    -- requeue / hide) was tested only against the Alt+M debug meet, which opens-
+    -- then-instantly-closes the vanilla screen (m_eventID 0) — NOT a real session,
+    -- so the results were unreliable (the hide attempt even orphaned input).
+    -- Paused until we can iterate on a REAL first contact, where the screen stays
+    -- up. See reference_civ_vi_diplomacy_input_wall.
 end
 
 function DiplomacyAccess.close()
     if not _open then return; end
     _open = false;
+    _ignoreNextClose = false;
     HandlerStack.removeByName("DiplomacyAccess");
     if UIManager ~= nil and UIManager.DequeuePopup ~= nil then
         UIManager:DequeuePopup(ContextPtr);
@@ -297,6 +318,14 @@ end
 
 -- Vanilla screen closed underneath us — make sure our overlay is gone too.
 local function OnSceneClosed()
+    -- Swallow the immediate echo the vanilla view fires right after open (see
+    -- DiplomacyAccess.open). Without this guard our modal is torn down a frame
+    -- after it announces, so arrows / Ctrl+T hit nothing.
+    if _ignoreNextClose then
+        _ignoreNextClose = false;
+        Log.info("DiplomacyAccess: ignored immediate SceneClosed echo (modal stays open)");
+        return;
+    end
     if _open then DiplomacyAccess.close(); end
 end
 

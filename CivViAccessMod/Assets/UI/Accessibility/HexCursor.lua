@@ -646,8 +646,7 @@ local CURSOR_HELP_ENTRIES = {
     -- Coordinates + verbosity
     { keyLabel = "S",       description = "Where am I — bearing from capital and coordinates" },
     { keyLabel = "Shift+S", description = "Survey — bearing from capital, terrain, nearest city, and coordinates" },
-    { keyLabel = "Alt+S",   description = "Speak absolute X, Y coordinates only" },
-    { keyLabel = "Alt+V",   description = "Toggle verbose / terse announce mode" },
+    { keyLabel = "Shift+V", description = "Toggle verbose / terse announce mode" },
 
     -- Help itself
     { keyLabel = "Question mark", description = "Open this help overlay" },

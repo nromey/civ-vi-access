@@ -100,7 +100,7 @@ HandlerStack.registerCommonHelpEntry({
     description = "Re-speak current item with full description",
 })
 HandlerStack.registerCommonHelpEntry({
-    keyLabel = "Alt+V",
+    keyLabel = "Shift+V",
     description = "Toggle verbose / terse announce mode",
 })
 HandlerStack.registerCommonHelpEntry({
@@ -936,15 +936,19 @@ function BaseMenu.install(ContextPtr, spec)
             return true
         end
 
-        -- Alt+V: toggle chatty / terse verbosity. Speak only the new mode
+        -- Shift+V: toggle chatty / terse verbosity. Speak only the new mode
         -- and let the user's next arrow speak the item in that mode. An
         -- earlier version re-announced the current item immediately so
         -- the user "heard the difference," but that doubled the work per
         -- press and made rapid toggling feel laggy. The mode utterance
         -- alone is fast enough to toggle in quick succession.
-        -- Alt+V everywhere (world view + menus). Verbosity.toggle()
+        -- Shift+V everywhere (world view + menus) — standardized 2026-06-03.
+        -- Checked before dispatchKey so it doesn't fall through to type-ahead
+        -- (which would otherwise jump to the next item starting with V). The
+        -- world uses Shift+V too (Alt+V was unusable there: bare V = engine
+        -- Alert, and the gesture parser dropped the Alt). Verbosity.toggle()
         -- broadcasts so the change propagates to every Context.
-        if altDown and key == Keys.V and Verbosity ~= nil then
+        if shiftDown and key == Keys.V and Verbosity ~= nil then
             local on = Verbosity.toggle()
             speak(on and "Verbose on" or "Verbose off", false)
             return true
