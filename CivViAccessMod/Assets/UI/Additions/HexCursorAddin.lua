@@ -23,6 +23,10 @@ include("ScreenReaderPlotUtils");
 include("Help");
 include("HexGeom");
 include("HexCursor");
+-- Scanner runs in THIS VM (next to the cursor): loads the scanner stack, wires
+-- Scanner.cursor to HexCursor, and listens for keys forwarded from the WorldInput
+-- capture-all wrap (LuaEvents.CivViAccess_ScannerInput).
+include("ScannerAddinGlue");
 include("UnitMovement");
 include("UnitInfo");
 include("CityProduction");

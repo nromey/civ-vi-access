@@ -171,31 +171,23 @@ function LeaderMeetAnnounce.OnLeaderScreen(leaderName, isLocalPlayer)
     local expr = moodExpression(pid, localPlayerID);
     if expr ~= nil and expr ~= "" then line = line .. " " .. expr; end
     line = line .. ".";
-    -- NOTE: the "Press Escape to exit" hint is intentionally NOT here — it's
-    -- appended to the greeting (trySpeakGreeting) so it comes LAST, after what
-    -- the leader says (Noel 2026-06-02: introduce -> mood -> speech -> Escape).
     Speech.emit(line, "critical");
     Log.info("LeaderMeetAnnounce: " .. line);
 
-    -- Try to read + speak what the leader says. The text may not be set on
-    -- the control yet at ShowLeaderScreen time; the Events.DiplomacyStatement
-    -- subscription below catches the deferred case.
-    trySpeakGreeting();
+    -- The leader's SPOKEN LINE is no longer read here. DiplomacyActionViewWrap
+    -- (in-context) now owns it: it reads LeaderResponseText for EVERY statement —
+    -- the opening greeting AND each later response (e.g. the reply after you
+    -- declare friendship) — which this once-per-encounter reader could not do
+    -- (Noel 2026-06-08: declared friendship, never heard Tamar's reply). This
+    -- function now speaks WHO + MOOD only; the old "Press Escape to exit" hint is
+    -- retired (the wrap's option summary says "Escape to leave").
 end
 
--- Events.DiplomacyStatement fires (in this VM too) when a leader statement is
--- applied — including the first-meet greeting and any later thing they say.
--- By the time it fires, ApplyStatement has set the response control, so this
--- is the reliable read point if ShowLeaderScreen was too early.
+-- The leader's spoken line is now read by DiplomacyActionViewWrap (in-context,
+-- covers greeting + every response), so this VM no longer speaks it on
+-- DiplomacyStatement. Kept as a no-op subscription point in case a future
+-- non-speech hook is wanted; speaking here would double the wrap's line.
 local function onDiplomacyStatement(fromPlayer, toPlayer, kVariants)
-    local localPlayerID = lp();
-    if localPlayerID < 0 then return; end
-    if fromPlayer == localPlayerID then return; end   -- our own statements
-    if toPlayer ~= localPlayerID and fromPlayer ~= localPlayerID then return; end
-    -- Read on this event (text is populated now). Not gated on _greetingSpoken
-    -- being false here — trySpeakGreeting handles the dedupe — but we DO reset
-    -- per encounter in OnLeaderScreen so a fresh statement can speak.
-    trySpeakGreeting();
 end
 
 local function onHideLeaderScreen()

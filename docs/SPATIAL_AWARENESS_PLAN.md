@@ -172,6 +172,41 @@ strings are log-readable — but input-leak / map-side-effects are ear-only. Bui
 against a live game; Noel triggers, Claude reads the log
 ([[government-access-2026-05-31]] proved this loop).
 
+## TIER 2 SCANNER v1 — BUILT + VALIDATED LIVE (2026-06-08)
+
+End-to-end working on first integration (Gathering Storm). The whole chain fired
+clean — every keypress `handled=true`, no errors.
+
+Architecture (ported from Civ V Access v1.4.0, adapted to Civ VI's VM split):
+- **Capture-all input host** — `ReplaceUIScript WorldInput` (ruleset entries
+  `WorldInputAccess[/_XP1/_XP2].lua` + shared `WorldInputAccessWrap.lua`). Wraps
+  `OnInputHandler`; consuming a key (return true) suppresses the engine's
+  InputAction (proven by the probe). Owns the map keyboard. `_sighted` flag →
+  passthrough everything (sighted-mode hook).
+- **Cross-VM bridge** — cursor (HexCursor) is in the HexCursorAddin VM, raw input
+  in WorldInput's VM. The wrap consumes scanner keys and forwards them via
+  `LuaEvents.CivViAccess_ScannerInput(key,mods)`; the scanner runs in the addin VM
+  next to the cursor. Existing Alt+letter nav untouched (passes through to engine
+  InputActions).
+- **Brain**: `ScannerCore` (taxonomy/contract/registry), `ScannerSnap` (nested
+  nearest-first snapshot + locate/prune), `ScannerNav` (4-level cycle + jump +
+  distance + identity-preserve rebuild). `ScannerHandler` (PageDn/Up=item,
+  +Shift=sub, +Ctrl=category, +Alt=instance, Home=jump, End=distance,
+  Backspace=return). `ScannerBackendUnits` (first backend). `ScannerAddinGlue`
+  (loads stack in addin VM, wires `Scanner.cursor`→HexCursor, listens for input).
+  Added `HexCursor.position()`.
+
+GOTCHAS banked: Civ VI `include()` RE-RUNS a file on every include even in ONE VM
+(ScannerCore logged "loaded" twice) → module top-level must be idempotent
+(`X = X or {}`). `Keys` enum is Civ VI's own numbering, not Windows VK → bind via
+`Keys.*` constants. Keybinding home: `docs/HOTKEY_REFERENCE.md`.
+
+NEXT: remaining backends (terrain/resources/cities/improvements/special/geography/
+recommendations — same proven pattern), then movement layer, sighted mode, key
+migration (drop Alt+ crutches → Civ V bare-key parity), polish (search/favorites/
+beep/surveyor). Diagnostic per-key logging in the wrap + glue should be quieted
+once stable.
+
 Related: [[project_routes_builder]], [[playability-pivot-2026-05-31]],
 [[hex-grid-navigation]], [[project_map_pins_feature]] (pins as named destinations),
 [[project_design_directions]], [[04-in-game-plan]], [[playable-basics-arc]].

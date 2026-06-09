@@ -377,5 +377,22 @@
             <Text>Dawn of Man transcript not available for this leader.</Text>
         </Row>
 
+        <!-- Scanner. SCANNER_HELP is the ? cheat-sheet (reword freely). The rest
+             are the scanner's standalone spoken strings. (Category/subcategory
+             labels still live in ScannerCore.lua and the per-instance announce
+             format in ScannerNav.lua — pending the string-localization audit.) -->
+        <Row Tag="LOC_CIVVIACCESS_SCANNER_HELP">
+            <Text>Use the scanner to select terrain, cities, resoureces and other items on the map and then jump to the selected items. This may help facilitate unit placement or map exploration. Scanner keys are as follows: Press Page Down and Page Up to cycle between items, units, terrain etc. For example,  hills, forest, or a resource. Press alt plus Page Down or alt+Page Up to step through selected item types. For instance, if hills is selected, you would press alt+Page Up or alt+Page Down to cycle through the visible explored hills on the map.   Press control plus Page Down or control+Page Up to change to a main map category : for instance, units, terrain, resources, cities. Press Shift plus Page Up or shift+Page Down  to change to a map item subcategory. For instance, selecting city will allow you to pick tye type of city to list. Press home to jump thje map cursor  to the currently selected  item on the scanner. Press end to read its distance and direction.   Press backspace to return to your previous map location.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_SCANNER_EMPTY">
+            <Text>Nothing here.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_SCANNER_HERE">
+            <Text>Here</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_SCANNER_NO_RETURN">
+            <Text>No jump to return from.</Text>
+        </Row>
+
     </BaseGameText>
 </GameData>

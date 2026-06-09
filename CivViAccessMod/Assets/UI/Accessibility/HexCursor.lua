@@ -476,6 +476,14 @@ function HexCursor.jumpTo(x, y)
     setCursor(plot);
 end
 
+-- Current cursor coords, or (nil, nil) before init. Read seam for the scanner
+-- (Scanner.cursor.position): the scanner sorts/measures distances from here and
+-- parks the cursor here when you Home onto a result.
+function HexCursor.position()
+    if not _initialized then return nil, nil; end
+    return _x, _y;
+end
+
 -- "selected French Builder" for the head-selected unit, or nil if nothing is
 -- selected. The cursor is free-roam, so the selected unit can be anywhere — the
 -- where-am-I reads name it so you always know what you're commanding (Noel

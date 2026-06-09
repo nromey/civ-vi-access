@@ -13,8 +13,12 @@
 -- SetHasMet is a gameplay-state WRITE, so it MUST run in the GameCore VM — hence
 -- a gameplay script (AddGameplayScripts), not the UI addin. (The same call is
 -- used by the ColdWar / Tutorial scenario start scripts, so it's supported.) We
--- trigger on Events.LocalPlayerTurnBegin, which fires in GameCore, meeting ONE
--- unmet major civ per turn: just End Turn and a fresh real meet opens, re-armable.
+-- trigger on Events.LocalPlayerTurnBegin, which fires in GameCore.
+--
+-- ONE-SHOT (tamed 2026-06-04): fires for the FIRST eligible turn only, meeting a
+-- single unmet major civ, then disarms. That gives one genuine, PERSISTENT first
+-- contact to test the accessible diplomacy rebuild against, WITHOUT meeting a new
+-- civ every End Turn (which wrecked a real game). To re-test, reload the save.
 --
 -- DEV ONLY. Set DEBUG_FORCE_MEET = false (or strip this file from
 -- AddGameplayScripts) before release. Noel 2026-06-04.
@@ -23,6 +27,7 @@ include("Log");
 
 local DEBUG_FORCE_MEET = true;   -- master switch
 local START_TURN       = 2;      -- skip turn 1 so first-turn popups don't collide
+local _hasFired        = false;  -- one-shot: meet a single civ, then disarm
 
 -- First alive, major, NOT-yet-met player (other than us), or nil.
 local function firstUnmetMajor(localID)
@@ -45,6 +50,7 @@ end
 
 local function onLocalPlayerTurnBegin()
     if not DEBUG_FORCE_MEET then return; end
+    if _hasFired then return; end                 -- one-shot
     if Game == nil or Game.GetLocalPlayer == nil then return; end
     local localID = Game.GetLocalPlayer();
     if localID == nil or localID < 0 then return; end
@@ -65,7 +71,11 @@ local function onLocalPlayerTurnBegin()
     local pDip = Players[localID]:GetDiplomacy();
     if pDip ~= nil and pDip.SetHasMet ~= nil then
         local ok, err = pcall(function() pDip:SetHasMet(target); end);
-        if not ok then Log.warn("DiploDebugMeet: local SetHasMet failed: " .. tostring(err)); end
+        if ok then
+            _hasFired = true;   -- disarm: this game gets exactly one forced meet
+        else
+            Log.warn("DiploDebugMeet: local SetHasMet failed: " .. tostring(err));
+        end
     else
         Log.warn("DiploDebugMeet: SetHasMet not available in this VM");
         return;
@@ -88,8 +98,8 @@ if Events ~= nil and Events.LocalPlayerTurnBegin ~= nil then
                      .. " p2=" .. tostring(p2) .. " (real first contact processed)");
         end);
     end
-    Log.info("DiploDebugMeet: loaded (DEBUG_FORCE_MEET=" .. tostring(DEBUG_FORCE_MEET)
-             .. ", START_TURN=" .. tostring(START_TURN) .. ")");
+    Log.info("DiploDebugMeet: loaded ONE-SHOT (DEBUG_FORCE_MEET=" .. tostring(DEBUG_FORCE_MEET)
+             .. ", START_TURN=" .. tostring(START_TURN) .. "; meets one civ then disarms)");
 else
     Log.warn("DiploDebugMeet: Events.LocalPlayerTurnBegin unavailable — not loaded");
 end

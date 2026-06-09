@@ -12,6 +12,21 @@
     <SupportsHotSeat>1</SupportsHotSeat>
     <CompatibleVersions>1.2,2.0</CompatibleVersions>
   </Properties>
+  <!-- Ruleset gates so the engine loads the matching accessible
+       DiplomacyActionView replacement (base / Rise & Fall / Gathering Storm),
+       mirroring how the expansions criteria-gate their own DiplomacyActionView
+       replacements. -->
+  <ActionCriteria>
+    <Criteria id="SRA_RulesetBase">
+      <RuleSetInUse>RULESET_STANDARD</RuleSetInUse>
+    </Criteria>
+    <Criteria id="SRA_RulesetXP1">
+      <RuleSetInUse>RULESET_EXPANSION_1</RuleSetInUse>
+    </Criteria>
+    <Criteria id="SRA_RulesetXP2">
+      <RuleSetInUse>RULESET_EXPANSION_2</RuleSetInUse>
+    </Criteria>
+  </ActionCriteria>
   <FrontEndActions>
     <ImportFiles id="SRAccess_FE_UpdateFiles">
       <File priority="10001">Assets/UI/ToolTips/PlotToolTip.lua</File>
@@ -81,6 +96,17 @@
       <File priority="10001">Assets/UI/Accessibility/BoardQueryProbe.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexGeom.lua</File>
       <File priority="10001">Assets/UI/Accessibility/HexCursor.lua</File>
+      <!-- Scanner stack (loads in the HexCursorAddin VM via ScannerAddinGlue). -->
+      <File priority="10001">Assets/UI/Accessibility/ScannerCore.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerSnap.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerNav.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerBackendUnits.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerBackendResources.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerBackendCities.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerBackendTerrain.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerBackendSpecial.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerHandler.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerAddinGlue.lua</File>
       <File priority="10001">Assets/UI/Accessibility/UnitMovement.lua</File>
       <File priority="10001">Assets/UI/Accessibility/UnitInfo.lua</File>
       <File priority="10001">Assets/UI/Accessibility/CityProduction.lua</File>
@@ -95,7 +121,19 @@
       <File priority="10001">Assets/UI/Additions/HexCursorAddin.lua</File>
       <File priority="10001">Assets/UI/Additions/ProductionPickerAddin.lua</File>
       <File priority="10001">Assets/UI/Additions/BuildImprovementPicker.lua</File>
-      <File priority="10001">Assets/UI/Additions/DiplomacyAccess.lua</File>
+      <!-- DiplomacyAccess.lua retired 2026-06-04: the QueuePopup-modal approach
+           needed a manual Escape (it competed with the vanilla screen for input).
+           Replaced by the in-context ReplaceUIScript wrap below
+           (DiplomacyActionViewAccess[_XP1/_XP2].lua + DiplomacyActionViewWrap.lua). -->
+      <File priority="10001">Assets/UI/Replacements/DiplomacyActionViewWrap.lua</File>
+      <File priority="10001">Assets/UI/Replacements/DiplomacyActionViewAccess.lua</File>
+      <File priority="10001">Assets/UI/Replacements/DiplomacyActionViewAccess_XP1.lua</File>
+      <File priority="10001">Assets/UI/Replacements/DiplomacyActionViewAccess_XP2.lua</File>
+      <!-- Capture-all input host: wraps WorldInput, forwards scanner keys to the addin VM. -->
+      <File priority="10001">Assets/UI/Replacements/WorldInputAccessWrap.lua</File>
+      <File priority="10001">Assets/UI/Replacements/WorldInputAccess.lua</File>
+      <File priority="10001">Assets/UI/Replacements/WorldInputAccess_XP1.lua</File>
+      <File priority="10001">Assets/UI/Replacements/WorldInputAccess_XP2.lua</File>
       <File priority="10001">Assets/UI/Additions/TechPickerAddin.lua</File>
       <File priority="10001">Assets/UI/Additions/CivicPickerAddin.lua</File>
       <File priority="10001">Assets/UI/Additions/HelpAddin.lua</File>
@@ -186,12 +224,57 @@
       </Properties>
       <File>Assets/UI/Additions/BuildImprovementPicker.xml</File>
     </AddUserInterfaces>
-    <AddUserInterfaces id="SRAccess_DiplomacyAccess">
+    <!-- Accessible DiplomacyActionView: wrap the screen IN-CONTEXT (no competing
+         modal, no manual Escape). One ReplaceUIScript per ruleset so the engine
+         picks the matching base/XP1/XP2 implementation (the same way the
+         expansions criteria-gate their own DiplomacyActionView replacements). The
+         high LoadOrder is meant to apply our replacement AFTER the expansion's so
+         ours wins the LuaContext binding. Each entry file include()s the matching
+         screen impl then DiplomacyActionViewWrap.lua. -->
+    <ReplaceUIScript id="SRAccess_DiplomacyActionView_Base" criteria="SRA_RulesetBase">
       <Properties>
-        <Context>InGame</Context>
+        <LoadOrder>1000</LoadOrder>
+        <LuaContext>DiplomacyActionView</LuaContext>
+        <LuaReplace>Assets/UI/Replacements/DiplomacyActionViewAccess.lua</LuaReplace>
       </Properties>
-      <File>Assets/UI/Additions/DiplomacyAccess.xml</File>
-    </AddUserInterfaces>
+    </ReplaceUIScript>
+    <ReplaceUIScript id="SRAccess_DiplomacyActionView_XP1" criteria="SRA_RulesetXP1">
+      <Properties>
+        <LoadOrder>1000</LoadOrder>
+        <LuaContext>DiplomacyActionView</LuaContext>
+        <LuaReplace>Assets/UI/Replacements/DiplomacyActionViewAccess_XP1.lua</LuaReplace>
+      </Properties>
+    </ReplaceUIScript>
+    <ReplaceUIScript id="SRAccess_DiplomacyActionView_XP2" criteria="SRA_RulesetXP2">
+      <Properties>
+        <LoadOrder>1000</LoadOrder>
+        <LuaContext>DiplomacyActionView</LuaContext>
+        <LuaReplace>Assets/UI/Replacements/DiplomacyActionViewAccess_XP2.lua</LuaReplace>
+      </Properties>
+    </ReplaceUIScript>
+    <!-- Capture-all input host: own WorldInput's keyboard (consume scanner keys +
+         forward to the addin VM), per-ruleset so the engine picks base/XP1/XP2. -->
+    <ReplaceUIScript id="SRAccess_WorldInput_Base" criteria="SRA_RulesetBase">
+      <Properties>
+        <LoadOrder>1000</LoadOrder>
+        <LuaContext>WorldInput</LuaContext>
+        <LuaReplace>Assets/UI/Replacements/WorldInputAccess.lua</LuaReplace>
+      </Properties>
+    </ReplaceUIScript>
+    <ReplaceUIScript id="SRAccess_WorldInput_XP1" criteria="SRA_RulesetXP1">
+      <Properties>
+        <LoadOrder>1000</LoadOrder>
+        <LuaContext>WorldInput</LuaContext>
+        <LuaReplace>Assets/UI/Replacements/WorldInputAccess_XP1.lua</LuaReplace>
+      </Properties>
+    </ReplaceUIScript>
+    <ReplaceUIScript id="SRAccess_WorldInput_XP2" criteria="SRA_RulesetXP2">
+      <Properties>
+        <LoadOrder>1000</LoadOrder>
+        <LuaContext>WorldInput</LuaContext>
+        <LuaReplace>Assets/UI/Replacements/WorldInputAccess_XP2.lua</LuaReplace>
+      </Properties>
+    </ReplaceUIScript>
     <AddUserInterfaces id="SRAccess_TechPickerAddin">
       <Properties>
         <Context>InGame</Context>
@@ -264,6 +347,24 @@
     <File>Assets/UI/Additions/BuildImprovementPicker.lua</File>
     <File>Assets/UI/Additions/DiplomacyAccess.xml</File>
     <File>Assets/UI/Additions/DiplomacyAccess.lua</File>
+    <File>Assets/UI/Replacements/DiplomacyActionViewWrap.lua</File>
+    <File>Assets/UI/Replacements/DiplomacyActionViewAccess.lua</File>
+    <File>Assets/UI/Replacements/DiplomacyActionViewAccess_XP1.lua</File>
+    <File>Assets/UI/Replacements/DiplomacyActionViewAccess_XP2.lua</File>
+    <File>Assets/UI/Accessibility/ScannerCore.lua</File>
+    <File>Assets/UI/Accessibility/ScannerSnap.lua</File>
+    <File>Assets/UI/Accessibility/ScannerNav.lua</File>
+    <File>Assets/UI/Accessibility/ScannerBackendUnits.lua</File>
+    <File>Assets/UI/Accessibility/ScannerBackendResources.lua</File>
+    <File>Assets/UI/Accessibility/ScannerBackendCities.lua</File>
+    <File>Assets/UI/Accessibility/ScannerBackendTerrain.lua</File>
+    <File>Assets/UI/Accessibility/ScannerBackendSpecial.lua</File>
+    <File>Assets/UI/Accessibility/ScannerHandler.lua</File>
+    <File>Assets/UI/Accessibility/ScannerAddinGlue.lua</File>
+    <File>Assets/UI/Replacements/WorldInputAccessWrap.lua</File>
+    <File>Assets/UI/Replacements/WorldInputAccess.lua</File>
+    <File>Assets/UI/Replacements/WorldInputAccess_XP1.lua</File>
+    <File>Assets/UI/Replacements/WorldInputAccess_XP2.lua</File>
     <File>Assets/UI/Additions/TechPickerAddin.xml</File>
     <File>Assets/UI/Additions/TechPickerAddin.lua</File>
     <File>Assets/UI/Additions/CivicPickerAddin.xml</File>
