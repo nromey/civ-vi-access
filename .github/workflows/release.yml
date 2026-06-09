@@ -93,6 +93,14 @@ jobs:
         with:
           arch: x64
 
+      # The launcher builds prism.dll from source during publish (camm's
+      # Camm.Prism.targets, CammPrismMode=BuildFromSource). Prism requires
+      # C++23; the CMake bundled with the runner's Visual Studio can be too
+      # old to know the MSVC C23 dialect flag (configure fails). Put a
+      # recent CMake + Ninja on PATH — build-prism.ps1 prefers PATH copies.
+      - name: Setup CMake + Ninja (for the Prism build-from-source)
+        uses: lukka/get-cmake@latest
+
       # Override the csproj <Version> at publish time so the binary
       # metadata matches the tag exactly. Without this, you could tag
       # v0.1.10 but the binary would still report whatever <Version>

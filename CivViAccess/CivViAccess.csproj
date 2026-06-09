@@ -142,6 +142,23 @@
   </ItemGroup>
 
   <!--
+    Prism native speech backend. CivViAccess bundles BOTH backends — the
+    Tolk sidecars above and Prism here — and CammModManifest.ScreenReaderBackend
+    selects which is active at launch (currently Prism, with automatic
+    Prism -> Tolk fallback; flip at launch with the CAMM_SCREEN_READER_BACKEND
+    env var, no rebuild). Prism is BUILT FROM SOURCE from the pinned
+    camm/third_party/prism submodule during this build and embedded as
+    `prism/prism.dll` — see camm/build/Camm.Prism.targets. Requires a C++
+    toolchain (Visual Studio with the C++ workload; CI loads MSVC). The
+    first clean build runs the ~2-minute Prism build; after that it's
+    incremental (rebuilds only when the submodule pin changes).
+  -->
+  <PropertyGroup>
+    <CammPrismMode>BuildFromSource</CammPrismMode>
+  </PropertyGroup>
+  <Import Project="..\camm\build\Camm.Prism.targets" />
+
+  <!--
     The mod source tree is embedded as resources (logical name
     `mod/<relative path>`) so the installer can extract it into Civ VI's
     DLC dir on install without needing an external mod download. Mod

@@ -53,4 +53,9 @@ return await CammHost.RunAsync(args, new CammModManifest
     // higher-priority interrupts (e.g. a critical-tier "Turn 2."
     // arriving 100ms after a status-tier continuation).
     DisableStickyNoInterruptWindow = true,
+    // Testing the Prism backend (both Tolk + Prism DLLs are bundled —
+    // see CivViAccess.csproj). Falls back to Tolk automatically if
+    // prism.dll is missing or no Prism backend initializes. Flip to Tolk
+    // for an A/B at launch with: set CAMM_SCREEN_READER_BACKEND=tolk
+    ScreenReaderBackend = Camm.Speech.ScreenReaderBackend.Prism,
 });
