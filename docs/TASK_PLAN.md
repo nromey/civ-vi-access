@@ -17,7 +17,7 @@ completeness.
 
 ---
 
-## P0 — Prism speech backend + user-selectable output  *(IN PROGRESS)*
+## P0 — Prism speech backend + user-selectable output  *(SHIPPED 2026-06-09: camm v0.6.0)*
 
 CAMM screen-reader abstraction so users pick their speech library.
 
@@ -42,16 +42,28 @@ CAMM screen-reader abstraction so users pick their speech library.
 - No upstream C# binding (only `bindings/py`) → hand-rolled wrapper is right.
 - clang is already on the GitHub Actions Windows runner — CI needs no extra install.
 
-**Open decision:** pinned Prism submodule (recommended — reproducible release tags,
-same model as camm; pull latest locally on demand) vs pull-latest-every-build.
+**Decision (RESOLVED 2026-06-09, chose pinned):** pinned Prism submodule —
+reproducible release tags, same model as camm, pull latest locally on demand.
+NOT pull-latest-every-build (would detonate a release on an upstream change,
+same class as the dirty-submodule break). Now at `camm/third_party/prism` @ bb68308.
 
 **Read first:** RimWorld Access (`C:\dev\rimworld_access`) ships both prism + tolk
 DLLs in its mod dir — copy its DLL-load + selection/fallback pattern.
 
-> NOTE 2026-06-09: Noel reports Prism support was added to camm and the mod this
-> morning. Remaining: the settings picker, live-test BOTH backends, the
-> pinned-vs-latest decision, and (since it's a camm change) commit+push camm +
-> bump the gitlink BEFORE tagging any release.
+> UPDATE 2026-06-09 (this session): SHIPPED. `IScreenReader` + Tolk/Prism backends
+> (our own `[LibraryImport]` P/Invoke, NOT Prismatoid), `ScreenReaderFactory`
+> (auto Prism->Tolk fallback), manifest `ScreenReaderBackend` + a
+> `CAMM_SCREEN_READER_BACKEND` launch override. Prism BUILT FROM SOURCE via a
+> PINNED submodule (`camm/third_party/prism` @ bb68308) + `build/Camm.Prism.targets`
+> (BuildFromSource) + `build/build-prism.ps1`. Built with MSVC (clang NOT required:
+> VS2026 CMake 4.2 handles C++23; VS2022 CMake 3.31 does not, so release.yml got a
+> `lukka/get-cmake` step). camm v0.6.0 committed+tagged+pushed (`743e9fa`);
+> civ-vi-access gitlink bumped (`0706ba6`). Validated Prism->NVDA on an
+> AOT-published launcher. REMAINING (small, non-blocking): (1) in-game A/B lag test
+> (only the launcher's `--about` is proven so far); (2) CI from-source build is
+> unproven until the next release tag exercises it (`Prebuilt` mode = fallback);
+> (3) the Tolk/Prism/auto settings picker is DEFERRED by Noel until the in-game
+> accessibility-options tab exists — the env override covers testing until then.
 
 ---
 
