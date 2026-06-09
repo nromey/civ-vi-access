@@ -22,6 +22,71 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.6.0 — 2026-06-08 — Capture-all input, the map scanner, and the diplomacy rebuild
+
+The biggest batch since the in-game work began, and the first tag since
+v0.5.3 — so this release also ships the previously-untagged 0.5.4 (tech +
+civic pickers, help with type-to-filter) and 0.5.5 (leader portrait
+coverage, 70 → 86), whose entries follow below.
+
+### Capture-all input (the keystone)
+
+The mod now owns the map keyboard. The WorldInput context is wrapped
+in-context via `<ReplaceUIScript>`; consuming a key in its
+`OnInputHandler` (return `true`) suppresses the engine's InputAction, so
+we can bind map keys without fighting engine gestures and without the
+`InputSettings.json` first-seen-gesture freeze. Keys are forwarded to the
+HexCursor addin VM (where the cursor + scanner live) over a one-way
+`LuaEvents` bridge. Sighted-mode passthrough rides this same layer (flag
+in place; per-player designation + turn-boundary flip is future work).
+
+### The map scanner
+
+A navigable index of everything on the map, ported from Civ V Access:
+- Four-level hierarchy — category → subcategory → item → instance — on a
+  modifier ladder over PageUp/PageDown (none / Shift / Ctrl / Alt).
+- Backends for units, cities, resources, terrain, and special tiles
+  (natural wonders, goody huts), each revealed/fog gated.
+- Home jumps the cursor onto a result and speaks what + where; End reads
+  distance + direction; Backspace returns to the pre-jump cell with a
+  "Returning to …" where-am-I.
+- `?` speaks a re-readable cheat-sheet of the whole ladder.
+
+### Direction vocabulary
+
+Shift+D cycles how every bearing is spoken — hex decomposition (default),
+8-point compass, clock face, or navigation degrees — across the scanner
+and the cursor where-am-I. Bearing math ported from Civ V Access; clock
+and degrees derived from it.
+
+### Diplomacy rebuild
+
+First-contact / leader-meet rebuilt with the Civ V Access pattern:
+`<ReplaceUIScript>` the DiplomacyActionView, `include()` the engine impl,
+wrap its input handler. The screen is arrow-navigable across statements
+without pressing Escape first; the leader's spoken line is read for every
+statement, and the options announce after the greeting rather than being
+clobbered by it.
+
+### Popups — Group A and Group B
+
+- Group A: a reveal-popup framework plus all ten reveal popups framed and
+  re-raisable (world wonders, heroes, secret societies, natural wonders
+  and disasters, boosts, era complete, tech/civic completion).
+- Group B: `ChoosePopupAccess` (navigate + single/multi-select), validated
+  on Pantheon and Dedication; and deep Government access — the
+  government-type chooser plus `PolicyWizard`, the policy-slot card
+  arranger driven by reveal listeners.
+
+### Also
+
+- Shift+V verbosity with a nav gate (terse vs chatty now actually changes
+  what tile nav speaks); Alt+P policy auto-fill; build-improvement picker
+  v2; load-screen "Creating game" / "Loading game" wording.
+
+~21,000 lines since v0.5.3 (≈16k hand-written Lua/C#; the remainder is
+generated asset descriptions, the describer tool, and planning/test docs).
+
 ## 0.5.5 — 2026-05-27 — Leader portrait coverage complete (86 leaders)
 
 Filled the remaining gaps in `LeaderDescriptions.xml`. The mod now has
