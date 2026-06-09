@@ -1,0 +1,132 @@
+# Civ VI Access — Ordered Task Plan
+
+**Current as of 2026-06-09.** This is the cross-session source of truth for what
+to work on and in what order. (The per-session task tracker does NOT persist
+between Claude Code sessions — this file does. Also see the persistent memory:
+`~/.claude/projects/C--dev-Civ-vi-access/memory/MEMORY.md` and
+`project_session_handoff_2026_06_08.md`.)
+
+## North star
+
+Once **P1 (scanner complete) → P2 (movement) → P3 (combat)** land, Noel can play
+solo with Claude on standby for fixes. Everything after is depth; the infra items
+ride alongside and don't block play.
+
+Goal framing test: "is this enough to actually play a turn?" beats checklist
+completeness.
+
+---
+
+## P0 — Prism speech backend + user-selectable output  *(IN PROGRESS)*
+
+CAMM screen-reader abstraction so users pick their speech library.
+
+- Add `IScreenReader` to CAMM (`Init/Speak/Stop/IsSpeaking/Shutdown`); back it
+  with Tolk (default) + Prism (opt-in). `AccessibleOutputHandler` calls through
+  the interface, not Tolk directly. The v0.5.4 coalesce window stays above the
+  interface so both backends inherit it.
+- **Our own** thin P/Invoke wrapper — NOT a third-party managed wrapper. Build
+  Prism from source with clang, bundle `prism.dll` exactly like `Tolk.dll`
+  (`camm/third_party/tolk/dotnet/Tolk.cs` is the template).
+- Civ VI accessibility-settings picker: Tolk / Prism / auto (can hide under
+  "advanced").
+
+**Prism recon (source is local at `C:\dev\prism`):**
+- Flat **C ABI**, P/Invoke-ready, no shim: `include/prism.h`, `extern "C"`,
+  `__cdecl`, `__declspec(dllexport/dllimport)` (define `PRISM_BUILDING` to build
+  the DLL), opaque handles (`PrismContext*`, `PrismBackend*`, `PrismConfig`), flat
+  `prism_*` funcs. Bind via `[DllImport("prism", CallingConvention=Cdecl)]`.
+- License **MPL-2.0** (weak/per-file copyleft) — compatible with our MIT: wrapper
+  stays MIT in its own files; preserve Prism's `LICENSE`/`NOTICE` + provide source;
+  don't modify Prism's files. Vendoring + building unmodified is clean.
+- No upstream C# binding (only `bindings/py`) → hand-rolled wrapper is right.
+- clang is already on the GitHub Actions Windows runner — CI needs no extra install.
+
+**Open decision:** pinned Prism submodule (recommended — reproducible release tags,
+same model as camm; pull latest locally on demand) vs pull-latest-every-build.
+
+**Read first:** RimWorld Access (`C:\dev\rimworld_access`) ships both prism + tolk
+DLLs in its mod dir — copy its DLL-load + selection/fallback pattern.
+
+> NOTE 2026-06-09: Noel reports Prism support was added to camm and the mod this
+> morning. Remaining: the settings picker, live-test BOTH backends, the
+> pinned-vs-latest decision, and (since it's a camm change) commit+push camm +
+> bump the gitlink BEFORE tagging any release.
+
+---
+
+## P1 — Scanner complete  *(do this whole block before movement)*
+
+Make the scanner exhaustive, surveyable, and searchable.
+
+- **#8 Backends** — finish the remaining ones: improvements, geography
+  (landmasses/oceans — needs contiguous-area grouping), recommendations.
+- **#19 Surveyor** — radius aggregate readout ("Dutch soldier 9 o'clock 6 hexes,
+  archer 3 o'clock 3 hexes"); tied to zoom.
+- **#12 Search + favorites + beep** — type-to-search a category/entity (the Civ V
+  feature Noel saw); favorites; HRTF/stereo-pan beep. (Search is grouped here with
+  the surveyor even though the scanner uses it.)
+- **#17 Zoom** — radius scope (5×5 / 10×10 / levels), speak zoom state.
+
+## P2 — Movement  *(#10)*
+
+- **Move-to**: send the selected unit to a scanned plot. Scanner Home already parks
+  the cursor; wire "issue move order to the current cursor/scanned plot."
+- **Routes (manual AND auto)**: select → destination → preview turns-to-arrive →
+  confirm a multi-turn move. Pathfinder is in STOCK Lua (`GetMoveToPathEx` →
+  `pathInfo.plots`), pure-Lua.
+- Cross-VM: units operate in GameCore, the cursor/scanner in the addin VM.
+
+## P3 — Combat  *(#11)*
+
+- Threat awareness (event-driven): barbarian/enemy appearance, "your Warrior was
+  attacked." Check `ScreenReaderEventHandlers` for existing coverage first.
+- Issuing attacks.
+- **At end of turn, speak enemy/other units that MOVED on the grid** (situational
+  awareness of what shifted while you weren't looking) — do this here.
+
+## P4 — Civilopedia  *(#21)*
+
+Navigable/readable Civilopedia (`docs/CIVILOPEDIA_PLAN.md`). Look up
+units/techs/civics/terrain mechanics in-game.
+
+## P5 — Empire stats  *(#22)*
+
+Add granularity to `EmpireStatus.lua`; bring it to parity with the turn-1 briefing.
+
+## P6 — Diplomacy flesh-out  *(#23)*
+
+Beyond first-contact (shipped v0.6.0): deal/trade screen, DeclareWarPopup (war
+routes through it), ongoing diplo interactions.
+
+---
+
+## Unphased infra (ride alongside / after P1–P3 — not blocking play)
+
+- **#13 Sighted mode** — input passthrough + per-player designation in game options
+  (hotseat with Julian/Dulian). Different use case than solo play.
+- **#14 Key migration** — move keys to capture-all + normalize to Civ V parity
+  (rearranges the whole cluster; finalizes Shift+D etc.).
+- **#15 Key audit** — classify keys, register in Help, live-test.
+- **#16 Two-tier help** — context-sensitive `?` + searchable F1 (the `?` cheat-sheet
+  already exists; move the searchable list to F1).
+- **#18 LOC audit** — ScannerCore category labels + backend itemNames still inline
+  English; use the LOC file going forward.
+
+---
+
+## Done (recent)
+
+- v0.6.0 shipped + GREEN: capture-all input, the map scanner (Core/Snap/Nav/Handler
+  + 5 backends), direction vocabulary (Shift+D: hex/compass/clock/degrees), the
+  diplomacy rebuild (first contact navigable without Escape), Group A/B popups.
+- Scanner jump announces: Home appends coords; Backspace = "Returning to" + where-am-I.
+
+## Standing gotchas
+
+- **Submodule-publish-before-tag:** when launcher (C#) code uses a new camm API,
+  commit+push camm (its own repo) + bump the gitlink + push BEFORE tagging — else
+  the Release CI compiles against the old camm and fails. `dotnet run` locally uses
+  the dirty submodule and hides the problem. (Same applies to Prism once vendored.)
+- **Strip debug before any public release:** `DiploDebugMeet.lua`, the Alt+M
+  DiploProbe in `LeaderMeetAnnounce`, `POSTFOUND_DIAG` in `HexCursorAddin`.
