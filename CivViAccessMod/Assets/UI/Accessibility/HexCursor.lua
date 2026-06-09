@@ -476,6 +476,40 @@ function HexCursor.jumpTo(x, y)
     setCursor(plot);
 end
 
+-- Scanner HOME: park the cursor on a found item and confirm both WHAT is there
+-- and WHERE it is. Speaks the tile glance (terrain/feature/resource/units —
+-- AnnouncePlot) then the coordinates. Two emits: glance at nav, coords at
+-- status so the coords queue after the glance instead of interrupting it
+-- (Noel 2026-06-08: Home should say "moving to sheep at 13, 25", not just the
+-- tile). selUnit/fog handling all live inside AnnouncePlot.
+function HexCursor.jumpAndAnnounce(x, y)
+    if not _initialized then
+        HexCursor.init();
+    end
+    local plot = Map.GetPlot(x, y);
+    if plot == nil then return; end
+    setCursor(plot);
+    AnnouncePlot(plot);
+    Speech.emit(HexGeom.absoluteCoords(x, y), "status");
+end
+
+-- Scanner BACKSPACE: return the cursor to the cell saved before the last jump.
+-- Frame it ("Returning to ...") plus the terse where-am-I (capital-relative
+-- bearing + coords) so it's clear the cursor moved BACK and to where — the bare
+-- tile glance left it ambiguous whether anything moved (Noel 2026-06-08).
+function HexCursor.returnAndAnnounce(x, y)
+    if not _initialized then
+        HexCursor.init();
+    end
+    local plot = Map.GetPlot(x, y);
+    if plot == nil then return; end
+    setCursor(plot);
+    local coords = HexGeom.absoluteCoords(x, y);
+    local rel = HexGeom.relativeToCapital(x, y);
+    local where = (rel == nil) and coords or (rel .. ". " .. coords);
+    Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_SCANNER_RETURNING", where), "status");
+end
+
 -- Current cursor coords, or (nil, nil) before init. Read seam for the scanner
 -- (Scanner.cursor.position): the scanner sorts/measures distances from here and
 -- parks the cursor here when you Home onto a result.
@@ -543,7 +577,7 @@ local function nearestOwnCity(x, y)
         end
     end
     if best == nil then return nil; end
-    return Locale.Lookup(best:GetName()), HexGeom.relativeDirection(x, y, bx, by);
+    return Locale.Lookup(best:GetName()), HexGeom.directionString(x, y, bx, by);
 end
 
 -- Shift+S: the RICH locate ("survey"). Where you are (capital-relative), the

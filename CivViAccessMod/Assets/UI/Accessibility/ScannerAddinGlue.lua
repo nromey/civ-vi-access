@@ -31,15 +31,20 @@ Scanner.cursor = {
         end
         return nil, nil;
     end,
-    -- Move the cursor onto (x, y) and speak the tile glance (HexCursor.AnnouncePlot
-    -- emits it). Return "" so ScannerNav/handler don't re-speak on top of it.
+    -- HOME: move the cursor onto (x, y) and confirm content + position (tile
+    -- glance then coords). HexCursor.jumpAndAnnounce emits; return "" so
+    -- ScannerNav/handler don't re-speak on top of it.
     jumpTo = function(x, y)
-        if HexCursor ~= nil and HexCursor.jumpTo ~= nil then
-            HexCursor.jumpTo(x, y);
+        if HexCursor ~= nil and HexCursor.jumpAndAnnounce ~= nil then
+            HexCursor.jumpAndAnnounce(x, y);
         end
-        local plot = (Map ~= nil and Map.GetPlot ~= nil) and Map.GetPlot(x, y) or nil;
-        if plot ~= nil and HexCursor ~= nil and HexCursor.AnnouncePlot ~= nil then
-            HexCursor.AnnouncePlot(plot);
+        return "";
+    end,
+    -- BACKSPACE: return the cursor to (x, y) with the "Returning to ..." +
+    -- where-am-I framing. Same emit-and-return-"" contract as jumpTo.
+    returnTo = function(x, y)
+        if HexCursor ~= nil and HexCursor.returnAndAnnounce ~= nil then
+            HexCursor.returnAndAnnounce(x, y);
         end
         return "";
     end,

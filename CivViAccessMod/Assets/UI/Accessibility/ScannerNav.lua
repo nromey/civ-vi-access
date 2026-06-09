@@ -57,6 +57,17 @@ local function cursorJumpTo(x, y)
     return "";
 end
 
+-- Backspace variant: returns the cursor to a previous cell with the
+-- "Returning to ..." + where-am-I framing (Scanner.cursor.returnTo). Falls back
+-- to the plain jump seam if the host hasn't wired returnTo.
+local function cursorReturnTo(x, y)
+    if Scanner ~= nil and Scanner.cursor ~= nil and Scanner.cursor.returnTo ~= nil then
+        local ok, glance = pcall(Scanner.cursor.returnTo, x, y);
+        if ok and glance ~= nil then return glance; end
+    end
+    return cursorJumpTo(x, y);
+end
+
 -- ---------------------------------------------------------------------------
 -- State (module upvalues, single scanner instance).
 -- ---------------------------------------------------------------------------
@@ -262,7 +273,7 @@ local function formatInstance(instance, instIdx, instCount)
     elseif cx == instance.plotX and cy == instance.plotY then
         dir = STR_HERE;
     else
-        dir = HexGeom.relativeDirection(cx, cy, instance.plotX, instance.plotY) or STR_HERE;
+        dir = HexGeom.directionString(cx, cy, instance.plotX, instance.plotY) or STR_HERE;
     end
     local entry = instance.entry;
     local name = entry.backend.FormatName(entry);   -- live-name seam
@@ -399,7 +410,7 @@ function ScannerNav.distanceFromCursor()
     local cx, cy = cursorPos();
     if cx == nil then return ""; end
     if cx == inst.plotX and cy == inst.plotY then return STR_HERE; end
-    return HexGeom.relativeDirection(cx, cy, inst.plotX, inst.plotY) or STR_HERE;
+    return HexGeom.directionString(cx, cy, inst.plotX, inst.plotY) or STR_HERE;
 end
 
 function ScannerNav.markPreJump(x, y)
@@ -420,7 +431,7 @@ function ScannerNav.returnToPreJump()
     if _preJumpX == nil then return STR_NO_RETURN; end
     local x, y = _preJumpX, _preJumpY;
     _preJumpX, _preJumpY = nil, nil;
-    return cursorJumpTo(x, y);
+    return cursorReturnTo(x, y);
 end
 
 Log.info("ScannerNav.lua: loaded");

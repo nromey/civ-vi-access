@@ -46,6 +46,24 @@ if Keys ~= nil then
     addKey(Keys.VK_OEM_2);  -- / and ? — scanner cheat-sheet (?) ; engine-free on the map
 end
 
+-- Mod-specific combos to capture + forward. Unlike SCANNER_KEYS (consumed
+-- under ANY modifier — that's the scanner's no-mod/Shift/Ctrl/Alt ladder),
+-- a combo fires ONLY on its exact (key, mods) so a different modifier on the
+-- same letter still reaches the engine. Shift+D = cycle direction vocabulary;
+-- Alt+D stays the engine's cursor-east binding (Alt+QWEADZXC), bare D stays
+-- free. Matched against InputRouter's mask (bit0 Shift / bit1 Ctrl / bit2 Alt).
+local SCANNER_COMBOS = {};
+local function addCombo(k, m) if k ~= nil then SCANNER_COMBOS[#SCANNER_COMBOS + 1] = { key = k, mods = m }; end end
+if Keys ~= nil then
+    addCombo(Keys.D, InputRouter.MOD_SHIFT);   -- Shift+D = cycle direction vocabulary
+end
+local function matchCombo(key, mods)
+    for _, c in ipairs(SCANNER_COMBOS) do
+        if c.key == key and c.mods == mods then return true; end
+    end
+    return false;
+end
+
 -- Sighted-mode flag (default blind). When on, pass the whole keyboard through.
 local _sighted = false;
 if LuaEvents ~= nil and LuaEvents.CivViAccess_SetSighted ~= nil then
@@ -57,9 +75,10 @@ function OnInputHandler(pInputStruct)
         local msg = pInputStruct:GetMessageType();
         if msg == KEYUP or msg == KEYDOWN then
             local key = pInputStruct:GetKey();
-            if SCANNER_KEYS[key] then
+            local mods = InputRouter.modifierMaskFromInputStruct(pInputStruct);
+            -- Bare scanner keys (any modifier — the ladder) OR an exact combo.
+            if SCANNER_KEYS[key] or matchCombo(key, mods) then
                 if msg == KEYUP then
-                    local mods = InputRouter.modifierMaskFromInputStruct(pInputStruct);
                     Log.info("WorldInputAccessWrap: forwarding scanner key=" .. tostring(key)
                         .. " mods=" .. tostring(mods));
                     if LuaEvents ~= nil and LuaEvents.CivViAccess_ScannerInput ~= nil then

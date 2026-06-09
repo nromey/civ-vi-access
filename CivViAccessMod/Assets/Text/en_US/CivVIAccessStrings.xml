@@ -382,7 +382,7 @@
              labels still live in ScannerCore.lua and the per-instance announce
              format in ScannerNav.lua — pending the string-localization audit.) -->
         <Row Tag="LOC_CIVVIACCESS_SCANNER_HELP">
-            <Text>Use the scanner to select terrain, cities, resoureces and other items on the map and then jump to the selected items. This may help facilitate unit placement or map exploration. Scanner keys are as follows: Press Page Down and Page Up to cycle between items, units, terrain etc. For example,  hills, forest, or a resource. Press alt plus Page Down or alt+Page Up to step through selected item types. For instance, if hills is selected, you would press alt+Page Up or alt+Page Down to cycle through the visible explored hills on the map.   Press control plus Page Down or control+Page Up to change to a main map category : for instance, units, terrain, resources, cities. Press Shift plus Page Up or shift+Page Down  to change to a map item subcategory. For instance, selecting city will allow you to pick tye type of city to list. Press home to jump thje map cursor  to the currently selected  item on the scanner. Press end to read its distance and direction.   Press backspace to return to your previous map location.</Text>
+            <Text>Use the scanner to select terrain, cities, resoureces and other items on the map and then jump to the selected items. This may help facilitate unit placement or map exploration. Scanner keys are as follows: Press Page Down and Page Up to cycle between items, units, terrain etc. For example,  hills, forest, or a resource. Press alt plus Page Down or alt+Page Up to step through selected item types. For instance, if hills is selected, you would press alt+Page Up or alt+Page Down to cycle through the visible explored hills on the map.   Press control plus Page Down or control+Page Up to change to a main map category : for instance, units, terrain, resources, cities. Press Shift plus Page Up or shift+Page Down  to change to a map item subcategory. For instance, selecting city will allow you to pick tye type of city to list. Press home to jump thje map cursor  to the currently selected  item on the scanner. Press end to read its distance and direction.   Press backspace to return to your previous map location. Press Shift plus D to change how directions are spoken: hex steps, compass, clock, or degrees.</Text>
         </Row>
         <Row Tag="LOC_CIVVIACCESS_SCANNER_EMPTY">
             <Text>Nothing here.</Text>
@@ -393,6 +393,32 @@
         <Row Tag="LOC_CIVVIACCESS_SCANNER_NO_RETURN">
             <Text>No jump to return from.</Text>
         </Row>
+        <!-- Spoken when Backspace returns the cursor to the pre-jump cell.
+             {1_Where} is the terse where-am-I (capital-relative bearing + coords). -->
+        <Row Tag="LOC_CIVVIACCESS_SCANNER_RETURNING">
+            <Text>Returning to {1_Where}</Text>
+        </Row>
+
+        <!-- Direction vocabulary (HexGeom). The mode setting picks which renderer
+             speaks a bearing: hex-decomposition (default), 8-point compass, clock
+             face, or degrees. {1_Dist} is the hex distance; {2_Dir} the bearing word.
+             COMPASS_* are the 8 points; CLOCK / DEGREES are the phrase templates;
+             MODE_* are what the toggle announces. Reword freely. -->
+        <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_N"><Text>north</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_NE"><Text>northeast</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_E"><Text>east</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_SE"><Text>southeast</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_S"><Text>south</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_SW"><Text>southwest</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_W"><Text>west</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_NW"><Text>northwest</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_PHRASE"><Text>{2_Dir}, {1_Dist} hexes</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_CLOCK_PHRASE"><Text>{2_Dir} o'clock, {1_Dist} hexes</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_DEGREES_PHRASE"><Text>{2_Dir} degrees, {1_Dist} hexes</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_MODE_HEX"><Text>Direction mode: hex</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_MODE_COMPASS"><Text>Direction mode: compass</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_MODE_CLOCK"><Text>Direction mode: clock</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_MODE_DEGREES"><Text>Direction mode: degrees</Text></Row>
 
     </BaseGameText>
 </GameData>

@@ -17,6 +17,7 @@
 include("Log");
 include("ScreenReader");
 include("InputRouter");
+include("HexGeom");   -- direction-vocabulary mode lives here (Shift+D cycles it)
 
 ScannerHandler = ScannerHandler or {};
 
@@ -31,6 +32,7 @@ local VK_HOME  = (Keys ~= nil) and Keys.VK_HOME  or nil;
 local VK_END   = (Keys ~= nil) and Keys.VK_END   or nil;
 local VK_BACK  = (Keys ~= nil) and Keys.VK_BACK  or nil;   -- Backspace
 local VK_HELP  = (Keys ~= nil) and Keys.VK_OEM_2 or nil;   -- / and ? (the help key)
+local VK_D     = (Keys ~= nil) and Keys.D        or nil;   -- Shift+D = cycle direction vocabulary
 
 -- Spoken cheat-sheet (the `?` key), from the localized text file
 -- (LOC_CIVVIACCESS_SCANNER_HELP in Assets/Text/en_US/CivVIAccessStrings.xml —
@@ -70,6 +72,14 @@ function ScannerHandler.dispatch(key, mods)
         speak(ScannerNav.returnToPreJump());    return true;
     elseif key == VK_HELP then
         speak(CHEAT_SHEET, "picker");           return true;   -- `?` (or `/`) reads the ladder
+    elseif key == VK_D and mods == MOD_SHIFT then
+        -- Cycle hex -> compass -> clock -> degrees and speak the new mode name.
+        -- HexGeom lives in this VM (loaded by ScannerNav), so the toggle and
+        -- every direction readout share one mode state.
+        if HexGeom ~= nil and HexGeom.cycleDirectionMode ~= nil then
+            speak(HexGeom.cycleDirectionMode(), "picker"); return true;
+        end
+        return false;
     end
     return false;
 end
