@@ -43,7 +43,12 @@ if Keys ~= nil then
     addKey(Keys.VK_HOME);
     addKey(Keys.VK_END);
     addKey(Keys.VK_BACK);   -- Backspace
-    addKey(Keys.VK_OEM_2);  -- / and ? — scanner cheat-sheet (?) ; engine-free on the map
+    -- NOTE: VK_OEM_2 (/ and ?) is NOT a bare scanner key. Bare `/` and Ctrl+`/`
+    -- stay on their InputActions (CIVVIACCESS_UnitInfo = speak unit stats,
+    -- CIVVIACCESS_RecenterOnUnit). Only Shift+`/` (`?`) forwards → cheat-sheet,
+    -- registered as an exact combo below.
+    addKey(Keys.S);         -- S = survey (consumed under any mod → frees S from the
+                            --   old where-am-I InputAction; routed to ScannerSurvey)
 end
 
 -- Mod-specific combos to capture + forward. Unlike SCANNER_KEYS (consumed
@@ -56,6 +61,30 @@ local SCANNER_COMBOS = {};
 local function addCombo(k, m) if k ~= nil then SCANNER_COMBOS[#SCANNER_COMBOS + 1] = { key = k, mods = m }; end end
 if Keys ~= nil then
     addCombo(Keys.D, InputRouter.MOD_SHIFT);   -- Shift+D = cycle direction vocabulary
+    -- Survey + zoom family (routed to ScannerSurvey in the addin VM; see
+    -- HOTKEY_REFERENCE.md). Exact combos so other modifiers on these letters still
+    -- reach the engine. (Bare S is captured above as a scanner key.)
+    addCombo(Keys.W, 0);                       -- W = where am I
+    addCombo(Keys.W, InputRouter.MOD_SHIFT);   -- Shift+W = rich locate
+    addCombo(Keys.G, InputRouter.MOD_ALT);     -- Alt+G = survey category: all
+    addCombo(Keys.U, InputRouter.MOD_ALT);     -- Alt+U = survey category: units
+    addCombo(Keys.R, InputRouter.MOD_ALT);     -- Alt+R = survey category: resources
+    if Keys.VK_OEM_PLUS  ~= nil then addCombo(Keys.VK_OEM_PLUS,  InputRouter.MOD_ALT); end  -- Alt+= zoom in
+    if Keys.VK_OEM_MINUS ~= nil then addCombo(Keys.VK_OEM_MINUS, InputRouter.MOD_ALT); end  -- Alt+- zoom out
+    -- Alt+digit zoom jumps (0 resets). Civ VI's Keys enum form for digits isn't
+    -- documented; capture whatever resolves (kept in sync with ScannerSurvey).
+    for d = 0, 9 do
+        local dk = Keys[tostring(d)] or Keys["NUMBER_" .. d] or Keys["VK_" .. d] or Keys["D" .. d];
+        if dk ~= nil then addCombo(dk, InputRouter.MOD_ALT); end
+    end
+    -- Move-to (P2): M = move to cursor, Shift+M = preview, Ctrl+M = cancel move.
+    -- Routed to UnitMovement in the addin VM; reclaims the engine's bare-M MoveTo.
+    addCombo(Keys.M, 0);
+    addCombo(Keys.M, InputRouter.MOD_SHIFT);
+    addCombo(Keys.M, InputRouter.MOD_CTRL);
+    -- Shift+`/` (`?`) = scanner cheat-sheet. Bare `/` and Ctrl+`/` deliberately
+    -- left to their InputActions (unit stats / recenter) — see SCANNER_KEYS note.
+    addCombo(Keys.VK_OEM_2, InputRouter.MOD_SHIFT);
 end
 local function matchCombo(key, mods)
     for _, c in ipairs(SCANNER_COMBOS) do

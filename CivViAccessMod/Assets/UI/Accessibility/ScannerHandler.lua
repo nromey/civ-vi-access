@@ -70,8 +70,8 @@ function ScannerHandler.dispatch(key, mods)
         speak(ScannerNav.distanceFromCursor()); return true;
     elseif key == VK_BACK and mods == MOD_NONE then
         speak(ScannerNav.returnToPreJump());    return true;
-    elseif key == VK_HELP then
-        speak(CHEAT_SHEET, "picker");           return true;   -- `?` (or `/`) reads the ladder
+    elseif key == VK_HELP and mods == MOD_SHIFT then
+        speak(CHEAT_SHEET, "picker");           return true;   -- `?` (Shift+/) reads the ladder; bare/Ctrl+/ stay unit-stats/recenter
     elseif key == VK_D and mods == MOD_SHIFT then
         -- Cycle hex -> compass -> clock -> degrees and speak the new mode name.
         -- HexGeom lives in this VM (loaded by ScannerNav), so the toggle and

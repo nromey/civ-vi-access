@@ -126,6 +126,31 @@ function StringifyUnit(unit)
     if isUnitDamaged(unit) then
         decorated = Locale.Lookup("LOC_CIVVIACCESS_UNIT_DAMAGED", decorated);
     end
+    -- En-route status (Noel 2026-06-09): an OWN unit auto-moving to a queued
+    -- destination reads "... moving to <dir>, <dist> hexes, at <x, y>" so a unit
+    -- walking over several turns isn't silent in the scanner / selection readouts.
+    -- Own units only — we don't (and shouldn't) see a foreign unit's orders.
+    -- Guarded: HexGeom may be absent in some VMs; falls back to coords.
+    local localPlayer = (Game ~= nil and Game.GetLocalPlayer) and Game.GetLocalPlayer() or -1;
+    if ownerId == localPlayer and UnitManager ~= nil and UnitManager.GetQueuedDestination ~= nil then
+        local okDest, destId = pcall(function() return UnitManager.GetQueuedDestination(unit); end);
+        if okDest and destId ~= nil and Map ~= nil and Map.GetPlotByIndex ~= nil then
+            local dest = Map.GetPlotByIndex(destId);
+            if dest ~= nil then
+                local dx, dy = dest:GetX(), dest:GetY();
+                local coords = (HexGeom ~= nil and HexGeom.absoluteCoords)
+                               and HexGeom.absoluteCoords(dx, dy) or (dx .. ", " .. dy);
+                local where = nil;
+                if HexGeom ~= nil and HexGeom.directionString and Map.GetPlotDistance then
+                    local dir  = HexGeom.directionString(unit:GetX(), unit:GetY(), dx, dy);
+                    local dist = Map.GetPlotDistance(unit:GetX(), unit:GetY(), dx, dy);
+                    if dir ~= nil and dist ~= nil then where = dir .. ", " .. dist .. " hexes"; end
+                end
+                decorated = decorated .. ", moving to "
+                            .. (where ~= nil and (where .. ", at " .. coords) or coords);
+            end
+        end
+    end
     return decorated;
 end
 

@@ -87,6 +87,12 @@ Make the scanner exhaustive, surveyable, and searchable.
 - **Routes (manual AND auto)**: select → destination → preview turns-to-arrive →
   confirm a multi-turn move. Pathfinder is in STOCK Lua (`GetMoveToPathEx` →
   `pathInfo.plots`), pure-Lua.
+- **Ocean crossings / embarkation** (Noel 2026-06-09): the pathfinder handles
+  embarkation, so move-to / routes onto another landmass cross at the narrowest
+  navigable point for free — surface via the route PREVIEW (read crossing +
+  embark hint + turns, allow adjust). Coast/embark points (`IsCoastalLand`) are
+  supporting scanner data; revealed water only (fog). Lean on the router, not a
+  hand-rolled water-gap search.
 - Cross-VM: units operate in GameCore, the cursor/scanner in the addin VM.
 
 ## P3 — Combat  *(#11)*
@@ -102,9 +108,16 @@ Make the scanner exhaustive, surveyable, and searchable.
 Navigable/readable Civilopedia (`docs/CIVILOPEDIA_PLAN.md`). Look up
 units/techs/civics/terrain mechanics in-game.
 
-## P5 — Empire stats  *(#22)*
+## P5 — Empire stats  *(#22)*  — EXPANDED 2026-06-09
 
-Add granularity to `EmpireStatus.lua`; bring it to parity with the turn-1 briefing.
+Grew from "EmpireStatus.lua granularity + turn-1 briefing parity" into a navigable,
+heading-jump **world/empire overview** report via the ReportWindow (more exhaustive
+than the EOT summary). Absorbs the map/exploration report + resources. Sections:
+economy (treasury/gold/sci/culture/faith + ETAs), resources (strategic stockpiles,
+luxuries→amenities, unimproved-in-borders — survey feeds it), cities, map/exploration
+(% explored, contiguity, where-to-scout, civs/city-states met), standing & threats,
+then government/civics/law/production/trade/great-people/era/religion. Core v1 =
+economy + resources + cities. Full detail: memory `project_empire_status_expansion`.
 
 ## P6 — Diplomacy flesh-out  *(#23)*
 
@@ -119,7 +132,12 @@ routes through it), ongoing diplo interactions.
   (hotseat with Julian/Dulian). Different use case than solo play.
 - **#14 Key migration** — move keys to capture-all + normalize to Civ V parity
   (rearranges the whole cluster; finalizes Shift+D etc.).
-- **#15 Key audit** — classify keys, register in Help, live-test.
+- **#15 Key audit** — classify keys, register in Help, live-test. Should produce a
+  real `(key,mods)→description` REGISTRY (not loose Help-label strings) — the spine
+  for **learn-key mode** (NVDA/JAWS-style: press a key to hear it, execute nothing)
+  + Help (#16) + **coherent per-key announces** (capture-all lets us drop the
+  diagnostic action-name crutch; one announce per key, scheduler-coalesced). Noel
+  2026-06-11; memory `project_key_registry_announce_learn`.
 - **#16 Two-tier help** — context-sensitive `?` + searchable F1 (the `?` cheat-sheet
   already exists; move the searchable list to F1).
 - **#18 LOC audit** — ScannerCore category labels + backend itemNames still inline

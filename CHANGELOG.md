@@ -22,6 +22,70 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.6.1 — 2026-06-11 — Scanner complete (backends + survey), move-to, Prism
+
+### Scanner backends finished (P1 #8)
+
+Three new backends round out the map index, each revealed/fog gated:
+- **Improvements** — built tile improvements; pillaged ones get a name suffix.
+- **Geography** — landmasses and oceans. Hybrid model: flood-fill over
+  connected revealed land named by its dominant continent; oceans numbered.
+- **Recommendations** — the engine's own settlement recommendations
+  (`GetSettlementRecommendations`) surfaced as navigable targets.
+
+Backends deliberately gather rich data (not just a label) so later features —
+auto-pick, placement preview, apply — can build on the same gather pass.
+
+### Surveyor + zoom (P1 #19 / #17)
+
+A cursor-centered radius census — "Dutch soldier 9 o'clock 6 hexes, archer
+3 o'clock 3 hexes" — reusing the scanner backends. The hex cursor is the
+universal center (move it, jump to a scan result, then survey).
+- **S** surveys the selected category within the current zoom radius.
+- **Alt+G / Alt+U / Alt+R** pick the survey category (all / units / resources;
+  selection persists).
+- **Alt+1–9 / Alt+0** set / reset the zoom level; **Alt+= / Alt+-** step it.
+  Zoom is map-size-aware, doubling out to "whole map."
+- **Alt+S** is a stub for spatial-audio sonification (future).
+- Where-am-I migrated off bare **S** to **W** (quick) / **Shift+W** (rich
+  locate) to free S for survey.
+
+### Move-to (P2 #10)
+
+Send the selected unit to the hex cursor, no engine fork — Civ VI auto-paths
+a distant `MOVE_TO` across turns natively.
+- **M** moves to the cursor (arrival + per-turn-remaining announced).
+- **Shift+M** previews the path: turn count, bearing, distance, plus
+  embark / unexplored hints (`GetMoveToPathEx`).
+- **Ctrl+M** cancels a queued move; it falls back selected → cursor-unit →
+  the single tracked en-route unit (a queued-move unit drops out of the
+  needs-orders cycle, so it can't always be re-selected).
+- Own units en route read their status in any readout via `StringifyUnit`
+  ("… moving to northeast, 4 hexes, at 11, 31").
+- Moving onto an enemy-occupied hex is refused with "… on target. Combat
+  coming in a future release." (combat is P3) rather than silently attacking.
+
+### Fixes
+
+- **Slash split** — bare `/` speaks the selected unit's stats and Ctrl+`/`
+  recenters the cursor (their InputActions), while only Shift+`/` (`?`) reads
+  the scanner cheat-sheet. (`/` had regressed to firing the cheat-sheet under
+  any modifier, eating unit-stats.)
+- **Barbarians classify as enemy** in the scanner (no formal war declaration,
+  but `IsBarbarian` → "enemy").
+- **Single-unit cycle** — when the only unit is busy auto-moving, the cycle
+  now finds it, selects it, and names it instead of a nameless "only one
+  ready unit."
+
+### Prism speech backend (P0, camm 0.6.0)
+
+Shipped with the v0.6.0 launcher (gitlink `0706ba6`): camm's `IScreenReader`
+abstraction with Tolk (default) + Prism backends, `ScreenReaderFactory`
+Prism→Tolk fallback, a manifest `ScreenReaderBackend` and a
+`CAMM_SCREEN_READER_BACKEND` override. Prism is built from source via a pinned
+submodule. Civ VI defaults to Prism; the in-game Tolk/Prism/auto picker waits
+on the accessibility-options tab.
+
 ## 0.6.0 — 2026-06-08 — Capture-all input, the map scanner, and the diplomacy rebuild
 
 The biggest batch since the in-game work began, and the first tag since

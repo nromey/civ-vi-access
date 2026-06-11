@@ -29,6 +29,15 @@ end
 -- Relationship of `ownerId` to the local player → subcategory key.
 local function relationshipSub(localId, ownerId, localDiplo)
     if ownerId == localId then return "mine"; end
+    -- Barbarians are always hostile but not a formal diplomatic "war", so
+    -- IsAtWarWith misses them and they'd fall to "neutral". Classify by
+    -- IsBarbarian so they land in "enemy", where threat-awareness and a blind
+    -- player both expect them (Noel 2026-06-11).
+    local owner = Players and Players[ownerId] or nil;
+    if owner ~= nil and owner.IsBarbarian ~= nil then
+        local ok, isBarb = pcall(function() return owner:IsBarbarian(); end);
+        if ok and isBarb == true then return "enemy"; end
+    end
     if localDiplo ~= nil then
         if localDiplo.IsAtWarWith ~= nil then
             local ok, atWar = pcall(function() return localDiplo:IsAtWarWith(ownerId); end);

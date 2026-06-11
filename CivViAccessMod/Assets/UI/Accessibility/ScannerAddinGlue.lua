@@ -18,7 +18,11 @@ include("ScannerBackendResources");
 include("ScannerBackendCities");
 include("ScannerBackendTerrain");
 include("ScannerBackendSpecial");
+include("ScannerBackendImprovements");
+include("ScannerBackendGeography");
+include("ScannerBackendRecommendations");
 include("ScannerHandler");
+include("ScannerSurvey");
 
 Scanner = Scanner or {};
 
@@ -54,15 +58,26 @@ Scanner.cursor = {
 -- scanner handler; pcall-guarded so a dispatch error can't break the addin.
 if LuaEvents ~= nil and LuaEvents.CivViAccess_ScannerInput ~= nil then
     LuaEvents.CivViAccess_ScannerInput.Add(function(key, mods)
-        if ScannerHandler == nil or ScannerHandler.dispatch == nil then
-            Log.warn("ScannerAddinGlue: received scanner key but ScannerHandler.dispatch missing");
-            return;
-        end
         local handled = false;
-        local ok, err = pcall(function() handled = ScannerHandler.dispatch(key, mods); end);
-        Log.info("ScannerAddinGlue: received scanner key=" .. tostring(key) .. " mods=" .. tostring(mods)
+        -- Survey / zoom / locate family first (S, W, Alt+G/U/R, Alt+digit). Anything
+        -- it doesn't claim falls through to the scanner ladder (PageUp/Down/Home/
+        -- End/Backspace/?).
+        if ScannerSurvey ~= nil and ScannerSurvey.dispatch ~= nil then
+            local ok, h = pcall(function() return ScannerSurvey.dispatch(key, mods); end);
+            if ok then handled = (h == true);
+            else Log.warn("ScannerAddinGlue: survey dispatch failed: " .. tostring(h)); end
+        end
+        if not handled and UnitMovement ~= nil and UnitMovement.dispatch ~= nil then
+            local ok, h = pcall(function() return UnitMovement.dispatch(key, mods); end);
+            if ok then handled = (h == true);
+            else Log.warn("ScannerAddinGlue: movement dispatch failed: " .. tostring(h)); end
+        end
+        if not handled and ScannerHandler ~= nil and ScannerHandler.dispatch ~= nil then
+            local ok, err = pcall(function() handled = ScannerHandler.dispatch(key, mods); end);
+            if not ok then Log.warn("ScannerAddinGlue: scanner dispatch failed: " .. tostring(err)); end
+        end
+        Log.info("ScannerAddinGlue: key=" .. tostring(key) .. " mods=" .. tostring(mods)
             .. " handled=" .. tostring(handled));
-        if not ok then Log.warn("ScannerAddinGlue: dispatch failed: " .. tostring(err)); end
     end);
     Log.info("ScannerAddinGlue: scanner wired into addin VM (cursor seam + input listener).");
 else

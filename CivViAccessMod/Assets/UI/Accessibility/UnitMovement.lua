@@ -40,6 +40,14 @@ local _pending = nil;
 -- addin's selection handler. nil = let the engine's deselect stand.
 local _keepSel = nil;
 
+-- Move-to (P2) destination tracking, keyed "player:unit". The engine auto-paths a
+-- distant MOVE_TO across turns; we stay silent on the per-hex UnitMoveComplete
+-- events (the one-hex _pending isn't set for move-to) and announce only on
+-- ARRIVAL. Forward-declared checker so the move-complete handlers (defined above
+-- the move-to block) can reach it.
+local _moveToTargets = {};
+local checkMoveToArrival;
+
 local function selectedUnit()
     if UI == nil or UI.GetHeadSelectedUnit == nil then return nil; end
     return UI.GetHeadSelectedUnit();
@@ -258,21 +266,24 @@ end
 -- routed that completion through UnitOperationsCleared instead.
 
 function UnitMovement.onMoveComplete(playerID, unitID, x, y)
-    if _pending == nil then return; end
-    if playerID ~= _pending.playerID or unitID ~= _pending.unitID then return; end
-    resolveAndSpeak();
+    if checkMoveToArrival ~= nil then checkMoveToArrival(playerID, unitID); end
+    if _pending ~= nil and playerID == _pending.playerID and unitID == _pending.unitID then
+        resolveAndSpeak();
+    end
 end
 
 function UnitMovement.onUnitOperationDeactivated(playerID, unitID, hOp, iData1)
-    if _pending == nil then return; end
-    if playerID ~= _pending.playerID or unitID ~= _pending.unitID then return; end
-    resolveAndSpeak();
+    if checkMoveToArrival ~= nil then checkMoveToArrival(playerID, unitID); end
+    if _pending ~= nil and playerID == _pending.playerID and unitID == _pending.unitID then
+        resolveAndSpeak();
+    end
 end
 
 function UnitMovement.onUnitOperationsCleared(playerID, unitID, hOp, iData1)
-    if _pending == nil then return; end
-    if playerID ~= _pending.playerID or unitID ~= _pending.unitID then return; end
-    resolveAndSpeak();
+    if checkMoveToArrival ~= nil then checkMoveToArrival(playerID, unitID); end
+    if _pending ~= nil and playerID == _pending.playerID and unitID == _pending.unitID then
+        resolveAndSpeak();
+    end
 end
 
 -- Keep-selected coordination with the addin's selection handler. After a move
@@ -518,6 +529,231 @@ function UnitMovement.buildImprovement()
     Speech.emit(msg .. ".", "event");
 end
 
+-- ===========================================================================
+--  MOVE-TO (P2): send the selected unit to the HEX CURSOR; the engine auto-paths
+--  across turns. Preview (Shift+M) is read-only; move (M) commits. Destination =
+--  the cursor (our universal pointer — parked by scanner Home / nav / search).
+--  Civ VI exposes the pathfinder in stock Lua (UnitManager.GetMoveToPathEx) and
+--  RequestOperation(MOVE_TO, distant x,y) resumes each turn natively — no engine
+--  fork (unlike Civ V Access), no per-turn re-issue. See project_routes_builder.
+--  Phase 2 (deferred): manual waypoint legs + worker route-to.
+-- ===========================================================================
+
+-- pathInfo = { plots = {plotId,...}, turns = {turnNum,...} }. Total turns to
+-- arrive = the largest turn number on the path.
+local function pathTurns(pathInfo)
+    if pathInfo == nil or pathInfo.turns == nil then return 1; end
+    local t = 1;
+    for _, n in pairs(pathInfo.turns) do
+        if type(n) == "number" and n > t then t = n; end
+    end
+    return t;
+end
+
+-- A land unit whose path includes a water plot needs to embark.
+local function pathCrossesWater(pathInfo, pUnit)
+    if pathInfo == nil or pathInfo.plots == nil then return false; end
+    local info = GameInfo.Units[pUnit:GetUnitType()];
+    if info == nil or info.Domain ~= "DOMAIN_LAND" then return false; end
+    for _, pid in pairs(pathInfo.plots) do
+        local p = Map.GetPlotByIndex(pid);
+        if p ~= nil and p.IsWater ~= nil and p:IsWater() then return true; end
+    end
+    return false;
+end
+
+-- Does the path run through tiles you haven't explored?
+local function pathEntersFog(pathInfo, localPlayerID)
+    if pathInfo == nil or pathInfo.plots == nil then return false; end
+    local vis = (PlayersVisibility ~= nil) and PlayersVisibility[localPlayerID] or nil;
+    if vis == nil or vis.IsRevealed == nil then return false; end
+    for _, pid in pairs(pathInfo.plots) do
+        local p = Map.GetPlotByIndex(pid);
+        if p ~= nil then
+            local ok, r = pcall(function() return vis:IsRevealed(p:GetX(), p:GetY()); end);
+            if ok and r ~= true then return true; end
+        end
+    end
+    return false;
+end
+
+local function cursorTarget()
+    if HexCursor ~= nil and HexCursor.position ~= nil then return HexCursor.position(); end
+    return nil, nil;
+end
+
+-- Shared front-half: selected OWN unit + a distinct cursor plot, or nil + reason.
+local function moveToContext()
+    local pUnit = selectedUnit();
+    if pUnit == nil then Speech.emit("No unit selected", "meta"); return nil; end
+    local lp = Game.GetLocalPlayer();
+    if lp == -1 then return nil; end
+    if pUnit:GetOwner() ~= lp then Speech.emit("Not your unit", "meta"); return nil; end
+    local cx, cy = cursorTarget();
+    if cx == nil then Speech.emit("No cursor target", "meta"); return nil; end
+    local endPlot = Map.GetPlot(cx, cy);
+    if endPlot == nil then Speech.emit("No tile there", "meta"); return nil; end
+    if pUnit:GetX() == cx and pUnit:GetY() == cy then
+        Speech.emit("Unit is already there", "meta"); return nil;
+    end
+    return pUnit, lp, cx, cy, endPlot;
+end
+
+-- Shift+M — read-only path preview to the cursor.
+function UnitMovement.previewToCursor()
+    local pUnit, lp, cx, cy, endPlot = moveToContext();
+    if pUnit == nil then return; end
+    local pathInfo = UnitManager.GetMoveToPathEx(pUnit, endPlot:GetIndex());
+    if pathInfo == nil or pathInfo.plots == nil or table.count(pathInfo.plots) <= 1 then
+        Speech.emit("No path there for " .. unitTypeName(pUnit) .. ".", "meta"); return;
+    end
+    local turns = pathTurns(pathInfo);
+    local dir  = HexGeom.directionString(pUnit:GetX(), pUnit:GetY(), cx, cy) or "";
+    local dist = Map.GetPlotDistance(pUnit:GetX(), pUnit:GetY(), cx, cy);
+    local turnWord = (turns == 1) and "1 turn" or (turns .. " turns");
+    local msg = turnWord .. " to " .. dir .. ", " .. dist .. " hexes";
+    if pathCrossesWater(pathInfo, pUnit) then msg = msg .. ", crosses water, needs embark"; end
+    if pathEntersFog(pathInfo, lp) then msg = msg .. ", enters unexplored"; end
+    Speech.emit(msg .. ".", "status");
+end
+
+-- M — commit: move the selected unit to the cursor (multi-turn auto-path).
+function UnitMovement.moveToCursor()
+    local pUnit, lp, cx, cy, endPlot = moveToContext();
+    if pUnit == nil then return; end
+    -- Combat is deferred (project_04_in_game_plan): refuse a target an enemy sits on.
+    local enemy = enemyAt(endPlot, lp);
+    if enemy ~= nil then
+        Speech.emit(unitTypeName(enemy) .. " on target. Combat coming in a future release.", "meta");
+        return;
+    end
+    local tParameters = {};
+    tParameters[UnitOperationTypes.PARAM_X] = cx;
+    tParameters[UnitOperationTypes.PARAM_Y] = cy;
+    if not UnitManager.CanStartOperation(pUnit, UnitOperationTypes.MOVE_TO, nil, tParameters) then
+        Speech.emit("Can't path " .. unitTypeName(pUnit) .. " there.", "meta");
+        return;
+    end
+    local turns = pathTurns(UnitManager.GetMoveToPathEx(pUnit, endPlot:GetIndex()));
+    local dir   = HexGeom.directionString(pUnit:GetX(), pUnit:GetY(), cx, cy) or "";
+    -- Track for the arrival announce. The engine auto-paths; per-hex
+    -- UnitMoveComplete events stay silent (no _pending) until the unit arrives.
+    _moveToTargets[lp .. ":" .. pUnit:GetID()] = { destX = cx, destY = cy };
+    tParameters[UnitOperationTypes.PARAM_MODIFIERS] = UnitOperationMoveModifiers.NONE;
+    UnitManager.RequestOperation(pUnit, UnitOperationTypes.MOVE_TO, tParameters);
+    local turnWord = (turns <= 1) and "arriving this turn" or (turns .. " turns");
+    Speech.emit("Moving " .. unitTypeName(pUnit) .. " " .. dir .. ", " .. turnWord .. ".", "event");
+end
+
+-- Arrival checker (forward-declared above). Fires from the move-complete events;
+-- announces + untracks when a tracked move-to unit reaches its destination.
+checkMoveToArrival = function(playerID, unitID)
+    local key = playerID .. ":" .. unitID;
+    local tgt = _moveToTargets[key];
+    if tgt == nil then return; end
+    local pPlayer = Players[playerID];
+    if pPlayer == nil then _moveToTargets[key] = nil; return; end
+    local pUnit = pPlayer:GetUnits():FindID(unitID);
+    if pUnit == nil then _moveToTargets[key] = nil; return; end   -- died en route
+    if pUnit:GetX() == tgt.destX and pUnit:GetY() == tgt.destY then
+        _moveToTargets[key] = nil;
+        Speech.emit(unitTypeName(pUnit) .. " arrived at destination.", "event");
+    end
+end
+
+-- Turn-start progress: terse "N turns remaining" for each unit still en route, so
+-- a unit walking on its own isn't a surprise. Drops finished/cancelled tracks.
+function UnitMovement.onLocalTurnBegin()
+    local lp = Game.GetLocalPlayer();
+    if lp == -1 or Players[lp] == nil then return; end
+    for key, tgt in pairs(_moveToTargets) do
+        local pidStr, uidStr = key:match("^(%d+):(%d+)$");
+        local pid, uid = tonumber(pidStr), tonumber(uidStr);
+        if pid == lp then
+            local pUnit = Players[lp]:GetUnits():FindID(uid);
+            if pUnit == nil then
+                _moveToTargets[key] = nil;
+            elseif UnitManager.GetQueuedDestination(pUnit) ~= nil then
+                local endPlot = Map.GetPlot(tgt.destX, tgt.destY);
+                local turns = endPlot and pathTurns(UnitManager.GetMoveToPathEx(pUnit, endPlot:GetIndex())) or nil;
+                if turns ~= nil then
+                    local tw = (turns <= 1) and "arriving this turn" or (turns .. " turns remaining");
+                    Speech.emit(unitTypeName(pUnit) .. " moving to destination, " .. tw .. ".", "status");
+                end
+            else
+                _moveToTargets[key] = nil;   -- no longer queued (arrived / cancelled)
+            end
+        end
+    end
+end
+
+local function doCancel(pUnit, lp)
+    UnitManager.RequestCommand(pUnit, UnitCommandTypes.CANCEL, nil);
+    _moveToTargets[lp .. ":" .. pUnit:GetID()] = nil;
+    Speech.emit("Movement cancelled, " .. unitTypeName(pUnit) .. ".", "event");
+end
+
+-- A unit auto-moving must be cancelled WITHOUT relying on re-selecting it — the
+-- engine drops a queued-move unit from the needs-orders cycle, so "select it
+-- again" fails ("only one ready unit"). So Ctrl+M finds the unit to cancel in
+-- order: the selected unit, then a moving unit under the cursor (scan to it ->
+-- Home -> Ctrl+M), then — the common case — the single unit you have en route.
+function UnitMovement.cancelMove()
+    local lp = Game.GetLocalPlayer();
+    if lp == -1 then return; end
+
+    -- 1. Selected unit with a queued move.
+    local sel = selectedUnit();
+    if sel ~= nil and sel:GetOwner() == lp and UnitManager.GetQueuedDestination(sel) ~= nil then
+        doCancel(sel, lp); return;
+    end
+
+    -- 2. An own unit on the cursor tile with a queued move.
+    local cx, cy = cursorTarget();
+    if cx ~= nil and Units ~= nil and Units.GetUnitsInPlotLayerID ~= nil then
+        local units = Units.GetUnitsInPlotLayerID(cx, cy, MapLayers.ANY);
+        if units ~= nil then
+            for _, u in ipairs(units) do
+                if u:GetOwner() == lp and UnitManager.GetQueuedDestination(u) ~= nil then
+                    doCancel(u, lp); return;
+                end
+            end
+        end
+    end
+
+    -- 3. The single unit we're tracking as en route (the "undo my last move" case).
+    local onlyKey, count = nil, 0;
+    for key, _ in pairs(_moveToTargets) do
+        if tonumber(key:match("^(%d+):")) == lp then count = count + 1; onlyKey = key; end
+    end
+    if count == 1 then
+        local uid = tonumber(onlyKey:match(":(%d+)$"));
+        local u = (Players[lp] ~= nil) and Players[lp]:GetUnits():FindID(uid) or nil;
+        if u ~= nil then doCancel(u, lp); return; end
+        _moveToTargets[onlyKey] = nil;
+    elseif count > 1 then
+        Speech.emit("Several units are moving. Scan to one and press Home, then Ctrl+M.", "meta");
+        return;
+    end
+    Speech.emit("No movement to cancel.", "meta");
+end
+
+-- Key dispatch, forwarded from the capture-all wrap. M = move-to-cursor,
+-- Shift+M = preview, Ctrl+M = cancel. mods bit0 = Shift, bit1 = Ctrl.
+local KEY_M = Keys and Keys.M;
+function UnitMovement.dispatch(key, mods)
+    mods = mods or 0;
+    if KEY_M ~= nil and key == KEY_M then
+        local shift = (mods % 2) == 1;
+        local ctrl  = (math.floor(mods / 2) % 2) == 1;
+        if ctrl then UnitMovement.cancelMove();
+        elseif shift then UnitMovement.previewToCursor();
+        else UnitMovement.moveToCursor(); end
+        return true;
+    end
+    return false;
+end
+
 local function Initialize()
     Log.info("UnitMovement.lua: file loaded");
     if Events == nil then
@@ -535,6 +771,10 @@ local function Initialize()
     if Events.UnitOperationsCleared ~= nil then
         Events.UnitOperationsCleared.Add(UnitMovement.onUnitOperationsCleared);
         Log.info("UnitMovement.Initialize: subscribed to Events.UnitOperationsCleared");
+    end
+    if Events.LocalPlayerTurnBegin ~= nil then
+        Events.LocalPlayerTurnBegin.Add(UnitMovement.onLocalTurnBegin);
+        Log.info("UnitMovement.Initialize: subscribed to Events.LocalPlayerTurnBegin");
     end
 end
 Initialize();

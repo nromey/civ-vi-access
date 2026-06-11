@@ -98,6 +98,64 @@ nothing); most punctuation; most modifier-combos (audit case by case).
   to the notification reader. Civ V also uses `Ctrl+[` / `Ctrl+]` (jump to oldest/
   newest) and `Shift+[` / `Shift+]` (cycle filter) — borrow that ladder.
 
+### Survey + zoom (NEW 2026-06-09) — cursor-centered radius census
+
+Anchored on the hex cursor; reuses the scanner backends. The cursor is the
+universal center (move it / type a coord / search → jump → survey). See
+`project_cursor_survey_subsystem` memory.
+
+- **W** — where am I (quick: bearing from capital + coords). *RECLAIM: engine W =
+  Great Works overlay (sighted-only). MIGRATED here from bare S (2026-06-09) to
+  free S for survey; W = "Where am I". Tradeoff: gives up the S-center-of-cluster
+  locate convention (`reference_where_am_i_center_key`) for a letter mnemonic —
+  Noel's call.*
+- **Shift+W** — rich positional locate (terrain + nearest city + coords).
+  *Migrated from Shift+S.*
+- **S** — survey: read the SELECTED category within the current zoom radius,
+  around the cursor. *FREE after the where-am-I move.*
+- **Alt+S** — sonify the current survey (spatial audio). *FREE combo.*
+- **Alt+G / Alt+U / Alt+R** — select survey category: general-all / units /
+  resources. *FREE combos (G/U/R clear of the Alt+QEADZC move cluster). The
+  selected category is saved (session state). More categories (cities / terrain /
+  improvements / yields) TBD: dedicated keys vs a "next category" cycle.*
+- **Alt+1–5** — set zoom level (radius ≈ 2 / 4 / 8 / 16 / whole revealed).
+  **Alt+0** — reset to level 1. *RECLAIM: number row = engine lenses, sighted-only.
+  Zoom is shared by the survey AND scanner reach (#17).*
+
+### Move-to / routes (NEW 2026-06-09, P2)
+
+Destination = the hex cursor (park it via scanner Home / nav / search, then act).
+Civ VI auto-paths a distant `MOVE_TO` across turns natively — no engine fork.
+
+- **M** — move the selected unit to the cursor (multi-turn auto-path; arrival +
+  per-turn-remaining are announced). *RECLAIM: engine M = MoveTo interface mode,
+  which we replace with our own. Routed to `UnitMovement.moveToCursor`.*
+- **Shift+M** — read-only **path preview** to the cursor: turn count + bearing +
+  distance + embark / unexplored hints. *Routed to `UnitMovement.previewToCursor`.*
+- **Ctrl+M** — cancel the selected unit's queued movement
+  (`UnitManager.RequestCommand(unit, UnitCommandTypes.CANCEL)`). *Routed to
+  `UnitMovement.cancelMove`.*
+
+Units auto-moving read their status in the scanner / selection readout via
+`StringifyUnit` ("... moving to northeast, 4 hexes, at 11, 31") — own units only.
+
+Phase 2 (deferred): manual waypoint legs, worker route-to (auto-build road).
+Auto-explore already exists on **Alt+X**.
+
+### Slash family — unit stats / recenter / help
+
+`/` (`VK_OEM_2`) is engine-FREE on the map. Three split bindings; the wrap only
+captures the Shift case so bare/Ctrl stay on their InputActions:
+
+- **`/`** (bare) — speak the selected unit's stats (`CIVVIACCESS_UnitInfo` →
+  `UnitInfo.speakInfo`). *InputAction path (NOT forwarded by the wrap).*
+- **Ctrl+`/`** — recenter the hex cursor on the selected unit
+  (`CIVVIACCESS_RecenterOnUnit`). *InputAction path.*
+- **Shift+`/`** (`?`) — read the scanner cheat-sheet (`ScannerHandler` → ladder).
+  *The ONLY slash case the capture-all wrap forwards (exact `Shift` combo), so it
+  can't clobber bare-`/` unit stats. (Bug fixed 2026-06-11: `VK_OEM_2` had been a
+  bare scanner key, so any-modifier `/` fired the cheat-sheet and ate unit-stats.)*
+
 ### Responsiveness note (Noel 2026-06-08)
 
 Keys routed through the capture-all `OnInputHandler` path fire noticeably faster

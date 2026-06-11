@@ -367,24 +367,35 @@ end
 local function OnGameCoreEventPublishComplete()
     if _cycleBatchesUntilCheck <= 0 then return; end
     _cycleBatchesUntilCheck = _cycleBatchesUntilCheck - 1;
-    if _cycleBatchesUntilCheck == 0 then
-        -- Include the current unit's name so the user knows what
-        -- they're still on, not just that nothing changed.
-        local msg = "Only one ready unit";
-        if UI ~= nil and UI.GetHeadSelectedUnit ~= nil then
-            local sel = UI.GetHeadSelectedUnit();
-            if sel ~= nil then
-                local row = GameInfo.Units[sel:GetUnitType()];
-                if row ~= nil and row.Name ~= nil then
-                    local nm = Locale.Lookup(row.Name);
-                    if nm ~= nil and nm ~= "" then
-                        msg = msg .. ". " .. nm;
-                    end
-                end
-            end
+    if _cycleBatchesUntilCheck ~= 0 then return; end
+
+    -- The cycle didn't land on a NEW ready unit. Find the unit to land on and
+    -- SELECT it, so "only one unit" is actionable instead of a dead end (Noel
+    -- 2026-06-11). The case that bit us: the only unit was busy auto-moving, so
+    -- the engine deselected it AND dropped it from the ready cycle — leaving
+    -- nothing selected and a nameless "only one ready unit". So prefer the
+    -- selected unit, else the player's single unit (busy or not), re-select it
+    -- (the user can then cancel its move / inspect), and announce it richly via
+    -- StringifyUnit (which carries the "moving to X" status); W gives coordinates.
+    local unit = (UI ~= nil and UI.GetHeadSelectedUnit ~= nil) and UI.GetHeadSelectedUnit() or nil;
+    if unit == nil then
+        local lp = Game.GetLocalPlayer();
+        if lp ~= -1 and Players[lp] ~= nil and Players[lp].GetUnits ~= nil then
+            local count, only = 0, nil;
+            for _, u in Players[lp]:GetUnits():Members() do count = count + 1; only = u; end
+            if count == 1 then unit = only; end
         end
-        Speech.emit(msg, "meta");
     end
+    if unit == nil then
+        Speech.emit("No units ready", "meta");
+        return;
+    end
+    if UI ~= nil and UI.SelectUnit ~= nil then
+        local cur = (UI.GetHeadSelectedUnit ~= nil) and UI.GetHeadSelectedUnit() or nil;
+        if cur ~= unit then pcall(function() UI.SelectUnit(unit); end); end
+    end
+    local name = (StringifyUnit ~= nil) and StringifyUnit(unit) or "unit";
+    Speech.emit("Only one unit, " .. name, "meta");
 end
 
 -- LuaEvents fired by various popup screens — tells us which popup is up
@@ -408,14 +419,15 @@ local function Initialize()
     lookupAction("CIVVIACCESS_CursorE",  function() HexCursor.move(DIR_E);  end);
     lookupAction("CIVVIACCESS_CursorSW", function() HexCursor.move(DIR_SW); end);
     lookupAction("CIVVIACCESS_CursorSE", function() HexCursor.move(DIR_SE); end);
-    -- Shift+S = the RICH survey (position + terrain + nearest city); bare S
-    -- (WhereAmICenter, dead-center of the cursor cluster) = the QUICK where-am-I;
-    -- Alt+S = absolute coords. Noel 2026-06-01.
-    lookupAction("CIVVIACCESS_WhereAmI",       HexCursor.speakSurvey);
-    -- Alt+S (coords-only) dropped 2026-06-03: it collided with bare S (same
-    -- Alt-modifier drop as Alt+V), and coordinates already ride on bare S and
-    -- Shift+S, so the dedicated key was redundant.
-    lookupAction("CIVVIACCESS_WhereAmICenter", HexCursor.speakWhereAmI);
+    -- Where-am-I + rich locate MIGRATED to the capture-all wrap (2026-06-09):
+    -- W = quick where-am-I, Shift+W = rich locate (HexCursor.speakWhereAmI /
+    -- speakSurvey, routed by ScannerSurvey.dispatch). This frees bare S for the
+    -- radius SURVEY (S) + sonify (Alt+S). The old S / Shift+S InputActions
+    -- (CIVVIACCESS_WhereAmICenter / _WhereAmI) are left DEFINED but UNWIRED so that
+    -- even if the wrap doesn't suppress a mod InputAction, pressing S can't
+    -- double-fire the old where-am-I. See docs/HOTKEY_REFERENCE.md.
+    --   lookupAction("CIVVIACCESS_WhereAmI",       HexCursor.speakSurvey);
+    --   lookupAction("CIVVIACCESS_WhereAmICenter", HexCursor.speakWhereAmI);
     lookupAction("CIVVIACCESS_OpenHelp",    function()
         if HexCursor.openHelp ~= nil then HexCursor.openHelp(); end
     end);

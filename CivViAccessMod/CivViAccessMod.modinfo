@@ -105,7 +105,11 @@
       <File priority="10001">Assets/UI/Accessibility/ScannerBackendCities.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScannerBackendTerrain.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScannerBackendSpecial.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerBackendImprovements.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerBackendGeography.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerBackendRecommendations.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScannerHandler.lua</File>
+      <File priority="10001">Assets/UI/Accessibility/ScannerSurvey.lua</File>
       <File priority="10001">Assets/UI/Accessibility/ScannerAddinGlue.lua</File>
       <File priority="10001">Assets/UI/Accessibility/UnitMovement.lua</File>
       <File priority="10001">Assets/UI/Accessibility/UnitInfo.lua</File>
@@ -359,7 +363,11 @@
     <File>Assets/UI/Accessibility/ScannerBackendCities.lua</File>
     <File>Assets/UI/Accessibility/ScannerBackendTerrain.lua</File>
     <File>Assets/UI/Accessibility/ScannerBackendSpecial.lua</File>
+    <File>Assets/UI/Accessibility/ScannerBackendImprovements.lua</File>
+    <File>Assets/UI/Accessibility/ScannerBackendGeography.lua</File>
+    <File>Assets/UI/Accessibility/ScannerBackendRecommendations.lua</File>
     <File>Assets/UI/Accessibility/ScannerHandler.lua</File>
+    <File>Assets/UI/Accessibility/ScannerSurvey.lua</File>
     <File>Assets/UI/Accessibility/ScannerAddinGlue.lua</File>
     <File>Assets/UI/Replacements/WorldInputAccessWrap.lua</File>
     <File>Assets/UI/Replacements/WorldInputAccess.lua</File>
