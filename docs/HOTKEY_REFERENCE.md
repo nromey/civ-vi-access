@@ -127,6 +127,16 @@ InputActions remain in `RemapForHexCursor.xml` but the wrap suppresses them
   Civ V's `Ctrl+[`/`]` (oldest/newest) and `Shift+[`/`]` (filter) ladder is
   still future work.
 
+### Help, two tiers (FINALIZED 2026-06-12 — the #16 split)
+
+- **Shift+`/`** — quick CONTEXT help in the pager: every binding registered on
+  the active context, one per part, plus the scanner guide prose. Walk with
+  Down/Up, Escape out; notifications buffer while reading.
+- **F1** — the SEARCHABLE help list: arrow-navigable, **Ctrl+F** filter,
+  type-ahead letters jump. (The original navigable Help mode, restored —
+  the wrap had silently suppressed it when Shift+/ moved to the cheat-sheet.
+  RECLAIM: engine F1 = ToggleRankings, visual-only.)
+
 ### The Pager (NEW 2026-06-12) — long-text reader
 
 Opens automatically when a speech-history entry over ~240 chars is recalled

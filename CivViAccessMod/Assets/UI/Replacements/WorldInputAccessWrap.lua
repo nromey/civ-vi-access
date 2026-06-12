@@ -117,6 +117,10 @@ if Keys ~= nil then
     -- Alt+`/` = select the own unit under the CURSOR (reverse of Ctrl+/) —
     -- completes the scanner->command loop: scan, Home, Alt+/, move.
     addCombo(Keys.VK_OEM_2, InputRouter.MOD_ALT);
+    -- F1 = the SEARCHABLE help list (navigable, Ctrl+F filter, type-ahead) —
+    -- the #16 two-tier split: quick context walk on Shift+/, searchable list
+    -- here. RECLAIM: engine F1 = ToggleRankings, a visual screen.
+    if Keys.F1 ~= nil then addCombo(Keys.F1, 0); end
     -- Shift+Enter = ACTIVATE the notification cycle's current entry (the
     -- keyboard form of the sighted left-click on a notification icon — opens
     -- the policy picker, tech chooser, etc.). Bare Enter stays the engine's

@@ -87,6 +87,16 @@ if LuaEvents ~= nil and LuaEvents.CivViAccess_ScannerInput ~= nil then
             if ok then handled = (h == true);
             else Log.warn("ScannerAddinGlue: combat dispatch failed: " .. tostring(h)); end
         end
+        -- F1 = the searchable help list (the original navigable Help mode:
+        -- arrows + Ctrl+F filter + type-ahead). Shift+/ is the quick paged
+        -- context walk; this is the search tier (#16).
+        if not handled and Keys ~= nil and Keys.F1 ~= nil and key == Keys.F1
+           and (mods or 0) == 0 then
+            if HexCursor ~= nil and HexCursor.openHelp ~= nil then
+                pcall(HexCursor.openHelp);
+                handled = true;
+            end
+        end
         -- Unit selection at cursor (Alt+/ = select own unit under cursor).
         if not handled and UnitInfo ~= nil and UnitInfo.dispatch ~= nil then
             local ok, h = pcall(function() return UnitInfo.dispatch(key, mods); end);
