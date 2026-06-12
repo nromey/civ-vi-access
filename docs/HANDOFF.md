@@ -4,7 +4,30 @@
 Full history is in `git log` — don't make dated copies. The ordered plan is in
 `docs/TASK_PLAN.md`; durable facts are in memory.
 
-_Last updated: 2026-06-12 (morning)._
+_Last updated: 2026-06-12 (afternoon — post live test)._
+
+## AFTERNOON TEST RESULTS (Noel, Lua.log 12:33) — nearly all GREEN
+
+- **Combat VERIFIED end-to-end:** preview ("Attack Warrior... You deal 31, take
+  29... confirm") → commit → damage announces → StatusMessagePanel result lines
+  → Noel KILLED a barbarian warrior. The "destroys it" verdict spoke correctly
+  on the lethal preview.
+- **Both combat event shapes confirmed:** `UnitDamageChanged` n=5 (player,
+  unit, newDmg, oldDmg, maxDmg); `UnitKilledInCombat` n=4 (killedPlayer,
+  killedUnit, killerPlayer, killerUnit). `COMBAT_DEBUG` now OFF; own-loss kill
+  announce wired ("Your Warrior was destroyed by X!"); enemy-kill announces
+  left to the wrapped StatusMessagePanel (already speaks them — don't double).
+- **Bug found + FIXED (untested):** Ctrl+A with 0 MP passed preview and spoke
+  "Warrior attacks Warrior." but the engine silently queued the MOVE_TO+ATTACK
+  and then DROPPED it next turn — Noel's "attack waited until next turn"
+  confusion. `requestAttackAt` now refuses up front: "Out of moves. Warrior
+  can attack next turn."
+- **Also verified live:** queued-move announce + next-turn "arrived at
+  destination"; "costs 2" on hills (silent on flat); exits ring on slash incl.
+  "northeast mountain" and "southeast 1, river"; "damaged" unit state.
+- **Still untested:** Ctrl+D direction vocab (never pressed); river-edge side
+  correctness (a river flag spoke, but which-side accuracy unconfirmed); the
+  new 0-MP attack refusal; the own-loss kill announce.
 
 ---
 

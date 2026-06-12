@@ -24,9 +24,10 @@
 
 UnitCombat = UnitCombat or {};
 
--- Set true to log raw combat-event args while we confirm signatures live; flip off
--- (and strip the per-event Log.info) before a public release.
-local COMBAT_DEBUG = true;
+-- Raw combat-event arg logging. Both signatures are now CONFIRMED from live
+-- logs (UnitDamageChanged 2026-06-11, UnitKilledInCombat 2026-06-12), so this
+-- ships off; flip on if an event ever surprises us again.
+local COMBAT_DEBUG = false;
 
 -- ---------------------------------------------------------------------------
 -- Small helpers (kept local rather than reaching into UnitMovement's locals).
@@ -300,6 +301,19 @@ end
 -- explain the refusal). pUnit must be the local player's selected unit.
 function UnitCombat.requestAttackAt(pUnit, plot)
     if pUnit == nil or plot == nil then return false; end
+    -- 0-MP gate (Lua.log 2026-06-12, Noel's "it queued until next turn"): with
+    -- no moves left the preview still passes (SimulateAttackVersus ignores MP)
+    -- and the melee commit's MOVE_TO+ATTACK gets ACCEPTED and silently queued —
+    -- which the engine then DROPS at next turn's activation (no damage events
+    -- ever fired for it). So the user heard "Warrior attacks Warrior." and
+    -- nothing happened. Refuse up front instead, like directMove's gate.
+    local mp = 0;
+    pcall(function() mp = pUnit:GetMovesRemaining() or 0; end);
+    if mp <= 0 then
+        _armed = nil;
+        Speech.emit("Out of moves. " .. unitName(pUnit) .. " can attack next turn.", "meta");
+        return true;
+    end
     local kind, defender, defName, isCity, ok, reason = classifyAttack(pUnit, plot);
     if not ok then
         _armed = nil;
@@ -366,12 +380,33 @@ function UnitCombat.onUnitDamageChanged(...)
     Speech.emit(unitName(pUnit) .. " under attack, " .. hpLeft .. " HP left.", "event");
 end
 
--- Signature unconfirmed (base handler ignores its arg). Log only for now; the
--- spoken kill announce gets wired once the live log shows the real arg shape.
+-- Shape CONFIRMED live (Lua.log 2026-06-12): n=4 (killedPlayerID, killedUnitID,
+-- killerPlayerID, killerUnitID) — e.g. [63, 1114128, 0, 131073] = barbarian
+-- warrior killed by our warrior. Announce ONLY our own losses: the wrapped
+-- StatusMessagePanel already speaks player-scored results ("Your Warrior (28
+-- damage) destroyed an enemy Warrior!"), so a kill announce here would double-
+-- speak our kills. (If our own death ALSO arrives via StatusMessagePanel in a
+-- live log, trim this to whichever phrasing Noel prefers.)
 function UnitCombat.onUnitKilledInCombat(...)
-    if COMBAT_DEBUG then
-        Log.info("UnitCombat.onUnitKilledInCombat " .. argsStr({ ... }, select("#", ...)));
-    end
+    local n = select("#", ...);
+    local a = { ... };
+    if COMBAT_DEBUG then Log.info("UnitCombat.onUnitKilledInCombat " .. argsStr(a, n)); end
+    local killedPlayer, killedUnit, killerPlayer, killerUnit = a[1], a[2], a[3], a[4];
+    local lp = Game.GetLocalPlayer();
+    if killedPlayer ~= lp then return; end
+    -- The dead unit may already be gone from the player's unit list — fall back
+    -- to a generic word rather than going silent on the worst news of the turn.
+    local victim = nil;
+    pcall(function() victim = Players[killedPlayer]:GetUnits():FindID(killedUnit); end);
+    local msg = "Your " .. ((victim ~= nil) and unitName(victim) or "unit") .. " was destroyed";
+    local killer = nil;
+    pcall(function()
+        if killerPlayer ~= nil and Players[killerPlayer] ~= nil then
+            killer = Players[killerPlayer]:GetUnits():FindID(killerUnit);
+        end
+    end);
+    if killer ~= nil then msg = msg .. " by " .. unitName(killer); end
+    Speech.emit(msg .. "!", "critical");
 end
 
 -- ---------------------------------------------------------------------------
