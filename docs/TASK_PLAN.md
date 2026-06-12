@@ -147,6 +147,18 @@ Two cooperating pieces, built in this order:
    utterance opens IN the pager; context-aware `?` and the empire report
    render through it. (Memory: `project_help_pager_and_context_help`.)
 
+## Advisor + tutorial content (Noel 2026-06-12 — "crucial for new players")
+
+We SUPPRESSED the first-turn advisor popups (mouse-only modal blockers,
+`SuppressFirstTurnAdvisor.lua`) as triage — the CONTENT was never delivered
+accessibly. Bring it back as speech: the tutorial system is event-driven Lua
+(`AdvisorRaise` / `GoalAdd` / `ShowWorldPointer` LuaEvents — see
+`reference_civ_vi_tutorial_arch`), so advisor guidance can speak + land in
+the history/pager instead of blocking. Scope when picked up: advisor hints
+during play, goal tracking, the "First Look" tutorial path
+(`project_tutorial_accessibility_goal`). Pairs with the engine
+recommendations already surfaced in the pickers.
+
 ## Queue manager (Noel 2026-06-12 — AFTER the pager + empire report)
 
 Unified queue awareness + editing across production / tech / civics (engine
