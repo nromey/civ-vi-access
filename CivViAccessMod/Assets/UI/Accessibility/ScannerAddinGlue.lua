@@ -87,6 +87,12 @@ if LuaEvents ~= nil and LuaEvents.CivViAccess_ScannerInput ~= nil then
             if ok then handled = (h == true);
             else Log.warn("ScannerAddinGlue: combat dispatch failed: " .. tostring(h)); end
         end
+        -- Unit selection at cursor (Alt+/ = select own unit under cursor).
+        if not handled and UnitInfo ~= nil and UnitInfo.dispatch ~= nil then
+            local ok, h = pcall(function() return UnitInfo.dispatch(key, mods); end);
+            if ok then handled = (h == true);
+            else Log.warn("ScannerAddinGlue: unitinfo dispatch failed: " .. tostring(h)); end
+        end
         -- Speech history (Shift+R = repeat last / walk back).
         if not handled and SpeechHistory ~= nil and SpeechHistory.dispatch ~= nil then
             local ok, h = pcall(function() return SpeechHistory.dispatch(key, mods); end);

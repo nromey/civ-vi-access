@@ -732,6 +732,7 @@ local CURSOR_HELP_ENTRIES = {
     -- Unit info
     { keyLabel = "Slash",   description = "Speak selected unit's stats, then the six exits with move costs" },
     { keyLabel = "Ctrl+Slash", description = "Recenter cursor on selected unit" },
+    { keyLabel = "Alt+Slash",  description = "Select your unit under the cursor (repeat cycles a stack)" },
 
     -- Pickers
     { keyLabel = "Shift+P", description = "Open city production picker" },

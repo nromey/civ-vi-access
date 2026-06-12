@@ -231,6 +231,10 @@ captures the Shift case so bare/Ctrl stay on their InputActions:
   listening for the exits. *InputAction path (NOT forwarded by the wrap).*
 - **Ctrl+`/`** — recenter the hex cursor on the selected unit
   (`CIVVIACCESS_RecenterOnUnit`). *InputAction path.*
+- **Alt+`/`** — SELECT your unit under the cursor (the reverse of Ctrl+/;
+  repeat presses cycle a stack). Completes the scanner→command loop: scan to
+  a unit, Home, Alt+/, then Shift+dir / M to command it. *Wrap combo →
+  `UnitInfo.selectAtCursor` (NEW 2026-06-12).*
 - **Shift+`/`** (`?`) — read the scanner cheat-sheet (`ScannerHandler` → ladder).
   *The ONLY slash case the capture-all wrap forwards (exact `Shift` combo), so it
   can't clobber bare-`/` unit stats. (Bug fixed 2026-06-11: `VK_OEM_2` had been a

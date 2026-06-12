@@ -301,6 +301,66 @@ function UnitInfo.cycleAllUnits(forward)
     -- points to something deeper than our Lua-side speech.
 end
 
+-- Alt+/: select an OWN unit on the cursor tile — the REVERSE of Ctrl+/
+-- (cursor goes to unit). Fuses the scanner into commanding (Noel 2026-06-12:
+-- "find where all my builders are / move them around"): scan to the Builder,
+-- Home parks the cursor on it, Alt+/ selects it, then Shift+dir / M command
+-- it. Repeat presses cycle through stacked own units on the tile.
+function UnitInfo.selectAtCursor()
+    if HexCursor == nil or HexCursor.position == nil then return; end
+    local cx, cy = HexCursor.position();
+    if cx == nil then
+        Speech.emit("No cursor", "meta");
+        return;
+    end
+    local lp = Game.GetLocalPlayer();
+    if lp == -1 then return; end
+    local own = {};
+    local units = Units.GetUnitsInPlotLayerID(cx, cy, MapLayers.ANY);
+    if units ~= nil then
+        for _, u in ipairs(units) do
+            if u:GetOwner() == lp then own[#own + 1] = u; end
+        end
+    end
+    if #own == 0 then
+        Speech.emit("No unit of yours here", "meta");
+        return;
+    end
+    -- If one of the stack is already selected, advance to the next (stack
+    -- cycling); else take the first.
+    local sel = selectedUnit();
+    local idx = 1;
+    if sel ~= nil then
+        for i, u in ipairs(own) do
+            if u:GetID() == sel:GetID() and u:GetOwner() == sel:GetOwner() then
+                idx = (i % #own) + 1;
+                break;
+            end
+        end
+    end
+    local target = own[idx];
+    if sel ~= nil and target:GetID() == sel:GetID()
+       and target:GetOwner() == sel:GetOwner() then
+        -- Re-selecting the same unit fires no event -> would be silent.
+        Speech.emit("Already selected, " .. StringifyUnit(target), "meta");
+        return;
+    end
+    if UI ~= nil and UI.SelectUnit ~= nil then
+        UI.SelectUnit(target);
+        -- Speech rides Events.UnitSelectionChanged, same as the cycle keys.
+    end
+end
+
+-- Alt+/ forwarded from the capture-all wrap (mods bit2 = Alt).
+local KEY_SLASH = Keys and Keys.VK_OEM_2;
+function UnitInfo.dispatch(key, mods)
+    if KEY_SLASH ~= nil and key == KEY_SLASH and (mods or 0) == 4 then
+        UnitInfo.selectAtCursor();
+        return true;
+    end
+    return false;
+end
+
 -- Recenter HexCursor on the selected unit. Useful when the cursor has
 -- wandered away during exploration and the user wants to return to
 -- whichever unit they're working with.

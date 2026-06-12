@@ -114,6 +114,9 @@ if Keys ~= nil then
     -- Shift+`/` (`?`) = scanner cheat-sheet. Bare `/` and Ctrl+`/` deliberately
     -- left to their InputActions (unit stats / recenter) — see SCANNER_KEYS note.
     addCombo(Keys.VK_OEM_2, InputRouter.MOD_SHIFT);
+    -- Alt+`/` = select the own unit under the CURSOR (reverse of Ctrl+/) —
+    -- completes the scanner->command loop: scan, Home, Alt+/, move.
+    addCombo(Keys.VK_OEM_2, InputRouter.MOD_ALT);
     -- Shift+Enter = ACTIVATE the notification cycle's current entry (the
     -- keyboard form of the sighted left-click on a notification icon — opens
     -- the policy picker, tech chooser, etc.). Bare Enter stays the engine's
