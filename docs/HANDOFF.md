@@ -127,6 +127,17 @@ log-only (COMBAT_DEBUG stays ON) until one shows up.
 - **Still queued for the briefing:** Enter turn-gate, verbosity option
   (all moves / enemy only / off), re-read key, city-damage speech.
 
+## NEW (evening, untested): bare G = My Government hub
+
+Noel wants to CHANGE the cards Alt+P auto-picked, anytime — not only when a
+blocker exists. Bare G (wrap combo; engine grid-toggle reclaimed) raises
+`LuaEvents.LaunchBar_GovernmentOpenMyGovernment` — the exact event the
+LaunchBar button raises — so the RevealListeners hub opens: announces current
+government, then G = type chooser, P = policy wizard. TEST: press G on the
+map → expect the government announce; press P → the slot walk; re-slot a
+card and Enter → confirm the commit speaks and sticks (the wizard's REAL
+RequestPolicyChanges commit is still live-pending from 2026-05-31).
+
 ## NEW (evening, untested): Shift+Enter activates the current notification
 
 Noel couldn't open the policy picker from the "a policy needs to be added"

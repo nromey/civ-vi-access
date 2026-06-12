@@ -80,6 +80,11 @@ if Keys ~= nil then
     addCombo(Keys.W, 0);                       -- W = where am I
     addCombo(Keys.W, InputRouter.MOD_SHIFT);   -- Shift+W = rich locate
     addCombo(Keys.G, InputRouter.MOD_ALT);     -- Alt+G = survey category: all
+    -- Bare G = open My Government (hub: announces current government, then
+    -- G = change type, P = policy wizard). RECLAIM: the engine's bare G is the
+    -- map grid toggle, sighted-only. Raised via the LaunchBar's own LuaEvent so
+    -- it behaves exactly like clicking the Government button.
+    addCombo(Keys.G, 0);
     addCombo(Keys.U, InputRouter.MOD_ALT);     -- Alt+U = survey category: units
     addCombo(Keys.R, InputRouter.MOD_ALT);     -- Alt+R = survey category: resources
     if Keys.VK_OEM_PLUS  ~= nil then addCombo(Keys.VK_OEM_PLUS,  InputRouter.MOD_ALT); end  -- Alt+= zoom in

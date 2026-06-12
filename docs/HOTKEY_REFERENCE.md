@@ -127,6 +127,16 @@ InputActions remain in `RemapForHexCursor.xml` but the wrap suppresses them
   Civ V's `Ctrl+[`/`]` (oldest/newest) and `Shift+[`/`]` (filter) ladder is
   still future work.
 
+### Government — bare G (NEW 2026-06-12)
+
+- **G** — open **My Government** (announces the current government), then
+  **G** = change government type, **P** = the policy wizard (re-slot cards:
+  Up/Down browse, T reads effect, Space slots + advances, Shift+Enter keeps
+  the current card, Enter applies all, Escape cancels). *RECLAIM: engine bare
+  G = map grid toggle, sighted-only. Raised via
+  `LuaEvents.LaunchBar_GovernmentOpenMyGovernment` — identical to clicking the
+  LaunchBar button, so the RevealListeners hub intercepts as usual.*
+
 ### Survey + zoom (NEW 2026-06-09) — cursor-centered radius census
 
 Anchored on the hex cursor; reuses the scanner backends. The cursor is the

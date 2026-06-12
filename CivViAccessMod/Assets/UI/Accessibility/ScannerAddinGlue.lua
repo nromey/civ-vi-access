@@ -87,6 +87,17 @@ if LuaEvents ~= nil and LuaEvents.CivViAccess_ScannerInput ~= nil then
             if ok then handled = (h == true);
             else Log.warn("ScannerAddinGlue: combat dispatch failed: " .. tostring(h)); end
         end
+        -- Bare G = open My Government (Noel 2026-06-12: needed a way to CHANGE
+        -- the cards Alt+P auto-picked). Raising the LaunchBar's own LuaEvent
+        -- reproduces the sighted button click exactly: the RevealListeners hub
+        -- intercepts, announces the current government, then G = type chooser,
+        -- P = policy wizard.
+        if not handled and Keys ~= nil and key == Keys.G and (mods or 0) == 0 then
+            if LuaEvents ~= nil and LuaEvents.LaunchBar_GovernmentOpenMyGovernment ~= nil then
+                LuaEvents.LaunchBar_GovernmentOpenMyGovernment();
+                handled = true;
+            end
+        end
         -- Notifications (Shift+Enter = activate the cycle's current entry).
         if not handled and Notifications ~= nil and Notifications.dispatch ~= nil then
             local ok, h = pcall(function() return Notifications.dispatch(key, mods); end);
