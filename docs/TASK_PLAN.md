@@ -158,6 +158,11 @@ the history/pager instead of blocking. Scope when picked up: advisor hints
 during play, goal tracking, the "First Look" tutorial path
 (`project_tutorial_accessibility_goal`). Pairs with the engine
 recommendations already surfaced in the pickers.
+DELIVERY SHAPE (Noel 2026-06-12): the advisor/tutorial narrative text gets
+REPLACED with accessible event-based modals — our popup-nav standard
+(arrow-navigable, re-readable, Escape-dismissable, long text through the
+pager), driven by the same tutorial LuaEvents, not the vanilla mouse-only
+popups. Civilopedia itself stays P4.
 
 ## Queue manager (Noel 2026-06-12 — AFTER the pager + empire report)
 
