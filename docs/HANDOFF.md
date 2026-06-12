@@ -25,9 +25,28 @@ _Last updated: 2026-06-12 (afternoon — post live test)._
 - **Also verified live:** queued-move announce + next-turn "arrived at
   destination"; "costs 2" on hills (silent on flat); exits ring on slash incl.
   "northeast mountain" and "southeast 1, river"; "damaged" unit state.
-- **Still untested:** Ctrl+D direction vocab (never pressed); river-edge side
-  correctness (a river flag spoke, but which-side accuracy unconfirmed); the
-  new 0-MP attack refusal; the own-loss kill announce.
+- **Still untested:** river-edge side correctness (a river flag spoke, but
+  which-side accuracy unconfirmed); the 0-MP attack refusal; the own-loss
+  kill announce.
+
+## EVENING TEST (Noel, post-relaunch) — briefing + Ctrl+D GREEN
+
+- **Overnight briefing VERIFIED live:** "Overnight: Your Warrior recovered 10
+  HP, 37 of 100. Enemy Barbarians Scout 2 southwest of Amsterdam." — recovery
+  tracking, the heal-tick deferral, AND the anchored enemy move all worked.
+- **Ctrl+D VERIFIED** (all four modes cycled). The #14 hex-cluster migration
+  is now fully verified.
+- **R on the damaged warrior said "Warrior fortified"** — HEAL was tried first
+  (damaged path) but the engine REFUSED it in the field; warrior was in
+  neutral territory. Open question: does UNITOPERATION_HEAL accept for land
+  military anywhere (friendly territory?), or is it naval/support-only in this
+  ruleset? Either way fortify heals (+10/turn per the briefing). Follow-up
+  idea: briefing says "fully healed" when a tracked unit hits max — plain
+  fortify never announces completion.
+- **Diplomacy re-meet (Robert kudo):** the statement DID speak ("Wise to keep
+  peace with your neighbors...") but Noel's arrow presses clobbered it — each
+  nav announce ("Goodbye, 1 of 1") interrupts the in-flight status line. The
+  known anti-clobber / repeat-key / pager work covers this; no diplo bug.
 
 ---
 
