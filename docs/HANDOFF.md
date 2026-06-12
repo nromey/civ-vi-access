@@ -36,6 +36,59 @@ that's the open "how to move forward" decision). CHANGELOG 0.6.1 + csproj
   `Shift+/` = cheat-sheet; was a regression where any-mod `/` fired help);
   barbarians classify as "enemy"; single-unit cycle selects + names the lone unit.
 
+## IN PROGRESS — Combat P3 (built 2026-06-11, UNCOMMITTED, pending live test)
+
+Agreed sequence: **combat → reporting (paged) → sonification**. Combat first.
+
+`CivViAccessMod/Assets/UI/Accessibility/UnitCombat.lua` (NEW) — no engine fork;
+Civ VI exposes `CombatManager.SimulateAttackVersus` (odds), `IsAttackChangeWarState`
+(war warning), `CanAttackTarget` (validity). Melee = `MOVE_TO` + `ATTACK` modifier;
+ranged = `RANGE_ATTACK` op; civilian = capture (plain `MOVE_TO`). One
+preview→confirm→commit engine, two entry points:
+- **Ctrl+A** = attack hex-cursor target (first press previews odds + war warning +
+  arms; Ctrl+A again commits). Works for ranged at distance. NOTE: first try bound
+  bare A, which stomped cursor-west (bare QEADZC = cursor, Shift+QEADZC = unit move,
+  both A's taken) — moved to Ctrl+A 2026-06-11.
+- **Move-into-enemy** = `M`/`Alt+dir` onto an adjacent enemy redirects into the same
+  flow (UnitMovement's old "combat coming" guards now call `UnitCombat.requestAttackAt`).
+Wired: modinfo (both blocks), `include("UnitCombat")` in HexCursorAddin, dispatch in
+ScannerAddinGlue (after movement). HOTKEY_REFERENCE updated.
+
+**TEST + what the log must confirm (then I wire part 3 / commit):**
+- Scan to the barbarian Scout, select your Warrior adjacent → press **A**: expect
+  "Attack Scout. Warrior 20 versus 10. You deal N, take M. <verdict>. Press A again
+  to confirm." → **A** again → "Warrior attacks Scout." Then the engine resolves.
+- Verify the `SimulateAttackVersus` numbers read right (DAMAGE_TO = damage RECEIVED
+  by each side — confirm "you deal/take" aren't swapped). Grep `UnitCombat` in Lua.log.
+- Part 3 announces are INSTRUMENTED not final: `COMBAT_DEBUG=true` logs
+  `onUnitDamageChanged` / `onUnitKilledInCombat` arg shapes. The "under attack, N HP"
+  line assumes `(playerID, unitID, newDamage, prevDamage)` — confirm from the log,
+  then wire the kill announce + fix damage announce. **Strip COMBAT_DEBUG before release.**
+- Known MVP gaps: non-adjacent melee says "move closer" (no auto-path-to-attack);
+  best-defender picks first enemy unit on the plot (civilian-under-escort edge case).
+
+### Combat — next layer (queued, after the MVP tests green)
+
+Civ VI-specific surfaces, all discussed 2026-06-11:
+- **Smarter defender + escort phrasing** — pick the strongest enemy military unit as
+  the defender (not first-on-tile); read stacks "defender first, escorting X";
+  append corps/army/fleet/armada via `pUnit:GetMilitaryFormation()`.
+- **District combat targets** — Encampments + city walls. Read both HP pools:
+  `pDistrict:GetMaxDamage(DefenseTypes.DISTRICT_OUTER/_GARRISON)` (walls vs city HP);
+  `SimulateAttackVersus` already returns wall hits separately as
+  `CombatResultParameters.DEFENSE_DAMAGE_TO`. "Bring siege" when walls up; ranged
+  can't capture. Extend `UnitCombat.classifyAttack` (today it no-ops on districts).
+- **Survey unit subcategories** — add **Threats** (hostile combat units, civilians
+  excluded — the "is anything coming for me" scan) and **My units**; civilians +
+  land/sea later. Long-term: per-owner filters + user-built custom categories
+  (Civ V Access model) once the survey earns a settings surface.
+- **Between-turns AI movement awareness** (the P3 "speak units that moved" item /
+  Civ V Access "Unit Moves" log) — we already get `UnitMoveComplete` for AI units
+  (we discard non-own). ACCUMULATE foreign-visible moves during the AI turn, SUMMARIZE
+  at `LocalPlayerTurnBegin` ("while you were away: Scout now 3 NE"); never speak live.
+  Reviewable log; later owner filters + exclude trade units (caravans clutter).
+  NOTE: today's "barbarians approaching" is an engine NOTIFICATION, not this tracker.
+
 ## Open items raised live 2026-06-11 (not blocking)
 
 - **Global "repeat last announce"** — Noel hit `R` expecting a repeat and got

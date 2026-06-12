@@ -17,13 +17,33 @@ If you're about to ask the user something, check these first — it's probably a
 
 ## Architecture you MUST know (don't re-litigate or miss these)
 
-- **Capture-all input — we OWN the map keyboard.** The WorldInput context is wrapped
-  via `<ReplaceUIScript>` (`Assets/UI/Replacements/WorldInputAccessWrap.lua`).
-  Consuming a key in its `OnInputHandler` (return `true`) **suppresses the engine's
-  InputAction** — proven. So there are **no key restrictions** and we do **not** fight
-  engine bindings or the `InputSettings.json` gesture-freeze. To add a map key:
-  add it to the wrap's `SCANNER_KEYS` (any-modifier) or `SCANNER_COMBOS` (exact
-  key+mods), NOT to engine InputActions. This was a huge unlock; build on it.
+- **Capture-all input — the wrap CAN own any map key, but does NOT own them all yet.**
+  (Read this carefully — it has tripped Claude up twice; don't let the headline fool
+  you.) The WorldInput context is wrapped via `<ReplaceUIScript>`
+  (`Assets/UI/Replacements/WorldInputAccessWrap.lua`). Consuming a key in its
+  `OnInputHandler` (return `true`) **suppresses the engine's InputAction** — proven,
+  and it's the right way to bind a map key (no `InputSettings.json` gesture-freeze, no
+  dual-dispatch). **BUT the wrap today captures ONLY the keys listed in its
+  `SCANNER_KEYS` / `SCANNER_COMBOS`; every other key still falls through to the engine
+  (`return BASE_OnInputHandler`).** So coverage is a MIX — always know which side a key
+  is on:
+  - **ON the wrap (reliable, speaks):** scanner ladder (PageUp/Down/Home/End/
+    Backspace), survey+zoom (S, W, Shift+W, Alt+G/U/R, Alt+digits/±), move-to (M /
+    Shift+M / Ctrl+M), combat (Ctrl+A), Shift+/ (`?`), Shift+D.
+  - **STILL on the legacy engine InputAction path (`Assets/Data/RemapForHexCursor.xml`)
+    — FLAKY, can fire silently or NOT AT ALL:** the hex-cursor move (**bare**
+    Q/E/A/D/Z/C), the unit one-hex move (**Shift+**Q/E/A/D/Z/C), and the rebound engine
+    letter-actions (**Alt+**Q/A/Z/C = resources/attack/sleep/civics, which are SILENT).
+    Verified from Lua.log 2026-06-11 that the Shift+dir unit-move was DEAD (no move, no
+    speech, no log line).
+  - **Task #14 = migrate ALL of the above onto the wrap**, rule: *every map key speaks*
+    (a mod action that talks, or an engine command we forward AND announce — no silent
+    keys). This is the north star Noel keeps pointing at.
+  - **To add a NEW map key:** put it on the wrap (`SCANNER_KEYS` any-mod / `SCANNER_COMBOS`
+    exact key+mods), NOT a new engine InputAction.
+  - **When the user reports a key did/said nothing: READ THE Lua.log FIRST** (grep the
+    action id + `#SCREENREADER`), don't theorize about what they pressed. See
+    `feedback_investigate_log_before_theorizing`.
 - **Scanner + cursor live in the HexCursorAddin VM.** The scanner
   (Core/Snap/Nav/Handler + backends) sits next to the hex cursor. The WorldInput
   wrap (a *separate* VM) forwards keys cross-VM via
@@ -76,3 +96,30 @@ file. Keep them separate:
 - In `MEMORY.md`, handoffs collapse to **one** pointer line → `docs/HANDOFF.md`.
 - At session end: update `docs/HANDOFF.md` (+ `docs/TASK_PLAN.md` if the plan moved);
   only write a NEW memory for a genuinely new durable fact.
+
+### Authority & accuracy (added 2026-06-11 after Claude forgot the input model twice)
+
+The records above answer *where* knowledge lives. These rules keep it *trustworthy*
+— they exist because stale/overclaiming docs made Claude misremember the capture-all
+input model twice and theorize instead of checking.
+
+- **Authority order: CODE + `git` + live `Lua.log` > docs > memory.** The code is the
+  only source of truth for what the system *does right now*. Docs (`HANDOFF`,
+  `TASK_PLAN`, `HOTKEY_REFERENCE`) and memory *describe* it and **go stale**. When a
+  doc/memory disagrees with the code, the code wins — **FIX the stale record on the
+  spot**, don't work around it. (`HOTKEY_REFERENCE` claiming cursor was on Alt+ was
+  stale and caused a wrong diagnosis.)
+- **High-drift vs timeless.** *Current-behavior* facts — key bindings, which handler
+  fires, event signatures, file/flag names, "what's wired" — DRIFT as we build. Do
+  **not** trust them from memory; **verify against code/log before acting or
+  repeating them.** Memory is for *timeless* facts/decisions/preferences only
+  (the *why*, the settled calls, Noel's UX). Put no current-state claims in memory —
+  they rot and mislead recall.
+- **Single source of truth per high-drift domain:** **key bindings →
+  `docs/HOTKEY_REFERENCE.md`** (audited 2026-06-11; #15 key registry will mechanize
+  it). Architecture invariants Claude keeps missing → the "Architecture you MUST
+  know" section above, kept ACCURATE (state vs goal explicitly separated, gotchas
+  self-flagged).
+- **Verify-before-theorize.** On any user test-result report, read the `Lua.log` +
+  code path first; reason from evidence, not "you must have pressed X." See
+  `feedback_investigate_log_before_theorizing`.

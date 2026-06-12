@@ -83,11 +83,34 @@ nothing); most punctuation; most modifier-combos (audit case by case).
 - **Backspace** — return the cursor to the pre-jump cell. *RECLAIM: Cancel /
   Stop-automation, mouse-first.*
 
-### Hex cursor / world nav (existing — to be normalized toward Civ V during the migration)
+### Hex cursor / world nav — the Q E A D Z C cluster (AUDITED 2026-06-11)
 
-- **Alt+Q/E/A/D/Z/C** — move the cursor one hex (the `Alt+` prefix is a *crutch*
-  to dodge engine letter-bindings; once the capture-all migration lands we can
-  drop it back to bare Q/E/A/D/Z/C like Civ V — task #14).
+The pointy-top hex cluster carries THREE layers by modifier (audited against
+`RemapForHexCursor.xml` + the engine `InputConfiguration.xml`). NW=Q, NE=E, W=A,
+E=D, SW=Z, SE=C.
+
+- **Bare Q/E/A/D/Z/C** — move the **hex CURSOR** one hex; speaks the tile.
+  (`CIVVIACCESS_Cursor*` → `HexCursor.move`.) Civ V Access uses the same bare
+  cluster for its cursor — already Civ V-aligned. (The old "cursor is on Alt+"
+  note was stale; cursor moved to bare letters in 0.5.0.)
+- **Shift+Q/E/A/D/Z/C** — move the selected **UNIT** one hex; speaks
+  "Moved west, N moves" (or the blocked reason). (`CIVVIACCESS_Move*` →
+  `UnitMovement.directMove`.)
+- **Alt+Q/A/Z/C** — the engine's own letter-actions, rebound here OFF the bare
+  letters so bare is free for the cursor: **Alt+Q** ToggleResources, **Alt+A**
+  Attack, **Alt+Z** Sleep, **Alt+C** ToggleCivicsTree. **These give NO speech**
+  (visual toggles / silent mouse-mode attack) — fat-fingering Alt for Shift lands
+  here silently. **Alt+E** is dormant (bare E intercepts it; auto-explore is
+  Alt+X). **Alt+D** = engine cursor-east.
+
+**KNOWN TRAP → task #14.** Cursor + unit-move are still on the unreliable engine
+InputAction path (frozen-gesture / dual-dispatch / the Alt+E dormancy hack), NOT
+the capture-all wrap. Migrating them onto the wrap (like the scanner / survey /
+move-to / combat keys) would: (a) make every directional press reliably speak,
+(b) suppress the silent Alt+letter engine actions (we'd own + announce or eat
+them), (c) drop the `InputSettings.json` first-seen-gesture fragility. This is the
+durable fix for "I pressed a move key and nothing was said."
+
 - **Shift+V** — verbosity toggle (terse / chatty).
 - Info / readout keys (Ctrl+T re-read, Ctrl+I image, etc.) — **AUDIT TODO**:
   enumerate + classify + list here.
@@ -141,6 +164,30 @@ Units auto-moving read their status in the scanner / selection readout via
 
 Phase 2 (deferred): manual waypoint legs, worker route-to (auto-build road).
 Auto-explore already exists on **Alt+X**.
+
+### Combat (NEW 2026-06-11, P3)
+
+No engine fork (Civ V Access forked C++; Civ VI exposes it all in stock Lua):
+`CombatManager.SimulateAttackVersus` (odds), `IsAttackChangeWarState` (war
+warning), `CanAttackTarget` (validity). Melee = `MOVE_TO` with the `ATTACK`
+modifier; ranged = `RANGE_ATTACK` operation. One preview→confirm→commit engine
+(`UnitCombat.lua`), two entry points.
+
+- **Ctrl+A** — attack the hex cursor target. *NOT bare A (= cursor west) or
+  Shift+A (= move unit west) — Ctrl completes the A-family. First press speaks the
+  odds + any war warning and arms; press Ctrl+A again on the same target to commit.
+  Works for ranged units at a distance.*
+- **Move-into-enemy** — `M` (move-to-cursor) or `Alt+`direction onto an adjacent
+  enemy routes into the SAME preview→confirm flow instead of refusing. *Melee
+  only (you can only move into adjacency); the confirm press keeps it from
+  starting a war by accident.*
+- Melee/ranged/capture are auto-detected; a defenceless civilian is a **capture**
+  (no odds, just confirm). Non-adjacent melee says "move closer"; out-of-range
+  ranged says "out of range."
+- **Result announces** ride engine events (`UnitKilledInCombat`,
+  `UnitDamageChanged`) — instrumented with arg-logging (`COMBAT_DEBUG`) until the
+  live signatures are confirmed, then the spoken "you were attacked / X destroyed"
+  lines get wired from the log. *Strip `COMBAT_DEBUG` before a public release.*
 
 ### Slash family — unit stats / recenter / help
 
