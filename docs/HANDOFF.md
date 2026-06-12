@@ -90,6 +90,14 @@ log-only (COMBAT_DEBUG stays ON) until one shows up.
 
 ## Combat — next layer (queued, after the Ctrl+A test greens)
 
+- **Pillage key** (Noel 2026-06-12): `UNITOPERATION_PILLAGE` / `PILLAGE_ROUTE`
+  via the same RequestOperation pattern as `UnitMovement.rest()`; preview the
+  yield (farms heal, mines gold, campus science) before committing; say the
+  3 MP cost. No engine hotkey exists (panel-button-only) — fresh wrap key.
+- **Rest-family key audit** (same pass, Noel 2026-06-12): R smart-rest /
+  Alt+Z sleep / Alt+X auto-explore exist but ride legacy InputActions — move
+  them onto the wrap like the nav cluster, confirm each speaks, and make sure
+  every rest state (sleep/fortify/alert/heal/skip) is reachable + announced.
 - Smarter defender + escort phrasing (strongest military defender; corps/army
   via `GetMilitaryFormation`).
 - District combat targets (Encampments + walls; both HP pools; "bring siege").
