@@ -127,6 +127,21 @@ log-only (COMBAT_DEBUG stays ON) until one shows up.
 - **Still queued for the briefing:** Enter turn-gate, verbosity option
   (all moves / enemy only / off), re-read key, city-damage speech.
 
+## NEW (evening, untested): Shift+Enter activates the current notification
+
+Noel couldn't open the policy picker from the "a policy needs to be added"
+blocker — our notification cycle had NO activate path at all (only [ / ]
+prev/next + Alt+N). The policies he DID get came from **Alt+P auto-pick**
+(CityProduction.unblockAll quietly filled 2 slots — log line
+"RequestPolicyChanges committed"). Added: **Shift+Enter** on the wrap →
+`Notifications.activateCurrent()` → `NotificationManager.Find` +
+`pNotification:Activate(true)` (the vanilla TryActivate chain) → the real
+NotificationPanel dispatches per-type → our wrappers intercept. TEST: bracket
+to the policy blocker, Shift+Enter → expect the PolicyWizard slot walk
+("Military slot 1, currently ..."). If instead the RAW GS GovernmentScreen
+opens (mouse wall), the GS notification handler routes differently than base —
+read the log for what LuaEvent fired and wire that path.
+
 ## Test next (relaunch first — launcher dev-deploys on run)
 
 1. **Queued move:** move a unit until ~1 MP left, Shift+dir into hills →

@@ -119,12 +119,13 @@ InputActions remain in `RemapForHexCursor.xml` but the wrap suppresses them
 - **Shift+V** — verbosity toggle (terse / chatty).
 - Info / readout keys (Ctrl+T re-read, Ctrl+I image, etc.) — **AUDIT TODO**:
   enumerate + classify + list here.
-- Notification cycle — currently on mod InputActions. **PLANNED (Noel 2026-06-08):
-  move to `[` / `]`** for notification review (RECLAIM from Prev/Next-city, which
-  the scanner's Cities category supersedes; matches Civ V's bracket message-buffer
-  convention). Trivial now under capture-all — consume `[`/`]` in the wrap, route
-  to the notification reader. Civ V also uses `Ctrl+[` / `Ctrl+]` (jump to oldest/
-  newest) and `Shift+[` / `Shift+]` (cycle filter) — borrow that ladder.
+- Notification cycle — **`[` / `]`** prev/next (LIVE — InputActions, reclaimed
+  from Prev/Next-city; the "PLANNED" note here was stale), **Alt+N** reminder
+  toggle, **Shift+Enter** = ACTIVATE the current entry (wrap combo, added
+  2026-06-12) — the keyboard form of clicking a notification icon: opens the
+  policy picker / tech chooser / etc. for the entry the brackets last spoke.
+  Civ V's `Ctrl+[`/`]` (oldest/newest) and `Shift+[`/`]` (filter) ladder is
+  still future work.
 
 ### Survey + zoom (NEW 2026-06-09) — cursor-centered radius census
 

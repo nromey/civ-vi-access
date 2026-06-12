@@ -501,6 +501,55 @@ function Notifications.cyclePrev()
     speakEntry(list[S.navIndex], S.navIndex, #list);
 end
 
+-- Activate the cycle's current notification — the keyboard form of the
+-- sighted LEFT-CLICK on a notification icon (Noel 2026-06-12: the engine's
+-- bare-Enter blocker activation never opened our policy flow). This is
+-- exactly what the vanilla panel's TryActivate does: NotificationManager.Find
+-- + pNotification:Activate(true). The engine then fires
+-- Events.NotificationActivated; the real NotificationPanel dispatches its
+-- per-type handler (FILL_CIVIC_SLOT -> open policies, CHOOSE_TECH -> tech
+-- chooser, ...) and our screen wrappers intercept from there.
+function Notifications.activateCurrent()
+    recordUserActivity();
+    local pid = localPlayerID();
+    local list = pickCycleList(pid);
+    if #list == 0 then
+        Speech.emit("No notifications", "meta");
+        return;
+    end
+    if S.navIndex < 1 or S.navIndex > #list then S.navIndex = 1; end
+    local entry = list[S.navIndex];
+    if entry == nil or entry.id == nil then
+        Speech.emit("Nothing to activate", "meta");
+        return;
+    end
+    local pNotification = nil;
+    pcall(function()
+        if NotificationManager ~= nil and NotificationManager.Find ~= nil then
+            pNotification = NotificationManager.Find(pid, entry.id);
+        end
+    end);
+    if pNotification == nil then
+        Speech.emit("Can't activate this notification", "meta");
+        return;
+    end
+    Log.info("Notifications.activateCurrent: id=" .. tostring(entry.id)
+             .. " type=" .. tostring(entry.typeName));
+    Speech.emit("Activating. " .. (entry.summary or ""), "event");
+    pcall(function() pNotification:Activate(true); end);
+end
+
+-- Shift+Enter, forwarded from the capture-all wrap (mods bit0 = Shift).
+local KEY_RETURN = Keys and Keys.VK_RETURN;
+function Notifications.dispatch(key, mods)
+    mods = mods or 0;
+    if KEY_RETURN ~= nil and key == KEY_RETURN and mods == 1 then
+        Notifications.activateCurrent();
+        return true;
+    end
+    return false;
+end
+
 function Notifications.toggleReminder()
     recordUserActivity();
     S.reminderEnabled = not S.reminderEnabled;

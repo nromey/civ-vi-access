@@ -87,6 +87,12 @@ if LuaEvents ~= nil and LuaEvents.CivViAccess_ScannerInput ~= nil then
             if ok then handled = (h == true);
             else Log.warn("ScannerAddinGlue: combat dispatch failed: " .. tostring(h)); end
         end
+        -- Notifications (Shift+Enter = activate the cycle's current entry).
+        if not handled and Notifications ~= nil and Notifications.dispatch ~= nil then
+            local ok, h = pcall(function() return Notifications.dispatch(key, mods); end);
+            if ok then handled = (h == true);
+            else Log.warn("ScannerAddinGlue: notifications dispatch failed: " .. tostring(h)); end
+        end
         if not handled and ScannerHandler ~= nil and ScannerHandler.dispatch ~= nil then
             local ok, err = pcall(function() handled = ScannerHandler.dispatch(key, mods); end);
             if not ok then Log.warn("ScannerAddinGlue: scanner dispatch failed: " .. tostring(err)); end
