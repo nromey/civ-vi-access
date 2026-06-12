@@ -31,11 +31,23 @@ reveal or the overnight briefing, Shift+R to recall it → reader announces
 "Last announce. Reader, N parts." → walk with Down/Up → Escape. Short
 entries still re-speak directly with their "Back N" prefix.
 
+## PAGER round 2 (post first live test, untested)
+
+Noel's first pager test found: (1) the `?` scanner cheat-sheet still fired as
+ONE giant picker-kind utterance — clobbered by the notifier AND excluded from
+the history ring (picker = browse chatter), so unrecoverable. FIXED: `?` now
+opens the cheat-sheet IN the pager ("Scanner help. Reader, N parts.").
+(2) Notification buffering implemented: Pager broadcasts
+`CivViAccess_PagerState`; Notifications buffers inline announces + mutes the
+idle reminder while the reader is open, releases on close.
+ALSO from the log: the scanner units ladder is fine — Noel has TWO warriors
+(instances under one "Warrior" item) and never pressed BARE PageDown, which
+is what steps items (Warrior → Builder). Teaching, not a bug.
+
 ## RESUME HERE — next session
 
-**Continue the PAGER arc:** notification buffering while the reader is open;
-route the EOT/empire report + context-sensitive `?` through it; pull the
-threshold into the future accessibility tab. — design settled in
+**Continue the PAGER arc:** route the EOT/empire report + context-sensitive
+`?` through it; pull the threshold into the future accessibility tab. — design settled in
 `docs/TASK_PLAN.md` ("NEXT UP" block): (1) repeat-last key first, (2) history
 ring buffer w/ cross-VM collector in the addin VM, (3) the sentence-paged
 reader. Three speech losses in one day (Robert's diplo line, the reveal

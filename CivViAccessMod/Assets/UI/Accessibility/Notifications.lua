@@ -116,6 +116,7 @@ Notifications._state = Notifications._state or {
     drainScheduled       = false,
     cache                = {},
     navIndex             = 0,
+    pagerOpen            = false,
     reminderEnabled      = true,
     lastUserActivity     = 0,
     lastReminderAt       = 0,
@@ -304,6 +305,13 @@ end
 local function drain()
     S.drainScheduled = false;
     if #S.pending == 0 then return; end
+    -- The PAGER is open: the user is READING. Buffer everything until the
+    -- reader closes (Noel 2026-06-12: the long help kept getting clobbered
+    -- by the notifier). Re-arm so the close releases the queue.
+    if S.pagerOpen then
+        S.drainScheduled = true;
+        return;
+    end
     local now = timeNow();
     if now - S.batchStartAt < DEBOUNCE_SECONDS or now < S.holdUntil then
         -- Still cooling. Re-arm so the next PublishComplete reattempts.
@@ -570,6 +578,7 @@ end
 -- notification cycle) resets the backoff window to the initial value.
 local function maybeFireReminder()
     if not S.reminderEnabled then return; end
+    if S.pagerOpen then return; end   -- never nag someone mid-read
     local pid = localPlayerID();
     if pid < 0 then return; end
     local count = Notifications.pendingCount(pid);
@@ -665,6 +674,16 @@ local function Initialize()
     end
     if Events.InputActionTriggered ~= nil then
         Events.InputActionTriggered.Add(onInputActionTriggered);
+    end
+    -- The pager broadcasts open/close (cross-VM). While it's open we buffer
+    -- inline announces and mute the idle reminder — reading is sacred.
+    if LuaEvents ~= nil and LuaEvents.CivViAccess_PagerState ~= nil then
+        LuaEvents.CivViAccess_PagerState.Add(function(open)
+            S.pagerOpen = (open == true);
+            if not S.pagerOpen and #S.pending > 0 then
+                S.drainScheduled = true;   -- release the buffer promptly
+            end
+        end);
     end
     S.lastUserActivity = timeNow();
     Log.info("Notifications: subscriptions complete");

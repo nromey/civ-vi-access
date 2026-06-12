@@ -106,6 +106,9 @@ local function close()
     if UIManager ~= nil and UIManager.DequeuePopup ~= nil then
         UIManager:DequeuePopup(ContextPtr);
     end
+    if LuaEvents ~= nil and LuaEvents.CivViAccess_PagerState ~= nil then
+        LuaEvents.CivViAccess_PagerState(false);   -- release buffered notifications
+    end
     Speech.emit("Reader closed", "meta");
 end
 
@@ -144,6 +147,11 @@ function Pager.open(title, text)
             UIManager:QueuePopup(ContextPtr, PopupPriority.Current);
         end
         HandlerStack.push(_handler);
+        -- Tell the notification layer to BUFFER while the user reads
+        -- (cross-VM; Notifications.lua holds its drain + idle reminder).
+        if LuaEvents ~= nil and LuaEvents.CivViAccess_PagerState ~= nil then
+            LuaEvents.CivViAccess_PagerState(true);
+        end
     end
     Speech.emit(_title .. ". Reader, " .. #_parts
         .. ((#_parts == 1) and " part." or " parts."), "critical");

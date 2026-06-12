@@ -71,7 +71,18 @@ function ScannerHandler.dispatch(key, mods)
     elseif key == VK_BACK and mods == MOD_NONE then
         speak(ScannerNav.returnToPreJump());    return true;
     elseif key == VK_HELP and mods == MOD_SHIFT then
-        speak(CHEAT_SHEET, "picker");           return true;   -- `?` (Shift+/) reads the ladder; bare/Ctrl+/ stay unit-stats/recenter
+        -- `?` (Shift+/) reads the ladder; bare/Ctrl+/ stay unit-stats/recenter.
+        -- The cheat-sheet is a PAGE of text — it used to fire as ONE picker-kind
+        -- utterance, which (a) the notification reminder clobbered and (b) the
+        -- history ring excluded (picker = browse chatter), so it was
+        -- unrecoverable (Noel 2026-06-12). Long help belongs in the PAGER:
+        -- sentence-walkable, every part re-readable.
+        if LuaEvents ~= nil and LuaEvents.CivViAccess_OpenPager ~= nil then
+            LuaEvents.CivViAccess_OpenPager("Scanner help", CHEAT_SHEET);
+        else
+            speak(CHEAT_SHEET, "picker");
+        end
+        return true;
     end
     -- NOTE: direction-vocabulary cycle moved from Shift+D to Ctrl+D and now lives in
     -- NavKeys.dispatch (task #14 finalized the D-family: bare=cursor E, Shift=unit E,
