@@ -29,6 +29,7 @@ include("HexCursor");
 include("ScannerAddinGlue");
 include("UnitMovement");
 include("UnitCombat");
+include("BetweenTurns");
 include("NavKeys");
 include("UnitInfo");
 include("CityProduction");

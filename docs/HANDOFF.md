@@ -85,6 +85,29 @@ log-only (COMBAT_DEBUG stays ON) until one shows up.
   is UNVERIFIED — if "river" speaks on the wrong side, swap fromPlot/toPlot in
   `UnitInfo.riverBetween` AND the cliff check it copies.
 
+## NEW (afternoon, untested): overnight briefing + heal-first R
+
+- **`BetweenTurns.lua` (NEW FILE, registered in modinfo + HexCursorAddin):**
+  collects during the AI turns, speaks at the player's turn start:
+  "Overnight: Your Warrior was attacked, lost 25 HP, 45 of 100 left. Your
+  Scout recovered 10 HP, 55 of 100. Enemy Barbarians Warrior 2 east of
+  Amsterdam." Net HP change per own unit (attack + heal in one night net
+  out); recovery speaks so Noel can plan rest-vs-walk-to-city (his ask).
+  Enemy moves are nearest-anchored to his units/cities, closest first, cap 3.
+  Quiet night = silence. Compose is DEFERRED one event pump past
+  LocalPlayerTurnBegin (heal ticks land at PlayerTurnActivated, after turn
+  begin — log-proven) via GameCoreEventPublishComplete.
+- **City damage events:** guard-subscribed (`CityDamageChanged` /
+  `DistrictDamageChanged`, whichever exists) and LOGGED ONLY (`BT_DEBUG`)
+  until a live siege confirms the arg shape — then wire "your city was
+  attacked" into the briefing. Noel once lost track of a barbarian that
+  attacked his city; this is the path to covering that.
+- **R heal-first:** a damaged unit now tries HEAL (fortify-until-healed)
+  before FORTIFY, announces "Warrior healing until full, 45 HP now"; rest
+  states got real spoken forms (fortified / on alert / sleeping).
+- **Still queued for the briefing:** Enter turn-gate, verbosity option
+  (all moves / enemy only / off), re-read key, city-damage speech.
+
 ## Test next (relaunch first — launcher dev-deploys on run)
 
 1. **Queued move:** move a unit until ~1 MP left, Shift+dir into hills →

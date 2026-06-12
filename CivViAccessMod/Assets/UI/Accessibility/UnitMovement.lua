@@ -356,11 +356,11 @@ end
 -- FORTIFY, others fall through. ALERT is included so units that can
 -- defend but aren't combat-fortifiable still have a resting state.
 local REST_CASCADE = {
-    { name = "Sleep",    op = UnitOperationTypes.SLEEP },
-    { name = "Fortify",  op = UnitOperationTypes.FORTIFY },
-    { name = "Alert",    op = UnitOperationTypes.ALERT },
-    { name = "Heal",     op = UnitOperationTypes.HEAL },
-    { name = "SkipTurn", op = UnitOperationTypes.SKIP_TURN },
+    { name = "Sleep",    spoken = "sleeping",            op = UnitOperationTypes.SLEEP },
+    { name = "Fortify",  spoken = "fortified",           op = UnitOperationTypes.FORTIFY },
+    { name = "Alert",    spoken = "on alert",            op = UnitOperationTypes.ALERT },
+    { name = "Heal",     spoken = "healing until full",  op = UnitOperationTypes.HEAL },
+    { name = "SkipTurn", spoken = "skipping turn",       op = UnitOperationTypes.SKIP_TURN },
 };
 
 function UnitMovement.rest()
@@ -375,12 +375,32 @@ function UnitMovement.rest()
         Speech.emit("Not your unit", "meta");
         return;
     end
-    for _, entry in ipairs(REST_CASCADE) do
+    -- A DAMAGED unit tries HEAL ("fortify until healed") FIRST, so R on a hurt
+    -- warrior keeps it resting until mended and wakes it after (Noel
+    -- 2026-06-12) — plain Fortify would accept first and never end. Healthy
+    -- units keep the original order.
+    local cascade = REST_CASCADE;
+    local damaged = false;
+    pcall(function() damaged = (pUnit:GetDamage() or 0) > 0; end);
+    if damaged then
+        cascade = {};
+        for _, e in ipairs(REST_CASCADE) do
+            if e.name == "Heal" then table.insert(cascade, 1, e);
+            else cascade[#cascade + 1] = e; end
+        end
+    end
+    for _, entry in ipairs(cascade) do
         local ok = UnitManager.CanStartOperation(
             pUnit, entry.op, nil, false, OperationResultsTypes.NO_TARGETS);
         if ok then
             UnitManager.RequestOperation(pUnit, entry.op, nil);
-            Speech.emit(unitTypeName(pUnit) .. " " .. string.lower(entry.name), "event");
+            local msg = unitTypeName(pUnit) .. " " .. entry.spoken;
+            if entry.name == "Heal" then
+                local hp = nil;
+                pcall(function() hp = (pUnit:GetMaxDamage() or 100) - (pUnit:GetDamage() or 0); end);
+                if hp ~= nil then msg = msg .. ", " .. hp .. " HP now"; end
+            end
+            Speech.emit(msg, "event");
             return;
         end
     end
