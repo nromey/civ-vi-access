@@ -25,7 +25,10 @@
 
 include("Log");
 
-local DEBUG_FORCE_MEET = true;   -- master switch
+local DEBUG_FORCE_MEET = false;  -- master switch — DISABLED 2026-06-12 (was force-
+                                 -- meeting civs Noel never met every reload, spamming
+                                 -- "Historic Moment / meeting the X" notifications).
+                                 -- Set true only to re-test the accessible diplo screen.
 local START_TURN       = 2;      -- skip turn 1 so first-turn popups don't collide
 local _hasFired        = false;  -- one-shot: meet a single civ, then disarm
 

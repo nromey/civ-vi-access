@@ -4,128 +4,118 @@
 Full history is in `git log` — don't make dated copies. The ordered plan is in
 `docs/TASK_PLAN.md`; durable facts are in memory.
 
-_Last updated: 2026-06-11._
+_Last updated: 2026-06-11 (evening checkpoint)._
 
-## Shipped (committed + pushed)
+---
+
+## RESUME HERE — first thing tomorrow
+
+**State:** everything below is **committed as an UNTESTED evening checkpoint** (no
+release, no version bump). The launcher dev-deploys mod source on run, so just
+**relaunch** and it's live. The two big pieces (the #14 key migration and combat)
+have **never been run** — testing them is the first job.
+
+**Test in THIS order (relaunch first):**
+
+1. **Nav migration — the headline.** The cursor + unit-move keys moved off the dead
+   InputAction path onto the wrap (`NavKeys.lua`).
+   - **Bare Q/E/A/D/Z/C** → moves the **cursor**, speaks the tile. (Q=NW E=NE A=W D=E Z=SW C=SE)
+   - **Shift + Q/E/A/D/Z/C** → moves the **unit** one hex → *"Warrior moved \<dir\>, N moves."*
+     **This was silent/dead before — it's the main thing to confirm.** Shift+D = unit east.
+   - **Ctrl+D** → *"Direction mode: compass / clock / …"* (vocab moved here off Shift+D).
+   - **Bare A** = cursor west (NOT attack); **Ctrl+A** = attack.
+2. **The fixes that ride with it** (verify while moving around):
+   - Selecting your lone unit (comma) now **snaps the cursor onto it** (press W to confirm).
+   - Moving into rough terrain after you've already moved → *"moving \<dir\>, not enough
+     moves this turn, arrives next turn"* (NOT "blocked"). Water/mountain still "blocked, reason".
+   - **No more "Historic Moment / meeting the …" spam** (debug meet disabled).
+3. **Combat (Ctrl+A)** — needs an enemy. Scan to a barbarian, get your Warrior adjacent,
+   **Ctrl+A** → hear the odds preview → **Ctrl+A again** → it attacks. Send the log: I need
+   to confirm the `SimulateAttackVersus` numbers read right (you-deal vs you-take not
+   swapped) and the `onUnitDamageChanged`/`onUnitKilledInCombat` arg shapes (logged via
+   `COMBAT_DEBUG`).
+
+**After a green test:** update CLAUDE.md + HOTKEY_REFERENCE to say the migration is
+*verified* (right now they describe it as in-flight); wire combat "part 3" (the kill
+announce) from the logged arg shapes; strip `COMBAT_DEBUG`. THEN consider a release.
+
+---
+
+## Shipped (committed + pushed, verified)
 
 - **v0.6.0** launcher (capture-all input, scanner v1, diplomacy rebuild).
-- **P0 Prism backend** — camm **0.6.0** (tag, commit `743e9fa`) + civ-vi-access
-  gitlink bump (`0706ba6`), both pushed. `IScreenReader` + Tolk/Prism (own
-  `[LibraryImport]` P/Invoke), `ScreenReaderFactory` Prism→Tolk fallback, manifest
-  `ScreenReaderBackend` + `CAMM_SCREEN_READER_BACKEND` override. Prism built from
-  source: pinned submodule `camm/third_party/prism` @ bb68308.
+- **P0 Prism backend** — camm **0.6.0** (`743e9fa`) + gitlink bump (`0706ba6`), pushed.
+- **0.6.1** (`a17ab83`, local, not tagged) — scanner backends (#8), survey/zoom (#19/#17),
+  move-to (#10), slash split. **Tested live 2026-06-11.**
+- **docs** (`5a2e68e`) — input-model accuracy fix + memory authority rules + hotkey audit.
 
-## Committed this session — `CivViAccessMod/` batch, version bumped to 0.6.1
+## Evening checkpoint — committed, NOT yet tested (this is the resume target)
 
-Tested live 2026-06-11, log-verified, then committed (NOT yet tagged/released —
-that's the open "how to move forward" decision). CHANGELOG 0.6.1 + csproj
-`<Version>` bumped together.
+### #14 capture-all key migration
+Root-caused from the log: the unit-move (Shift+dir) InputAction was DEAD. Migrated the
+hex cluster onto the wrap:
+- `NavKeys.lua` (NEW) — bare cluster → `HexCursor.move`; Shift+cluster →
+  `UnitMovement.directMove`; **Ctrl+D → direction-vocab**.
+- Wrap added bare + Shift combos for the cluster + Ctrl+D. **D-family finalized:** bare
+  D cursor-east / Shift+D unit-east / Ctrl+D vocab (vocab moved off Shift+D — the one
+  real collision). Glue routes NavKeys first; ScannerHandler's Shift+D vocab removed.
+- Old `CIVVIACCESS_Cursor*/Move*` InputActions left in `RemapForHexCursor.xml` (wrap
+  suppresses them; also a revert fallback). Alt+letter engine-actions NOT migrated yet
+  ("map some engine keys, not all" — follow-up). Log check: `NavKeys` lines present, NO
+  `CIVVIACCESS_Cursor*/Move*` InputActionTriggered.
 
-- **#8 scanner backends** — `ScannerBackendImprovements` / `Geography` (hybrid:
-  flood-fill revealed land named by dominant continent + numbered oceans) /
-  `Recommendations`. Validated live.
-- **#19 survey + #17 zoom** — `ScannerSurvey.lua`, cursor-centered radius census.
-  `S` survey, `Alt+S` sonify (STUB), `Alt+G/U/R` category, `Alt+1–9`/`0`/`=`/`-`
-  zoom (map-size-aware). `W`/`Shift+W` where-am-I (migrated off bare-S). Validated.
-- **P2 move-to** — `UnitMovement.lua`: `M` move-to-cursor (engine auto-paths),
-  `Shift+M` preview (`GetMoveToPathEx`), `Ctrl+M` cancel. Arrival + turn-begin
-  progress; en-route status in `StringifyUnit`. Enemy-occupied target refused
-  ("… on target. Combat coming in a future release."). Validated live, incl. the
-  barbarian-target refusal (warrior kept its moves — working as designed).
-- **Fixes** — slash split (bare `/` = unit stats, `Ctrl+/` = recenter, only
-  `Shift+/` = cheat-sheet; was a regression where any-mod `/` fired help);
-  barbarians classify as "enemy"; single-unit cycle selects + names the lone unit.
+### Combat P3 (`UnitCombat.lua`)
+No engine fork — `CombatManager.SimulateAttackVersus` (odds), `IsAttackChangeWarState`
+(war warning), `CanAttackTarget` (validity). Melee = `MOVE_TO`+`ATTACK` modifier; ranged
+= `RANGE_ATTACK`; civilian = capture. One preview→confirm→commit engine, two entry
+points: **Ctrl+A** (cursor target, works ranged) + **move-into-enemy** (M/Alt+dir
+redirects the old "combat coming" guard here). Part 3 (result announces) is INSTRUMENTED
+(`COMBAT_DEBUG` logs event args) but not final. Known MVP gaps: non-adjacent melee says
+"move closer"; defender = first enemy on the plot (civilian-under-escort edge case).
 
-## IN PROGRESS — Combat P3 (built 2026-06-11, UNCOMMITTED, pending live test)
+### Small fixes (same checkpoint)
+- Move announce leads with the unit name ("Warrior moved west, N moves").
+- Cursor-follows-selected-unit: the "only one unit" path now snaps the cursor onto it.
+- Queued-move vs block: `resolveAndSpeak` checks `GetQueuedDestination` → "moving \<dir\>,
+  arrives next turn" instead of "blocked" when the engine defers the move.
+- `DiploDebugMeet` `DEBUG_FORCE_MEET = false` (was force-meeting civs every reload).
 
-Agreed sequence: **combat → reporting (paged) → sonification**. Combat first.
+## Combat — next layer (queued, after the MVP tests green)
 
-`CivViAccessMod/Assets/UI/Accessibility/UnitCombat.lua` (NEW) — no engine fork;
-Civ VI exposes `CombatManager.SimulateAttackVersus` (odds), `IsAttackChangeWarState`
-(war warning), `CanAttackTarget` (validity). Melee = `MOVE_TO` + `ATTACK` modifier;
-ranged = `RANGE_ATTACK` op; civilian = capture (plain `MOVE_TO`). One
-preview→confirm→commit engine, two entry points:
-- **Ctrl+A** = attack hex-cursor target (first press previews odds + war warning +
-  arms; Ctrl+A again commits). Works for ranged at distance. NOTE: first try bound
-  bare A, which stomped cursor-west (bare QEADZC = cursor, Shift+QEADZC = unit move,
-  both A's taken) — moved to Ctrl+A 2026-06-11.
-- **Move-into-enemy** = `M`/`Alt+dir` onto an adjacent enemy redirects into the same
-  flow (UnitMovement's old "combat coming" guards now call `UnitCombat.requestAttackAt`).
-Wired: modinfo (both blocks), `include("UnitCombat")` in HexCursorAddin, dispatch in
-ScannerAddinGlue (after movement). HOTKEY_REFERENCE updated.
+- **Smarter defender + escort phrasing** — strongest enemy military as defender; read
+  stacks "defender first, escorting X"; corps/army/fleet/armada via `GetMilitaryFormation`.
+- **District combat targets** — Encampments + city walls; read both HP pools
+  (`DefenseTypes.DISTRICT_OUTER/_GARRISON`); `SimulateAttackVersus` returns wall hits as
+  `CombatResultParameters.DEFENSE_DAMAGE_TO`. "Bring siege"; ranged can't capture.
+- **Survey unit subcategories** — **Threats** (hostile combat units) + **My units**.
+- **Between-turns AI movement** — accumulate foreign-visible moves during the AI turn,
+  summarize at turn-begin; **gate the turn on Enter**, re-readable; verbosity option
+  (all moves / enemy only / off). Exclude trade units.
 
-**TEST + what the log must confirm (then I wire part 3 / commit):**
-- Scan to the barbarian Scout, select your Warrior adjacent → press **A**: expect
-  "Attack Scout. Warrior 20 versus 10. You deal N, take M. <verdict>. Press A again
-  to confirm." → **A** again → "Warrior attacks Scout." Then the engine resolves.
-- Verify the `SimulateAttackVersus` numbers read right (DAMAGE_TO = damage RECEIVED
-  by each side — confirm "you deal/take" aren't swapped). Grep `UnitCombat` in Lua.log.
-- Part 3 announces are INSTRUMENTED not final: `COMBAT_DEBUG=true` logs
-  `onUnitDamageChanged` / `onUnitKilledInCombat` arg shapes. The "under attack, N HP"
-  line assumes `(playerID, unitID, newDamage, prevDamage)` — confirm from the log,
-  then wire the kill announce + fix damage announce. **Strip COMBAT_DEBUG before release.**
-- Known MVP gaps: non-adjacent melee says "move closer" (no auto-path-to-attack);
-  best-defender picks first enemy unit on the plot (civilian-under-escort edge case).
+## Other queued work (detail in memory — see MEMORY.md)
 
-### Combat — next layer (queued, after the MVP tests green)
+- **Sequence:** combat → **paged reports** (`project_empire_status_expansion` — one
+  Reports surface, page between economy/military/cities/etc.) → **sonification**
+  (the `Alt+S` survey stub + JJFlex waterfall toolkit).
+- **Help pager + context-sensitive `?`** (`project_help_pager_and_context_help`) — paged
+  long-text reader that buffers notifications while active; `?` becomes context-aware.
+- **Unit state surfacing** (`project_unit_state_surfacing`) — sleeping/fortifying/healing/
+  en-route in the slash readout + scanner via a shared `unitStatus()` helper; + a
+  cancel/wake key.
+- **Keymap profiles + Civ V F-key compat** (`project_keymap_profiles_civ_v_compat`).
+- **Notification anti-clobber + verbosity options** (rides with the pager).
 
-Civ VI-specific surfaces, all discussed 2026-06-11:
-- **Smarter defender + escort phrasing** — pick the strongest enemy military unit as
-  the defender (not first-on-tile); read stacks "defender first, escorting X";
-  append corps/army/fleet/armada via `pUnit:GetMilitaryFormation()`.
-- **District combat targets** — Encampments + city walls. Read both HP pools:
-  `pDistrict:GetMaxDamage(DefenseTypes.DISTRICT_OUTER/_GARRISON)` (walls vs city HP);
-  `SimulateAttackVersus` already returns wall hits separately as
-  `CombatResultParameters.DEFENSE_DAMAGE_TO`. "Bring siege" when walls up; ranged
-  can't capture. Extend `UnitCombat.classifyAttack` (today it no-ops on districts).
-- **Survey unit subcategories** — add **Threats** (hostile combat units, civilians
-  excluded — the "is anything coming for me" scan) and **My units**; civilians +
-  land/sea later. Long-term: per-owner filters + user-built custom categories
-  (Civ V Access model) once the survey earns a settings surface.
-- **Between-turns AI movement awareness** (the P3 "speak units that moved" item /
-  Civ V Access "Unit Moves" log) — we already get `UnitMoveComplete` for AI units
-  (we discard non-own). ACCUMULATE foreign-visible moves during the AI turn, SUMMARIZE
-  at `LocalPlayerTurnBegin` ("while you were away: Scout now 3 NE"); never speak live.
-  Reviewable log; later owner filters + exclude trade units (caravans clutter).
-  NOTE: today's "barbarians approaching" is an engine NOTIFICATION, not this tracker.
+## Open items / known gaps (not blocking)
 
-## Open items raised live 2026-06-11 (not blocking)
-
-- **Global "repeat last announce"** — Noel hit `R` expecting a repeat and got
-  Rest. Want a consistent repeat-last key (JJFlex/NVDA style). There's already a
-  `CIVVIACCESS_RepeatAnnounce` action — wire/standardize it as the global repeat.
-  Fold into the key-registry work (`project_key_registry_announce_learn`).
-- **Move-adjacent affordance for enemy targets** — move-to onto an enemy is
-  (correctly) refused since combat is P3. `directMove` already phrases it as
-  "<enemy> <dir>"; move-to could hint "move adjacent" / pick the best adjacent
-  hex. Real answer lands with combat (P3).
-- **Pluralization "1 hexes" → "1 hex"** — deferred to its own small commit.
-  Two layers: ad-hoc Lua concat (`ScannerSurvey`, `ScreenReaderPlotUtils`) needs a
-  shared `hexCount(n)`; the `LOC_CIVVIACCESS_DIR_*_PHRASE` strings (compass/clock/
-  degrees in `HexGeom`) need LOC plural handling.
-- **Repo hygiene** — `CLAUDE.md` and this `HANDOFF.md` were untracked; committed
-  this session.
-
-## Test status / risk flags (verify in deeper play; all pcall-guarded)
-
-- **Enemy-halt behavior still UNVERIFIED** — no friendly-vs-enemy move-through
-  case tested. Verify "does an auto-move stop on enemy contact"; if it stalls
-  silently, add a "movement paused" announce.
-- Survey perf: `S` runs ALL backends (incl. geography flood-fill) each press —
-  may lag on big maps; scope the gather down if so.
-- Digit zoom `Alt+1–9` depends on the Civ VI `Keys` digit enum; `Alt+=/-` is the
-  reliable fallback.
-
-## Next decision (Noel to pick)
-
-- **Combat (P3)** — move-to is exposing the gap (the barbarian-target refusal);
-  unblocks enemy interaction + the move-adjacent affordance.
-- **Phase 2 move** — manual waypoint legs + worker route-to (auto-build road).
-- **Unexplored as a navigable category** — flood-fill fog → frontier targets →
-  move-to = steerable manual exploration (`project_map_exploration_report`).
-- **Search-to-center (#12)** — "search Lisbon → cursor jumps → survey/route."
+- Global "repeat last announce" key (Noel hit R, got Rest; `CIVVIACCESS_RepeatAnnounce`
+  exists — standardize it).
+- Pluralization "1 hexes" → "1 hex" (shared `hexCount(n)` + the `LOC_*_PHRASE` strings).
+- A queued directional move arrives SILENTLY next turn (no "arrived" announce) — minor.
+- Enemy-halt on auto-move still unverified (no enemy tested).
+- Survey perf: `S` runs all backends incl. geography flood-fill each press.
 
 ## Heads-up
 
-- A second session may be active — keep sessions on **different files**.
+- A second session may be active — keep sessions on **different files** (the scanner
+  help LOC string `CivVIAccessStrings.xml` was edited outside this session).
 - The launcher dev-deploys mod source on run, so a relaunch picks up edits.

@@ -29,16 +29,22 @@ If you're about to ask the user something, check these first — it's probably a
   is on:
   - **ON the wrap (reliable, speaks):** scanner ladder (PageUp/Down/Home/End/
     Backspace), survey+zoom (S, W, Shift+W, Alt+G/U/R, Alt+digits/±), move-to (M /
-    Shift+M / Ctrl+M), combat (Ctrl+A), Shift+/ (`?`), Shift+D.
-  - **STILL on the legacy engine InputAction path (`Assets/Data/RemapForHexCursor.xml`)
-    — FLAKY, can fire silently or NOT AT ALL:** the hex-cursor move (**bare**
-    Q/E/A/D/Z/C), the unit one-hex move (**Shift+**Q/E/A/D/Z/C), and the rebound engine
-    letter-actions (**Alt+**Q/A/Z/C = resources/attack/sleep/civics, which are SILENT).
-    Verified from Lua.log 2026-06-11 that the Shift+dir unit-move was DEAD (no move, no
-    speech, no log line).
-  - **Task #14 = migrate ALL of the above onto the wrap**, rule: *every map key speaks*
-    (a mod action that talks, or an engine command we forward AND announce — no silent
-    keys). This is the north star Noel keeps pointing at.
+    Shift+M / Ctrl+M), combat (Ctrl+A), Shift+/ (`?`).
+  - **JUST MIGRATED onto the wrap (`NavKeys.lua`, committed 2026-06-11, UNVERIFIED —
+    test before trusting):** the hex-cursor move (**bare** Q/E/A/D/Z/C →
+    `HexCursor.move`), the unit one-hex move (**Shift+**Q/E/A/D/Z/C →
+    `UnitMovement.directMove`), and **Ctrl+D = direction-vocab** (moved off Shift+D, so
+    the D-family is now bare=cursor-E / Shift=unit-E / Ctrl=vocab, mirroring A). This was
+    the #14 fix for the DEAD Shift+dir unit-move (Lua.log 2026-06-11: no move/speech/log).
+    The old `CIVVIACCESS_Cursor*/Move*` InputActions still sit in `RemapForHexCursor.xml`
+    but the wrap suppresses them. **If a fresh session sees this UNVERIFIED note, the
+    first job is to live-test it (see `docs/HANDOFF.md`).**
+  - **STILL on the legacy engine InputAction path — FLAKY, SILENT:** only the rebound
+    engine letter-actions remain (**Alt+**Q/A/Z/C = resources/attack/sleep/civics). The
+    "map some engine keys, not all" follow-up owns + announces (or eats) these.
+  - **Task #14 rule (now mostly done): *every map key speaks*** — a mod action that talks,
+    or an engine command we forward AND announce (no silent keys). Remaining: the Alt
+    engine-actions above. This is the north star Noel keeps pointing at.
   - **To add a NEW map key:** put it on the wrap (`SCANNER_KEYS` any-mod / `SCANNER_COMBOS`
     exact key+mods), NOT a new engine InputAction.
   - **When the user reports a key did/said nothing: READ THE Lua.log FIRST** (grep the

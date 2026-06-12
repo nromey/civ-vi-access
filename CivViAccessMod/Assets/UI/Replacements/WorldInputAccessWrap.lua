@@ -60,7 +60,20 @@ end
 local SCANNER_COMBOS = {};
 local function addCombo(k, m) if k ~= nil then SCANNER_COMBOS[#SCANNER_COMBOS + 1] = { key = k, mods = m }; end end
 if Keys ~= nil then
-    addCombo(Keys.D, InputRouter.MOD_SHIFT);   -- Shift+D = cycle direction vocabulary
+    -- Hex-cluster navigation (task #14): cursor on BARE Q/E/A/D/Z/C, unit move on
+    -- SHIFT+cluster. Migrated off the flaky engine InputAction path onto the wrap so
+    -- every press reliably reaches NavKeys.dispatch and SPEAKS (the unit-move was
+    -- firing silently / not at all on the old path). Engine letter-actions stay on
+    -- Alt (not captured here yet — "map some engine keys, not all").
+    for _, navKey in ipairs({ Keys.Q, Keys.E, Keys.A, Keys.D, Keys.Z, Keys.C }) do
+        if navKey ~= nil then
+            addCombo(navKey, 0);                       -- bare = move cursor
+            addCombo(navKey, InputRouter.MOD_SHIFT);   -- Shift = move unit
+        end
+    end
+    -- D-family finalized: bare D = cursor east, Shift+D = unit east (both above),
+    -- Ctrl+D = cycle direction vocabulary (moved off Shift+D to free the cluster).
+    if Keys.D ~= nil then addCombo(Keys.D, InputRouter.MOD_CTRL); end
     -- Survey + zoom family (routed to ScannerSurvey in the addin VM; see
     -- HOTKEY_REFERENCE.md). Exact combos so other modifiers on these letters still
     -- reach the engine. (Bare S is captured above as a scanner key.)
@@ -82,6 +95,11 @@ if Keys ~= nil then
     addCombo(Keys.M, 0);
     addCombo(Keys.M, InputRouter.MOD_SHIFT);
     addCombo(Keys.M, InputRouter.MOD_CTRL);
+    -- Combat (P3): Ctrl+A = attack the hex cursor target (preview, then Ctrl+A again
+    -- to confirm). NOT bare A (= cursor west) and NOT Shift+A (= move unit west) —
+    -- Ctrl completes the A-family without stomping either. Ctrl chords pass through
+    -- screen readers; only the exact Ctrl combo is captured.
+    addCombo(Keys.A, InputRouter.MOD_CTRL);
     -- Shift+`/` (`?`) = scanner cheat-sheet. Bare `/` and Ctrl+`/` deliberately
     -- left to their InputActions (unit stats / recenter) — see SCANNER_KEYS note.
     addCombo(Keys.VK_OEM_2, InputRouter.MOD_SHIFT);

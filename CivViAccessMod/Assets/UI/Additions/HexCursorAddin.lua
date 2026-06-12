@@ -28,6 +28,8 @@ include("HexCursor");
 -- capture-all wrap (LuaEvents.CivViAccess_ScannerInput).
 include("ScannerAddinGlue");
 include("UnitMovement");
+include("UnitCombat");
+include("NavKeys");
 include("UnitInfo");
 include("CityProduction");
 include("Notifications");
@@ -393,6 +395,13 @@ local function OnGameCoreEventPublishComplete()
     if UI ~= nil and UI.SelectUnit ~= nil then
         local cur = (UI.GetHeadSelectedUnit ~= nil) and UI.GetHeadSelectedUnit() or nil;
         if cur ~= unit then pcall(function() UI.SelectUnit(unit); end); end
+    end
+    -- Snap the cursor onto the unit so it's positioned to move/inspect — even when
+    -- selection DIDN'T change (single already-selected unit), where the UnitInfo
+    -- cursor-follow never fires because no UnitSelectionChanged event is raised.
+    -- (Noel 2026-06-11: pressed comma on his lone Warrior, cursor stayed on the city.)
+    if HexCursor ~= nil and HexCursor.jumpTo ~= nil then
+        pcall(function() HexCursor.jumpTo(unit:GetX(), unit:GetY()); end);
     end
     local name = (StringifyUnit ~= nil) and StringifyUnit(unit) or "unit";
     Speech.emit("Only one unit, " .. name, "meta");

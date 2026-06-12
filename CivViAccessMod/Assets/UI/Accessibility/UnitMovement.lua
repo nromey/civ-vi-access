@@ -146,15 +146,16 @@ function UnitMovement.directMove(direction)
         return;
     end
     local tx, ty = target:GetX(), target:GetY();
-    -- Combat is deferred to a future release per project_04_in_game_plan +
-    -- the 0.5.x Playable Basics scope. If the target plot has an enemy,
-    -- refuse the move with a helpful message rather than letting
-    -- MoveUnitToPlot route to RANGE_ATTACK / COASTAL_RAID / ATTACK.
+    -- Enemy on the adjacent target -> route into the combat preview/confirm flow
+    -- (P3). Moving a melee unit into an adjacent enemy IS the attack; UnitCombat
+    -- previews the odds on the first press and commits on the second.
     local enemy = enemyAt(target, localPlayerID);
     if enemy ~= nil then
-        Speech.emit(
-            unitTypeName(enemy) .. " " .. DIR_NAMES[direction]
-            .. ". Combat coming in a future release.", "meta");
+        if UnitCombat ~= nil and UnitCombat.requestAttackAt ~= nil then
+            UnitCombat.requestAttackAt(pUnit, target);
+        else
+            Speech.emit(unitTypeName(enemy) .. " " .. DIR_NAMES[direction] .. ".", "meta");
+        end
         return;
     end
     -- 0-MP gate. Without this the engine accepts the move and queues it
@@ -234,23 +235,43 @@ local function resolveAndSpeak()
     -- operation silently. Speak that explicitly rather than misleading
     -- "Moved" or "Stopped short" — both of which imply some motion.
     if x == snap.startX and y == snap.startY then
-        -- Passed the pre-check but didn't budge — almost always enemy zone of
-        -- control from an adjacent unit, sometimes a terrain edge. Name it
-        -- (Noel 2026-06-01: "blocked a few times without finding out why").
+        -- The move may have been ACCEPTED but DEFERRED to next turn: the unit had
+        -- already moved this turn and can't afford the target tile's MP cost now
+        -- (rough terrain — hills cost 2). The engine QUEUES it rather than refusing,
+        -- so the unit doesn't budge THIS turn. That's NOT a block (Noel 2026-06-12:
+        -- "desert hills shouldn't block a warrior" — it didn't; the move was queued).
+        if UnitManager ~= nil and UnitManager.GetQueuedDestination ~= nil then
+            local okDest, destId = pcall(function() return UnitManager.GetQueuedDestination(pUnit); end);
+            if okDest and destId ~= nil and Map ~= nil and Map.GetPlotByIndex ~= nil then
+                local dest = Map.GetPlotByIndex(destId);
+                if dest ~= nil and dest:GetX() == snap.targetX and dest:GetY() == snap.targetY then
+                    Speech.emit(unitTypeName(pUnit) .. " moving " .. (DIR_NAMES[snap.direction] or "?")
+                        .. ", not enough moves this turn, arrives next turn.", "move_result");
+                    return;
+                end
+            end
+        end
+        -- No queued move -> a real block. Passed the pre-check but didn't budge —
+        -- almost always enemy zone of control from an adjacent unit, sometimes a
+        -- terrain edge. Name it (Noel 2026-06-01: "blocked without finding out why").
         local why = blockedReason(Map.GetPlot(snap.startX, snap.startY),
                                   Map.GetPlot(snap.targetX, snap.targetY), snap.direction);
         if why == nil and enemyAdjacent(snap.startX, snap.startY, snap.playerID) then
             why = "enemy zone of control";
         end
-        local msg = "Move blocked " .. (DIR_NAMES[snap.direction] or "?");
+        local msg = unitTypeName(pUnit) .. " blocked " .. (DIR_NAMES[snap.direction] or "?");
         if why ~= nil then msg = msg .. ", " .. why; end
         Speech.emit(msg, "move_result");
         return;
     end
+    -- Lead with the UNIT NAME (Noel 2026-06-11): "Warrior moved west" not "Moved
+    -- west". A directional press is always one hex, so distance is implicit; the
+    -- moves-remaining is the useful number. (Multi-hex distance lives on move-to / M.)
     local direction = DIR_NAMES[snap.direction] or "?";
+    local name = unitTypeName(pUnit);
     local reached = (x == snap.targetX and y == snap.targetY);
-    local lead = reached and ("Moved " .. direction)
-                          or ("Stopped short " .. direction);
+    local lead = reached and (name .. " moved " .. direction)
+                          or (name .. " stopped short " .. direction);
     local mpText = formatMovesRemaining(pUnit:GetMovesRemaining());
     Speech.emit(lead .. ". " .. mpText, "move_result");
     if HexCursor ~= nil and HexCursor.jumpTo ~= nil then
@@ -621,10 +642,16 @@ end
 function UnitMovement.moveToCursor()
     local pUnit, lp, cx, cy, endPlot = moveToContext();
     if pUnit == nil then return; end
-    -- Combat is deferred (project_04_in_game_plan): refuse a target an enemy sits on.
+    -- Enemy on the target -> route into the combat preview/confirm flow (P3).
+    -- Melee only via this path; UnitCombat refuses a non-adjacent melee with a
+    -- "move closer" hint, and ranged units are nudged to the A key.
     local enemy = enemyAt(endPlot, lp);
     if enemy ~= nil then
-        Speech.emit(unitTypeName(enemy) .. " on target. Combat coming in a future release.", "meta");
+        if UnitCombat ~= nil and UnitCombat.requestAttackAt ~= nil then
+            UnitCombat.requestAttackAt(pUnit, endPlot);
+        else
+            Speech.emit(unitTypeName(enemy) .. " on target.", "meta");
+        end
         return;
     end
     local tParameters = {};

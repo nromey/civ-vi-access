@@ -72,15 +72,10 @@ function ScannerHandler.dispatch(key, mods)
         speak(ScannerNav.returnToPreJump());    return true;
     elseif key == VK_HELP and mods == MOD_SHIFT then
         speak(CHEAT_SHEET, "picker");           return true;   -- `?` (Shift+/) reads the ladder; bare/Ctrl+/ stay unit-stats/recenter
-    elseif key == VK_D and mods == MOD_SHIFT then
-        -- Cycle hex -> compass -> clock -> degrees and speak the new mode name.
-        -- HexGeom lives in this VM (loaded by ScannerNav), so the toggle and
-        -- every direction readout share one mode state.
-        if HexGeom ~= nil and HexGeom.cycleDirectionMode ~= nil then
-            speak(HexGeom.cycleDirectionMode(), "picker"); return true;
-        end
-        return false;
     end
+    -- NOTE: direction-vocabulary cycle moved from Shift+D to Ctrl+D and now lives in
+    -- NavKeys.dispatch (task #14 finalized the D-family: bare=cursor E, Shift=unit E,
+    -- Ctrl=vocab). Shift+D here would never fire anyway — NavKeys claims it first.
     return false;
 end
 

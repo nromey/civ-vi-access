@@ -59,10 +59,18 @@ Scanner.cursor = {
 if LuaEvents ~= nil and LuaEvents.CivViAccess_ScannerInput ~= nil then
     LuaEvents.CivViAccess_ScannerInput.Add(function(key, mods)
         local handled = false;
-        -- Survey / zoom / locate family first (S, W, Alt+G/U/R, Alt+digit). Anything
+        -- Hex-cluster nav FIRST (bare Q/E/A/D/Z/C = cursor, Shift+cluster = unit move,
+        -- Ctrl+D = direction vocab) — the most frequent presses, migrated onto the wrap
+        -- (task #14). Claims only those (key,mods); everything else falls through.
+        if NavKeys ~= nil and NavKeys.dispatch ~= nil then
+            local ok, h = pcall(function() return NavKeys.dispatch(key, mods); end);
+            if ok then handled = (h == true);
+            else Log.warn("ScannerAddinGlue: nav dispatch failed: " .. tostring(h)); end
+        end
+        -- Survey / zoom / locate family (S, W, Alt+G/U/R, Alt+digit). Anything
         -- it doesn't claim falls through to the scanner ladder (PageUp/Down/Home/
         -- End/Backspace/?).
-        if ScannerSurvey ~= nil and ScannerSurvey.dispatch ~= nil then
+        if not handled and ScannerSurvey ~= nil and ScannerSurvey.dispatch ~= nil then
             local ok, h = pcall(function() return ScannerSurvey.dispatch(key, mods); end);
             if ok then handled = (h == true);
             else Log.warn("ScannerAddinGlue: survey dispatch failed: " .. tostring(h)); end
@@ -71,6 +79,13 @@ if LuaEvents ~= nil and LuaEvents.CivViAccess_ScannerInput ~= nil then
             local ok, h = pcall(function() return UnitMovement.dispatch(key, mods); end);
             if ok then handled = (h == true);
             else Log.warn("ScannerAddinGlue: movement dispatch failed: " .. tostring(h)); end
+        end
+        -- Combat (A = attack at cursor). After movement so M/Alt+dir stay movement
+        -- (they redirect INTO combat themselves when the target is an enemy).
+        if not handled and UnitCombat ~= nil and UnitCombat.dispatch ~= nil then
+            local ok, h = pcall(function() return UnitCombat.dispatch(key, mods); end);
+            if ok then handled = (h == true);
+            else Log.warn("ScannerAddinGlue: combat dispatch failed: " .. tostring(h)); end
         end
         if not handled and ScannerHandler ~= nil and ScannerHandler.dispatch ~= nil then
             local ok, err = pcall(function() handled = ScannerHandler.dispatch(key, mods); end);
