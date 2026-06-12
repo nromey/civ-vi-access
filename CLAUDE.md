@@ -89,6 +89,13 @@ If you're about to ask the user something, check these first — it's probably a
   not inline English. Register via `<UpdateText>` in the modinfo.
 - **Logs** are at `AppData\Local\Firaxis Games\Sid Meier's Civilization VI\Logs\`
   (NOT Documents — OneDrive). Grep them directly. Mod folder is `CivViAccessMod`.
+  **The live Lua.log only covers the CURRENT session** (the game truncates on
+  launch) — but the launcher archives every prior session's Lua/Database/Modding
+  logs to `AppData\Local\CivViAccess\logs-archive\<name>-<timestamp>.log.gz`
+  (30-day retention, camm `LogArchiver`). When Noel reports something from an
+  earlier session, `zcat`/grep the archives — do NOT conclude "no evidence" from
+  the live log alone. (This caught a false green on 2026-06-12: a key believed
+  tested had never fired in any of seven archived sessions.)
 
 ## Memory & handoff policy (keeps MEMORY.md from constantly hitting its cap)
 
