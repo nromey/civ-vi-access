@@ -127,6 +127,18 @@ InputActions remain in `RemapForHexCursor.xml` but the wrap suppresses them
   Civ V's `Ctrl+[`/`]` (oldest/newest) and `Shift+[`/`]` (filter) ladder is
   still future work.
 
+### Speech history — Shift+R (UPGRADED 2026-06-12)
+
+- **Shift+R** (once) — repeat the last announce verbatim, any kind, from any
+  VM. **Shift+R again** — walk BACK through the last 20 meaningful announces,
+  newest first ("Back 2. Uncovered 6 hexes: ..."); nav/picker browse chatter
+  is excluded from the walk. Any new announce resets it; the oldest entry
+  says "End of history". *Wrap combo → `SpeechHistory.lua` (fed by the
+  `CivViAccess_SpeechEmitted` broadcast inside Speech.emit). The legacy
+  `CIVVIACCESS_RepeatAnnounce` InputAction remains as a dead fallback. Depth
+  becomes a setting when the accessibility options tab exists. The pager
+  (next deliverable) will render long entries.*
+
 ### Government — bare G (NEW 2026-06-12)
 
 - **G** — open **My Government** (announces the current government), then

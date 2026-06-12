@@ -87,6 +87,10 @@ if Keys ~= nil then
     addCombo(Keys.G, 0);
     addCombo(Keys.U, InputRouter.MOD_ALT);     -- Alt+U = survey category: units
     addCombo(Keys.R, InputRouter.MOD_ALT);     -- Alt+R = survey category: resources
+    -- Shift+R = repeat last announce / walk the speech history (SpeechHistory).
+    -- Migrated from the legacy CIVVIACCESS_RepeatAnnounce InputAction; the wrap
+    -- consuming it suppresses that action (kept as a dead fallback).
+    addCombo(Keys.R, InputRouter.MOD_SHIFT);
     if Keys.VK_OEM_PLUS  ~= nil then addCombo(Keys.VK_OEM_PLUS,  InputRouter.MOD_ALT); end  -- Alt+= zoom in
     if Keys.VK_OEM_MINUS ~= nil then addCombo(Keys.VK_OEM_MINUS, InputRouter.MOD_ALT); end  -- Alt+- zoom out
     -- Alt+digit zoom jumps (0 resets). Civ VI's Keys enum form for digits isn't

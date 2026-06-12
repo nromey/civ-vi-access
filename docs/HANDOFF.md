@@ -6,9 +6,23 @@ Full history is in `git log` — don't make dated copies. The ordered plan is in
 
 _Last updated: 2026-06-12 (end of day)._
 
+## NEW (late evening, untested): Shift+R speech history (pager deliverable 1)
+
+`SpeechHistory.lua` (NEW, addin VM, modinfo + include registered): Shift+R
+once = repeat last announce verbatim; again = walk back through a 20-deep
+ring of meaningful announces ("Back 2. ..."), nav/picker chatter excluded;
+new speech resets the walk; "End of history" at the bottom. Rides the
+EXISTING `CivViAccess_SpeechEmitted` broadcast in Speech.emit (was feeding
+the one-deep legacy Shift+R InputAction, now superseded — kept as dead
+fallback). TEST: move cursor a few tiles, Shift+R (repeats the tile), Shift+R
+again (should skip the tile chatter and read the last real event, e.g. the
+move result or a notification). Verify a cut-off line (trigger a reveal, mash
+a key, then Shift+R twice) is recoverable.
+
 ## RESUME HERE — next session
 
-**Start the PAGER + SPEECH HISTORY arc** — design settled in
+**Continue the PAGER + SPEECH HISTORY arc** (deliverable 1 shipped above —
+next: the sentence-paged reader, then notification buffering + context `?`) — design settled in
 `docs/TASK_PLAN.md` ("NEXT UP" block): (1) repeat-last key first, (2) history
 ring buffer w/ cross-VM collector in the addin VM, (3) the sentence-paged
 reader. Three speech losses in one day (Robert's diplo line, the reveal

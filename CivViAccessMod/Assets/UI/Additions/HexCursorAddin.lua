@@ -30,6 +30,7 @@ include("ScannerAddinGlue");
 include("UnitMovement");
 include("UnitCombat");
 include("BetweenTurns");
+include("SpeechHistory");
 include("NavKeys");
 include("UnitInfo");
 include("CityProduction");
@@ -663,22 +664,17 @@ local function Initialize()
         LeaderMeetAnnounce.DebugMeet();
     end);
 
-    -- Mod-wide "say again" (Ctrl+T): re-speak the last announcement from ANY
-    -- VM. Works over the vanilla DLC reveal popups (engine actions fire while
-    -- those Low-priority popups are up). _lastSpoken is fed by the cross-VM
-    -- CivViAccess_SpeechEmitted broadcast (subscribed just below).
+    -- Mod-wide "say again" (Shift+R). Superseded by SpeechHistory (ring buffer
+    -- + walk, fed by the same CivViAccess_SpeechEmitted broadcast); the wrap
+    -- consumes Shift+R and routes there, so this legacy InputAction is a dead
+    -- fallback that only fires if the wrap misses.
     lookupAction("CIVVIACCESS_RepeatAnnounce", function()
-        if _lastSpoken == nil or _lastSpoken == "" then
+        if SpeechHistory ~= nil and SpeechHistory.repeatOrStep ~= nil then
+            SpeechHistory.repeatOrStep();
+        else
             Speech.emit("Nothing to repeat", "meta");
-            return;
         end
-        Speech.emit(_lastSpoken, "selection");
     end);
-    if LuaEvents.CivViAccess_SpeechEmitted ~= nil then
-        LuaEvents.CivViAccess_SpeechEmitted.Add(function(text, kind)
-            if text ~= nil and text ~= "" then _lastSpoken = text; end
-        end);
-    end
 
     -- Shift+T: verbose tile readout (full mechanics — yields, defense bonus,
     -- appeal, fresh water, movement cost, continent) for the hex under the

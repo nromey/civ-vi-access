@@ -87,6 +87,12 @@ if LuaEvents ~= nil and LuaEvents.CivViAccess_ScannerInput ~= nil then
             if ok then handled = (h == true);
             else Log.warn("ScannerAddinGlue: combat dispatch failed: " .. tostring(h)); end
         end
+        -- Speech history (Shift+R = repeat last / walk back).
+        if not handled and SpeechHistory ~= nil and SpeechHistory.dispatch ~= nil then
+            local ok, h = pcall(function() return SpeechHistory.dispatch(key, mods); end);
+            if ok then handled = (h == true);
+            else Log.warn("ScannerAddinGlue: speech-history dispatch failed: " .. tostring(h)); end
+        end
         -- Bare G = open My Government (Noel 2026-06-12: needed a way to CHANGE
         -- the cards Alt+P auto-picked). Raising the LaunchBar's own LuaEvent
         -- reproduces the sighted button click exactly: the RevealListeners hub
