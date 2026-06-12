@@ -36,8 +36,10 @@ fortified outside friendly land — open question whether HEAL ever accepts in
 the field); production replace + confirmation WITH turns-left; completion
 hand-offs; bare G → government hub (full chain incl. real policy commit);
 Shift+P city-under-cursor; reveal announce (content fine — delivery is the
-pager's job). SOFT-GREEN — Shift+Enter notification activation (Noel reports
-working; no log line captured this session). STILL UNVERIFIED — river-edge
+pager's job). UNTESTED — Shift+Enter notification activation: archive search across ALL
+seven 2026-06-12 sessions found zero "Activating." lines, so it has never
+actually fired (what Noel exercised was another path). Ten-second test:
+bracket to a notification, Shift+Enter, listen for "Activating." STILL UNVERIFIED — river-edge
 side correctness; 0-MP attack refusal; own-loss kill announce; city-damage
 event shape (BT_DEBUG logging, awaiting a siege).
 
