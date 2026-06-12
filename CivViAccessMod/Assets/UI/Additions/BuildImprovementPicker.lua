@@ -240,6 +240,24 @@ local function navTo(i)
     announceCurrent();
 end
 
+-- Ctrl+T: what the improvement actually DOES (Noel 2026-06-12: items spoke
+-- only their names — "no extended data"). Description comes from GameInfo;
+-- Speech.emit strips the [ICON_*] markers on its own.
+local function describeCurrent()
+    local item = _items[_index];
+    if item == nil then return; end
+    local parts = { impName(item.eImp) };
+    local r = GameInfo.Improvements[item.eImp];
+    if r ~= nil and r.Description ~= nil then
+        local ok, d = pcall(function() return Locale.Lookup(r.Description); end);
+        if ok and d ~= nil and d ~= "" then parts[#parts + 1] = d; end
+    end
+    if item.locked and item.reason ~= nil then
+        parts[#parts + 1] = "Locked, " .. item.reason;
+    end
+    Speech.emit(table.concat(parts, ". "), "status");
+end
+
 local function commit()
     local item = _items[_index];
     if item == nil then return; end
@@ -259,8 +277,24 @@ local function commit()
     tParameters[UnitOperationTypes.PARAM_X] = pUnit:GetX();
     tParameters[UnitOperationTypes.PARAM_Y] = pUnit:GetY();
     tParameters[UnitOperationTypes.PARAM_IMPROVEMENT_TYPE] = item.eImp;
+    -- Charges read BEFORE the operation: counts the one being spent now.
+    local charges = nil;
+    pcall(function() charges = pUnit:GetBuildCharges(); end);
     UnitManager.RequestOperation(pUnit, op, tParameters);
-    Speech.emit("Building " .. impName(item.eImp), "event");
+    -- Builders work INSTANTLY in Civ VI (no build turns — unlike Civ V
+    -- workers) and spend one of their charges. Say where it landed and what's
+    -- left (Noel 2026-06-12: "no way to tell where it put it and how long").
+    local msg = "Built " .. impName(item.eImp) .. " on this tile";
+    if charges ~= nil then
+        local left = charges - 1;
+        if left <= 0 then
+            msg = msg .. ". That was the Builder's last charge";
+        else
+            msg = msg .. ". Builder has " .. left
+                .. ((left == 1) and " charge" or " charges") .. " left";
+        end
+    end
+    Speech.emit(msg, "event");
     BuildImprovementPicker.close();
 end
 
@@ -280,11 +314,12 @@ local _handler = {
         bind(VK_RETURN, MOD_NONE, commit, "Build selected improvement"),
         bind(VK_SPACE,  MOD_NONE, commit, "Build selected improvement"),
         bind(VK_ESCAPE, MOD_NONE, cancel, "Cancel"),
-        bind(VK_T,      MOD_CTRL, announceCurrent, "Re-read current"),
+        bind(VK_T,      MOD_CTRL, describeCurrent, "What the improvement does"),
     },
     helpEntries = {
         { keyLabel = "Up/Down", description = "Previous / next improvement (available ones first, then locked)" },
         { keyLabel = "Home/End", description = "First / last improvement" },
+        { keyLabel = "Ctrl+T", description = "What the selected improvement does (yields, effects)" },
         { keyLabel = "Enter", description = "Build the selected improvement; on a locked one, explain what it needs" },
         { keyLabel = "Escape", description = "Cancel without building" },
     },

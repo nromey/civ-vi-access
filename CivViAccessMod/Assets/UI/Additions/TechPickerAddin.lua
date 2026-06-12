@@ -258,8 +258,39 @@ end
 -- Ctrl+T long-form: full description + prereqs + boost description
 -- (what action completes the boost). Engine ResearchChooser builds
 -- this surface piecewise; we replicate the readable subset.
+-- What a tech/civic actually GETS you (Noel 2026-06-12: "Wheel ... they don't
+-- talk about what they do"): most techs have NO Description — their payload
+-- is the unlock list the sighted tree shows as icons. Enumerate everything
+-- gated on this tech/civic across the GameInfo tables.
+local function unlocksList(prereqField, typeValue, extraTables)
+    local names = {};
+    pcall(function()
+        local tables = { "Units", "Buildings", "Districts", "Improvements", "Projects" };
+        if extraTables ~= nil then
+            for _, t in ipairs(extraTables) do tables[#tables + 1] = t; end
+        end
+        for _, tblName in ipairs(tables) do
+            local t = GameInfo[tblName];
+            if t ~= nil then
+                for r in t() do
+                    if r[prereqField] == typeValue then
+                        local n = (r.Name ~= nil) and Locale.Lookup(r.Name) or nil;
+                        if n ~= nil and n ~= "" then names[#names + 1] = n; end
+                    end
+                end
+            end
+        end
+    end);
+    return names;
+end
+
 local function composeLongForm(pPlayer, pTechs, row, status)
     local parts = {};
+    -- Unlocks FIRST — it's the "what does this actually do" answer.
+    local unlocks = unlocksList("PrereqTech", row.TechnologyType);
+    if #unlocks > 0 then
+        parts[#parts + 1] = "Unlocks " .. table.concat(unlocks, ", ");
+    end
     if row.Description ~= nil and row.Description ~= "" then
         local desc = safeLookup(row.Description);
         if desc ~= "" then

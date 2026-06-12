@@ -223,8 +223,35 @@ end
 -- Ctrl+T long-form: description + prereqs + inspiration trigger text.
 -- GameInfo.Boosts is the same table for techs and civics; rows are
 -- distinguished by which of TechnologyType / CivicType is non-null.
+-- What the civic actually GETS you (Noel 2026-06-12, same gap as techs):
+-- civics mostly pay out in policy cards, governments, buildings, districts —
+-- the icons on the sighted tree. Enumerate everything gated on this civic.
+local function unlocksList(civicType)
+    local names = {};
+    pcall(function()
+        for _, tblName in ipairs({ "Policies", "Governments", "Units",
+                                   "Buildings", "Districts", "Improvements" }) do
+            local t = GameInfo[tblName];
+            if t ~= nil then
+                for r in t() do
+                    if r.PrereqCivic == civicType then
+                        local n = (r.Name ~= nil) and Locale.Lookup(r.Name) or nil;
+                        if n ~= nil and n ~= "" then names[#names + 1] = n; end
+                    end
+                end
+            end
+        end
+    end);
+    return names;
+end
+
 local function composeLongForm(pPlayer, pCulture, row, status)
     local parts = {};
+    -- Unlocks FIRST — the "what does this actually do" answer.
+    local unlocks = unlocksList(row.CivicType);
+    if #unlocks > 0 then
+        parts[#parts + 1] = "Unlocks " .. table.concat(unlocks, ", ");
+    end
     if row.Description ~= nil and row.Description ~= "" then
         local desc = safeLookup(row.Description);
         if desc ~= "" then
