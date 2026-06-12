@@ -515,7 +515,18 @@ local function Initialize()
         local pPlayer = Players[localPlayerID];
         if pPlayer == nil then return; end
         local pCity = nil;
-        if UI ~= nil and UI.GetHeadSelectedCity ~= nil then
+        -- City under the CURSOR wins (Noel 2026-06-12: with two cities,
+        -- Shift+P always opened the capital — scan to the other city, Home,
+        -- Shift+P should manage it without travel). Cursor = universal pointer.
+        if Cities ~= nil and Cities.GetCityInPlot ~= nil
+           and HexCursor ~= nil and HexCursor.position ~= nil then
+            local cx, cy = HexCursor.position();
+            if cx ~= nil then
+                local c = Cities.GetCityInPlot(cx, cy);
+                if c ~= nil and c:GetOwner() == localPlayerID then pCity = c; end
+            end
+        end
+        if pCity == nil and UI ~= nil and UI.GetHeadSelectedCity ~= nil then
             pCity = UI.GetHeadSelectedCity();
         end
         if pCity == nil then
