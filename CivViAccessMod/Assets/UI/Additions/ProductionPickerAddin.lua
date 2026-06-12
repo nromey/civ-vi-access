@@ -251,6 +251,17 @@ local COMMIT_VERB_BY_PARAM = {
 local function commitBuild(pCity, paramKey, hash, displayName, turnsStr)
     local tParameters = {};
     tParameters[paramKey] = hash;
+    -- REPLACE the current build, don't append (Noel 2026-06-12: picking
+    -- Granary mid-Warrior silently QUEUED it behind the Warrior — the
+    -- engine's default insert mode appends). The vanilla ProductionPanel
+    -- sends exactly this pair for a normal pick with the queue UI closed
+    -- (GetBuildInsertMode): replace at queue slot 0. An explicit
+    -- queue-append gesture can come later with real queue support.
+    if CityOperationTypes.PARAM_INSERT_MODE ~= nil
+       and CityOperationTypes.VALUE_REPLACE_AT ~= nil then
+        tParameters[CityOperationTypes.PARAM_INSERT_MODE] = CityOperationTypes.VALUE_REPLACE_AT;
+        tParameters[CityOperationTypes.PARAM_QUEUE_DESTINATION_LOCATION] = 0;
+    end
     local ok, err = pcall(function()
         CityManager.RequestOperation(pCity, CityOperationTypes.BUILD, tParameters);
     end);

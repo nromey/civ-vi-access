@@ -44,9 +44,10 @@ local _composeArmed = false;
 local _moves  = {};   -- "pid:uid" -> { pid, uid, x, y }  last visible position
 local _hp     = {};   -- "pid:uid" -> { startDamage, endDamage, maxHP } own units
 local _losses = {};   -- array of own unit names destroyed overnight
+local _built  = {};   -- array of { city, cityID, item } own production completed
 
 local function reset()
-    _moves, _hp, _losses = {}, {}, {};
+    _moves, _hp, _losses, _built = {}, {}, {}, {};
 end
 
 local function localPlayer()
@@ -174,6 +175,54 @@ function BetweenTurns.onUnitKilledInCombat(killedPid, killedUid, killerPid, kill
     end
 end
 
+-- Resolve a production-type HASH to a spoken name (the picker's queue-tab
+-- approach: scan the GameInfo tables a city can produce from).
+local function productionHashName(hash)
+    if hash == nil or hash == 0 then return nil; end
+    local name = nil;
+    pcall(function()
+        for _, tbl in ipairs({ "Units", "Buildings", "Districts", "Projects" }) do
+            local t = GameInfo[tbl];
+            if t ~= nil then
+                for row in t() do
+                    if row.Hash == hash then
+                        if row.Name ~= nil then name = Locale.Lookup(row.Name); end
+                        return;
+                    end
+                end
+            end
+        end
+    end);
+    return name;
+end
+
+-- Production completed (Noel 2026-06-12: the Warrior finished SILENTLY and
+-- the queued Granary slid in as current with no announce). Arg shape per the
+-- vanilla TutorialUIRoot handler: orderType 0 = ORDER_TRAIN indexes
+-- GameInfo.Units; ORDER_CONSTRUCT = buildings; ORDER_ZONE = districts.
+function BetweenTurns.onCityProductionCompleted(pid, cityID, orderType, objType, canceled)
+    if not _collecting then return; end
+    local lp = localPlayer();
+    if pid ~= lp or canceled == true then return; end
+    local item = nil;
+    pcall(function()
+        local row = nil;
+        if OrderTypes ~= nil then
+            if     orderType == OrderTypes.ORDER_TRAIN     then row = GameInfo.Units[objType];
+            elseif orderType == OrderTypes.ORDER_CONSTRUCT then row = GameInfo.Buildings[objType];
+            elseif orderType == OrderTypes.ORDER_ZONE      then row = GameInfo.Districts[objType];
+            end
+        end
+        if row ~= nil and row.Name ~= nil then item = Locale.Lookup(row.Name); end
+    end);
+    local cityName = "a city";
+    pcall(function()
+        local c = Players[pid]:GetCities():FindID(cityID);
+        if c ~= nil then cityName = Locale.Lookup(c:GetName()); end
+    end);
+    _built[#_built + 1] = { city = cityName, cityID = cityID, item = item };
+end
+
 -- City damage: shape UNCONFIRMED — log only (the UnitCombat pattern). Once a
 -- live siege shows the args, wire "your city was attacked" into the briefing.
 function BetweenTurns.onCityDamageEvent(...)
@@ -199,6 +248,30 @@ local function compose()
 
     for _, name in ipairs(_losses) do
         bits[#bits + 1] = "Your " .. name .. " was destroyed";
+    end
+
+    -- Production completions, each with what the city moved on to — a queue
+    -- continuing without a word was exactly the Granary surprise.
+    for _, b in ipairs(_built) do
+        local line = b.city .. " completed " .. (b.item or "its build");
+        local nextName, idle = nil, true;
+        pcall(function()
+            local c = Players[lp]:GetCities():FindID(b.cityID);
+            local q = (c ~= nil) and c:GetBuildQueue() or nil;
+            if q ~= nil and q.GetCurrentProductionTypeHash ~= nil then
+                local hash = q:GetCurrentProductionTypeHash();
+                if hash ~= nil and hash ~= 0 then
+                    idle = false;
+                    nextName = productionHashName(hash);
+                end
+            end
+        end);
+        if idle then
+            line = line .. ", production needed";
+        elseif nextName ~= nil then
+            line = line .. ", now building " .. nextName;
+        end
+        bits[#bits + 1] = line;
     end
 
     -- Net HP change per own unit: negative = hurt, positive = recovered.
@@ -285,6 +358,7 @@ local function Initialize()
         { ev = "UnitMoveComplete",            fn = BetweenTurns.onUnitMoveComplete },
         { ev = "UnitDamageChanged",           fn = BetweenTurns.onUnitDamageChanged },
         { ev = "UnitKilledInCombat",          fn = BetweenTurns.onUnitKilledInCombat },
+        { ev = "CityProductionCompleted",     fn = BetweenTurns.onCityProductionCompleted },
         { ev = "GameCoreEventPublishComplete", fn = BetweenTurns.onEventPumpComplete },
         -- Guard-subscribed: exact event name for city damage varies by ruleset;
         -- whichever exists gets LOGGED until its shape is confirmed.

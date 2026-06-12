@@ -127,6 +127,24 @@ log-only (COMBAT_DEBUG stays ON) until one shows up.
 - **Still queued for the briefing:** Enter turn-gate, verbosity option
   (all moves / enemy only / off), re-read key, city-damage speech.
 
+## NEW (evening, untested): production queue fix + completion announces
+
+Noel's report: picked Granary mid-Warrior expecting to CHANGE production;
+it silently QUEUED behind the Warrior, the Warrior finished with no announce,
+and the Granary slid in as current. Log + vanilla source confirmed the cause:
+our picker's `RequestOperation(BUILD)` sent no `PARAM_INSERT_MODE`, and the
+engine default APPENDS — vanilla's normal pick sends `VALUE_REPLACE_AT` at
+slot 0. Fixes:
+- **Picker commits now REPLACE the current build** (vanilla's exact pair).
+  Queue-append becomes an explicit gesture later if wanted.
+- **Overnight briefing announces completions:** "Amsterdam completed Warrior,
+  now building Granary" / ", production needed" (arg shape confirmed from
+  vanilla TutorialUIRoot: ORDER_TRAIN/CONSTRUCT/ZONE index Units/Buildings/
+  Districts). EotReport's N report still accumulates them too.
+- **Known gap (deferred):** the picker's Queue tab only shows the CURRENT
+  item, not queued entries — real queue display/management is future work
+  (less urgent now that picks replace).
+
 ## NEW (evening, untested): bare G = My Government hub
 
 Noel wants to CHANGE the cards Alt+P auto-picked, anytime — not only when a
