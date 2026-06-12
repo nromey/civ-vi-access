@@ -126,6 +126,27 @@ routes through it), ongoing diplo interactions.
 
 ---
 
+## NEXT UP: Pager + speech history (Noel 2026-06-12 — design settled)
+
+Three losses in one day (Robert's diplomacy line, the reveal payload,
+notification detail) proved the gap: speech that gets interrupted is GONE.
+Two cooperating pieces, built in this order:
+
+1. **Repeat-last key** (first deliverable, ships before anything else):
+   re-speak the most recent utterance, works everywhere.
+   (`CIVVIACCESS_RepeatAnnounce` exists as a stub — standardize or replace.)
+2. **Speech history queue:** ring buffer of the last N utterances; a key steps
+   back through them (newest first), another re-reads. N configurable later in
+   the accessibility options tab (NOT built yet — hardcode a sane default,
+   ~20). ARCHITECTURE: emits happen in MULTIPLE VMs, so Speech.emit
+   LuaEvents-broadcasts each utterance to ONE collector in the addin VM (same
+   cross-VM pattern as scanner input forwarding); collector owns history +
+   keys.
+3. **Pager for long text:** sentence-paged reader (N/P/re-read/Escape),
+   buffers notifications while active; any history entry too long for one
+   utterance opens IN the pager; context-aware `?` and the empire report
+   render through it. (Memory: `project_help_pager_and_context_help`.)
+
 ## Queue manager (Noel 2026-06-12 — AFTER the pager + empire report)
 
 Unified queue awareness + editing across production / tech / civics (engine
