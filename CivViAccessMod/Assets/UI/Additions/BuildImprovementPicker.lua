@@ -142,7 +142,10 @@ local function lockReason(impRow)
     -- should still say "Coast or Ocean", not just the tech) — so you know both
     -- what to research/adopt AND where the builder has to be.
     local hint = terrainHint(impRow.ImprovementType);
-    local where = (hint ~= nil) and ("; requires " .. hint) or "";
+    -- ", and needs" not ";" — spoken, the semicolon ran the two separate gates
+    -- (research vs terrain) together into one mushy clause (detail audit
+    -- 2026-06-12).
+    local where = (hint ~= nil) and (", and needs " .. hint .. " terrain") or "";
     if impRow.PrereqTech ~= nil and not hasTech(impRow.PrereqTech) then
         local t = GameInfo.Technologies[impRow.PrereqTech];
         return "needs " .. (t and Locale.Lookup(t.Name) or "a technology") .. where;
