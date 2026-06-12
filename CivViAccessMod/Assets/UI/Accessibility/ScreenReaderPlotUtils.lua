@@ -212,6 +212,20 @@ function ResourceName(plot)
     return Locale.Lookup(resourceRow.Name);
 end
 
+-- "your territory" / "Scottish territory" / nil for unowned — the spoken form
+-- of the border colors sighted players see. Callers decide how to handle nil:
+-- the cursor tile announce stays SILENT on unclaimed land (exceptions speak);
+-- slash says "in neutral land" explicitly (on-demand readout, and neutral is
+-- the case that changes heal behavior).
+function TerritoryPhrase(ownerId)
+    if ownerId == nil or ownerId == -1 then return nil; end
+    local lp = (Game ~= nil and Game.GetLocalPlayer) and Game.GetLocalPlayer() or -1;
+    if ownerId == lp then return "your territory"; end
+    local adjective = civilizationAdjective(ownerId);
+    if adjective ~= "" then return adjective .. " territory"; end
+    return "foreign territory";
+end
+
 -- Effective MP cost to ENTER the plot, or nil if impassable. Base number is the
 -- engine's own per-plot cost (terrain + feature — the same figure the sighted
 -- plot tooltip prints). An unpillaged road overrides it with the route's rate

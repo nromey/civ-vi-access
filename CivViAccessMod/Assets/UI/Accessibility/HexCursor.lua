@@ -185,6 +185,21 @@ local function AnnouncePlot(plot)
     if improvement ~= "" then parts[#parts + 1] = improvement; end
     local route = routeName(plot);
     if route ~= "" then parts[#parts + 1] = route; end
+    -- Territory (Noel 2026-06-12): sighted players read ownership off border
+    -- colors; speak the owner when there IS one ("your territory" / "Scottish
+    -- territory"), stay silent on unclaimed land (exceptions speak). Skipped on
+    -- city plots — StringifyCity already names the civ. Static like
+    -- improvements (borders persist under fog).
+    if TerritoryPhrase ~= nil then
+        local hasCity = false;
+        pcall(function() hasCity = plot:IsCity(); end);
+        if not hasCity then
+            local ownerId = -1;
+            pcall(function() ownerId = plot:GetOwner(); end);
+            local terr = TerritoryPhrase(ownerId);
+            if terr ~= nil then parts[#parts + 1] = terr; end
+        end
+    end
     -- Entry cost, exceptions-only (Noel 2026-06-12): "costs N" speaks iff N > 1,
     -- so flat tiles stay terse and only the turn-eaters (hills, woods, marsh)
     -- announce themselves. Silence = the normal 1. Roads flatten the cost back

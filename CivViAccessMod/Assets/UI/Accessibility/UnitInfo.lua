@@ -188,6 +188,17 @@ function UnitInfo.speakInfo()
             .. tostring(roundMp(maxMoves)) .. " moves";
     end
 
+    -- Territory the unit STANDS in (Noel 2026-06-12): decides the heal rate
+    -- and whether heal-until-full accepts — sighted players read it off the
+    -- border colors. Neutral is spoken explicitly here (slash is on-demand,
+    -- and neutral is exactly the case that changes rest behavior).
+    pcall(function()
+        local plot = Map.GetPlot(pUnit:GetX(), pUnit:GetY());
+        local ownerId = (plot ~= nil) and plot:GetOwner() or -1;
+        local terr = (TerritoryPhrase ~= nil) and TerritoryPhrase(ownerId) or nil;
+        parts[#parts + 1] = "in " .. (terr or "neutral land");
+    end);
+
     -- HP. Only mention if damaged — otherwise full HP is implied.
     local okD, damage = pcall(function() return pUnit:GetDamage(); end);
     local okMD, maxDamage = pcall(function() return pUnit:GetMaxDamage(); end);
