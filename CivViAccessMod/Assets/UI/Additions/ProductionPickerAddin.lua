@@ -414,6 +414,21 @@ local function turnsString(pQueue, typeString)
     return tostring(turns) .. " turns";
 end
 
+-- Engine build recommendations for the open city (the same set the sighted
+-- panel marks with the "Recommended" icon — pCity:GetCityAI():
+-- GetBuildRecommendations()). Refreshed per open; items matching get a
+-- ", recommended" label token (Noel 2026-06-12).
+local _recommendedHashes = {};
+
+local function refreshRecommendations(pCity)
+    _recommendedHashes = {};
+    pcall(function()
+        for _, kItem in ipairs(pCity:GetCityAI():GetBuildRecommendations()) do
+            _recommendedHashes[kItem.BuildItemHash] = true;
+        end
+    end);
+end
+
 -- Build a Choice entry given strict-check results. If isCanStart is
 -- false, the entry is disabled — label appends "disabled, [reasons]"
 -- and activation speaks the same line instead of committing.
@@ -426,6 +441,9 @@ local function makeChoiceWithState(pCity, paramKey, hash, displayName,
     -- meaningful turns-to-complete since you can't start it).
     if isCanStart and turnsStr ~= nil then
         label = label .. " — " .. turnsStr;
+    end
+    if isCanStart and _recommendedHashes[hash] then
+        label = label .. " — recommended";
     end
     if requiresPlacement then
         label = label .. " — placement needed (coming soon)";
@@ -643,6 +661,9 @@ local function buildProduceTab(pCity)
             Log.warn("buildProduceTab: UI.GetHeadSelectedCity returned nil; using iter city");
         end
     end
+    -- After the selCity swap — GetCityAI on a non-UI-selected city may be the
+    -- same sentinel trap as GetBuildQueue.
+    refreshRecommendations(pCity);
     local items = {};
     local units = buildUnitEntries(pCity);
     local districts = buildDistrictEntries(pCity);

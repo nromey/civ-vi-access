@@ -214,10 +214,27 @@ local function boostSuffix(pTechs, row)
     return "";
 end
 
+-- Engine tech recommendations (the advisor icons on the sighted chooser —
+-- pPlayer:GetGrandStrategicAI():GetTechRecommendations()). Refreshed per
+-- picker open; matching available items get a "— recommended" token.
+local _recommendedTechHashes = {};
+
+local function refreshRecommendations(pPlayer)
+    _recommendedTechHashes = {};
+    pcall(function()
+        local pGrandAI = pPlayer:GetGrandStrategicAI();
+        if pGrandAI ~= nil then
+            for _, rec in pairs(pGrandAI:GetTechRecommendations()) do
+                _recommendedTechHashes[rec.TechHash] = true;
+            end
+        end
+    end);
+end
+
 -- Compose the label for a navigable tech entry. Status-shape varies:
 --   researched:   "Astrology — researched"
 --   currently researching: "Mining — researching now, 4 turns remaining"
---   available:    "Pottery — 5 turns — boosted"  (boost optional)
+--   available:    "Pottery — 5 turns — recommended — boosted"  (both optional)
 --   locked:       "Astronomy — requires Mathematics"
 local function composeLabel(pPlayer, pTechs, row, status, isCurrent)
     local name = safeLookup(row.Name);
@@ -251,6 +268,9 @@ local function composeLabel(pPlayer, pTechs, row, status, isCurrent)
             -- yield. Tell the user why rather than silently omitting.
             base = name .. " — turns unavailable";
         end
+    end
+    if _recommendedTechHashes[row.Hash] then
+        base = base .. " — recommended";
     end
     return base .. boostSuffix(pTechs, row);
 end
@@ -361,6 +381,7 @@ local function buildItems()
         items[#items + 1] = { kind = ITEM_TEXT, label = "No tech state" };
         return items;
     end
+    refreshRecommendations(pPlayer);
     local currentTechIdx = -1;
     local okCur, cur = pcall(function() return pTechs:GetResearchingTech(); end);
     if okCur and cur ~= nil then currentTechIdx = cur; end
