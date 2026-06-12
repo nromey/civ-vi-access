@@ -151,10 +151,13 @@ Noel wants to CHANGE the cards Alt+P auto-picked, anytime — not only when a
 blocker exists. Bare G (wrap combo; engine grid-toggle reclaimed) raises
 `LuaEvents.LaunchBar_GovernmentOpenMyGovernment` — the exact event the
 LaunchBar button raises — so the RevealListeners hub opens: announces current
-government, then G = type chooser, P = policy wizard. TEST: press G on the
-map → expect the government announce; press P → the slot walk; re-slot a
-card and Enter → confirm the commit speaks and sticks (the wizard's REAL
-RequestPolicyChanges commit is still live-pending from 2026-05-31).
+government, then G = type chooser, P = policy wizard. TEST: just press G on
+the map → expect the government announce (the hub/wizard themselves are
+proven). **The wizard's REAL commit is now VERIFIED LIVE** (2026-06-12 log:
+"Chose Urban Planning" → "Applying policy changes." → policy blocker
+dismissed → "Ready to end turn") — the last live-pending piece of the
+2026-05-31 government build is closed. Noel reached it via the
+civic-completion open path.
 
 ## NEW (evening, untested): Shift+Enter activates the current notification
 
