@@ -136,10 +136,34 @@ local _handler = {
     },
 };
 
+-- text may be a STRING (sentence-split here) or a TABLE of part strings
+-- (each entry = one part — used by context help so every key binding is its
+-- own part). Table parts longer than a couple of sentences get sentence-
+-- exploded in place so prose passed inside a list still pages.
+local LONG_PART = 200;
+
+local function normalizeParts(text)
+    if type(text) ~= "table" then return splitParts(text); end
+    local out = {};
+    for _, p in ipairs(text) do
+        local s = tostring(p);
+        if s ~= "" then
+            if #s > LONG_PART then
+                for _, sub in ipairs(splitParts(s)) do out[#out + 1] = sub; end
+            else
+                out[#out + 1] = s;
+            end
+        end
+    end
+    if #out == 0 then out = { "Empty" }; end
+    return out;
+end
+
 function Pager.open(title, text)
-    if text == nil or tostring(text) == "" then return; end
+    if text == nil then return; end
+    if type(text) ~= "table" and tostring(text) == "" then return; end
     _title = (title ~= nil and title ~= "") and tostring(title) or "Reader";
-    _parts = splitParts(text);
+    _parts = normalizeParts(text);
     _index = 1;
     if not _open then
         _open = true;

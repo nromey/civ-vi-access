@@ -71,14 +71,26 @@ function ScannerHandler.dispatch(key, mods)
     elseif key == VK_BACK and mods == MOD_NONE then
         speak(ScannerNav.returnToPreJump());    return true;
     elseif key == VK_HELP and mods == MOD_SHIFT then
-        -- `?` (Shift+/) reads the ladder; bare/Ctrl+/ stay unit-stats/recenter.
-        -- The cheat-sheet is a PAGE of text — it used to fire as ONE picker-kind
-        -- utterance, which (a) the notification reminder clobbered and (b) the
-        -- history ring excluded (picker = browse chatter), so it was
-        -- unrecoverable (Noel 2026-06-12). Long help belongs in the PAGER:
-        -- sentence-walkable, every part re-readable.
+        -- `?` (Shift+/) = CONTEXT HELP in the pager (Noel 2026-06-12: "not only
+        -- scanner help — run context help through the pager"). Composes every
+        -- binding registered with the HandlerStack (common map entries + the
+        -- active handler's) as one part each, then the scanner guide prose
+        -- (sentence-exploded by the pager). History: this key originally
+        -- opened the navigable Help list via CIVVIACCESS_OpenHelp; the wrap
+        -- claiming Shift+/ suppressed that action and left only the scanner
+        -- blob — this restores the full-context intent on the pager surface.
         if LuaEvents ~= nil and LuaEvents.CivViAccess_OpenPager ~= nil then
-            LuaEvents.CivViAccess_OpenPager("Scanner help", CHEAT_SHEET);
+            local parts = {};
+            pcall(function()
+                if HandlerStack ~= nil and HandlerStack.collectHelpEntries ~= nil
+                   and Help ~= nil and Help.resolveEntry ~= nil then
+                    for _, e in ipairs(HandlerStack.collectHelpEntries()) do
+                        parts[#parts + 1] = Help.resolveEntry(e);
+                    end
+                end
+            end);
+            parts[#parts + 1] = CHEAT_SHEET;   -- pager sentence-explodes long parts
+            LuaEvents.CivViAccess_OpenPager("Help", parts);
         else
             speak(CHEAT_SHEET, "picker");
         end

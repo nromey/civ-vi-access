@@ -31,6 +31,16 @@ reveal or the overnight briefing, Shift+R to recall it → reader announces
 "Last announce. Reader, N parts." → walk with Down/Up → Escape. Short
 entries still re-speak directly with their "Back N" prefix.
 
+## PAGER round 3 (untested): Shift+/ = full CONTEXT help in the reader
+
+Shift+/ on the map now composes EVERY HandlerStack-registered binding
+(common map entries + active handler) one-per-part, then the scanner guide
+prose (pager sentence-explodes long parts) → "Help. Reader, N parts."
+Pager.open also accepts a TABLE of parts now. (Archaeology: Shift+/ was
+ORIGINALLY the navigable Help list via CIVVIACCESS_OpenHelp — the wrap
+claiming the combo suppressed it silently; the menus' navigable
+Help/filter mode is untouched and still theirs.)
+
 ## PAGER round 2 (post first live test, untested)
 
 Noel's first pager test found: (1) the `?` scanner cheat-sheet still fired as
