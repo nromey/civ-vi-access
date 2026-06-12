@@ -82,12 +82,31 @@ function SpeechHistory.repeatOrStep()
     say("Back " .. pos .. ". " .. _ring[pos]);
 end
 
--- Shift+R, forwarded from the capture-all wrap (mods bit0 = Shift).
+-- Ctrl+R = step FORWARD (toward newest) while walking (Noel 2026-06-12:
+-- "we can go back, but is there a way to go forward?"). Inverse of the
+-- Shift+R back-step; at the top it says so and stays.
+function SpeechHistory.stepForward()
+    if _walkIndex == 0 then
+        say("Not in history. Shift R walks back.");
+        return;
+    end
+    local pos = _walkIndex - 1;
+    if _walkIndex <= 1 or _ring[pos] == nil then
+        say("At the newest");
+        return;
+    end
+    _walkIndex = pos;
+    say("Back " .. pos .. ". " .. _ring[pos]);
+end
+
+-- Forwarded from the capture-all wrap: Shift+R back, Ctrl+R forward
+-- (mods bit0 = Shift, bit1 = Ctrl).
 local KEY_R = Keys and Keys.R;
 function SpeechHistory.dispatch(key, mods)
-    if KEY_R ~= nil and key == KEY_R and (mods or 0) == 1 then
-        SpeechHistory.repeatOrStep();
-        return true;
+    mods = mods or 0;
+    if KEY_R ~= nil and key == KEY_R then
+        if mods == 1 then SpeechHistory.repeatOrStep(); return true; end
+        if mods == 2 then SpeechHistory.stepForward(); return true; end
     end
     return false;
 end

@@ -131,6 +131,7 @@ InputActions remain in `RemapForHexCursor.xml` but the wrap suppresses them
 
 - **Shift+R** (once) — repeat the last announce verbatim, any kind, from any
   VM. **Shift+R again** — walk BACK through the last 20 meaningful announces,
+  **Ctrl+R** — step FORWARD again (toward newest; "At the newest" at the top),
   newest first ("Back 2. Uncovered 6 hexes: ..."); nav/picker browse chatter
   is excluded from the walk. Any new announce resets it; the oldest entry
   says "End of history". *Wrap combo → `SpeechHistory.lua` (fed by the
