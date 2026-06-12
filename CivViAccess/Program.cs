@@ -10,6 +10,12 @@ using CivVIAccess.Launcher.Speech;
 // report/WebView2 code lives in CivViAccess (Report\), not CAMM.
 var reportBridge = new ReportBridge();
 
+// Keep a month of archived game logs (Lua/Database/Modding snapshots
+// taken each launch — see CivViGameInstance.GetArchivableLogPaths).
+// CAMM's default is 7 days; Noel 2026-06-12: post-mortems regularly
+// reach back further than a week ("afraid we'll miss something").
+LogArchiver.RetentionDays = 30;
+
 // Civ VI Access launcher entry point. Builds the CAMM manifest and
 // hands the whole launcher lifecycle to CammHost.RunAsync — apply-
 // pending-update, Tolk bootstrap, args dispatch (--install /
