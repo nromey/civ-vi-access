@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Pager UI Context. Registered via <AddUserInterfaces context="InGame"> in
+  CivViAccessMod.modinfo. The screen-reader PAGED READER for long text
+  (pager arc deliverable 2, Noel 2026-06-12): sentence-at-a-time navigation
+  so a long announce can never be lost to one interruption again. Audio-only
+  modal — same shell as BuildImprovementPicker: Hidden="1", opened via
+  UIManager:QueuePopup so raw keyboard reaches ContextPtr:SetInputHandler.
+-->
+<Context Name="PagerAccess" Hidden="1">
+  <Grid ID="Root" Size="1,1" Anchor="C,C"/>
+</Context>

@@ -48,9 +48,24 @@ function SpeechHistory.onSpeechEmitted(text, kind)
     if #_ring > DEPTH then table.remove(_ring); end
 end
 
-local function say(text)
+-- Entries longer than this open in the PAGER (sentence-walk) instead of
+-- re-speaking as one interruptible blob — Noel's "if it's long, it'd use the
+-- pager" design (2026-06-12). Threshold becomes a setting with the
+-- accessibility tab.
+local PAGER_THRESHOLD = 240;
+
+-- prefix: spoken position tag for short entries ("Back 2"). pagerTitle:
+-- non-nil marks the text as pager-eligible (history content, not status
+-- chatter like "End of history") and titles the reader when it opens.
+local function say(text, prefix, pagerTitle)
+    if pagerTitle ~= nil and #text > PAGER_THRESHOLD
+       and LuaEvents ~= nil and LuaEvents.CivViAccess_OpenPager ~= nil then
+        LuaEvents.CivViAccess_OpenPager(pagerTitle, text);
+        return;
+    end
+    local spoken = (prefix ~= nil) and (prefix .. ". " .. text) or text;
     _suppress = true;
-    pcall(function() Speech.emit(text, "selection"); end);
+    pcall(function() Speech.emit(spoken, "selection"); end);
     _suppress = false;
 end
 
@@ -63,7 +78,7 @@ function SpeechHistory.repeatOrStep()
         -- First press: literal repeat. Marks the walk as started at "1" so
         -- the next press knows to step into the ring.
         _walkIndex = 1;
-        say(_lastSpoken);
+        say(_lastSpoken, nil, "Last announce");
         return;
     end
     -- Walking. From the literal repeat, step to the first ring entry that
@@ -79,7 +94,7 @@ function SpeechHistory.repeatOrStep()
         return;
     end
     _walkIndex = pos;
-    say("Back " .. pos .. ". " .. _ring[pos]);
+    say(_ring[pos], "Back " .. pos, "Back " .. pos);
 end
 
 -- Ctrl+R = step FORWARD (toward newest) while walking (Noel 2026-06-12:
@@ -96,7 +111,7 @@ function SpeechHistory.stepForward()
         return;
     end
     _walkIndex = pos;
-    say("Back " .. pos .. ". " .. _ring[pos]);
+    say(_ring[pos], "Back " .. pos, "Back " .. pos);
 end
 
 -- Forwarded from the capture-all wrap: Shift+R back, Ctrl+R forward

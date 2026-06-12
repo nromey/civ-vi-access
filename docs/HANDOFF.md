@@ -19,10 +19,23 @@ again (should skip the tile chatter and read the last real event, e.g. the
 move result or a notification). Verify a cut-off line (trigger a reveal, mash
 a key, then Shift+R twice) is recoverable.
 
+## NEW (night, untested): the PAGER (arc deliverable 2)
+
+`Pager.xml/.lua` (NEW context, BuildImprovementPicker modal shell, modinfo
+registered ×3): sentence-paged reader — Down/N next, Up/P prev, Home/End,
+Ctrl+T re-read, A read-rest, Escape close. Opens via
+`LuaEvents.CivViAccess_OpenPager(title, text)`. FIRST FEED: SpeechHistory —
+a recalled entry over 240 chars opens in the reader instead of re-speaking
+as one blob ("if it's long, it'd use the pager", Noel). TEST: trigger a long
+reveal or the overnight briefing, Shift+R to recall it → reader announces
+"Last announce. Reader, N parts." → walk with Down/Up → Escape. Short
+entries still re-speak directly with their "Back N" prefix.
+
 ## RESUME HERE — next session
 
-**Continue the PAGER + SPEECH HISTORY arc** (deliverable 1 shipped above —
-next: the sentence-paged reader, then notification buffering + context `?`) — design settled in
+**Continue the PAGER arc:** notification buffering while the reader is open;
+route the EOT/empire report + context-sensitive `?` through it; pull the
+threshold into the future accessibility tab. — design settled in
 `docs/TASK_PLAN.md` ("NEXT UP" block): (1) repeat-last key first, (2) history
 ring buffer w/ cross-VM collector in the addin VM, (3) the sentence-paged
 reader. Three speech losses in one day (Robert's diplo line, the reveal

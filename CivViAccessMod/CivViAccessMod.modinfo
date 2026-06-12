@@ -129,6 +129,8 @@
       <File priority="10001">Assets/UI/Additions/HexCursorAddin.lua</File>
       <File priority="10001">Assets/UI/Additions/ProductionPickerAddin.lua</File>
       <File priority="10001">Assets/UI/Additions/BuildImprovementPicker.lua</File>
+      <File priority="10001">Assets/UI/Additions/Pager.xml</File>
+      <File priority="10001">Assets/UI/Additions/Pager.lua</File>
       <!-- DiplomacyAccess.lua retired 2026-06-04: the QueuePopup-modal approach
            needed a manual Escape (it competed with the vanilla screen for input).
            Replaced by the in-context ReplaceUIScript wrap below
@@ -231,6 +233,12 @@
         <Context>InGame</Context>
       </Properties>
       <File>Assets/UI/Additions/BuildImprovementPicker.xml</File>
+    </AddUserInterfaces>
+    <AddUserInterfaces id="SRAccess_Pager">
+      <Properties>
+        <Context>InGame</Context>
+      </Properties>
+      <File>Assets/UI/Additions/Pager.xml</File>
     </AddUserInterfaces>
     <!-- Accessible DiplomacyActionView: wrap the screen IN-CONTEXT (no competing
          modal, no manual Escape). One ReplaceUIScript per ruleset so the engine
@@ -357,6 +365,8 @@
     <File>Assets/UI/Additions/ProductionPickerAddin.lua</File>
     <File>Assets/UI/Additions/BuildImprovementPicker.xml</File>
     <File>Assets/UI/Additions/BuildImprovementPicker.lua</File>
+    <File>Assets/UI/Additions/Pager.xml</File>
+    <File>Assets/UI/Additions/Pager.lua</File>
     <File>Assets/UI/Additions/DiplomacyAccess.xml</File>
     <File>Assets/UI/Additions/DiplomacyAccess.lua</File>
     <File>Assets/UI/Replacements/DiplomacyActionViewWrap.lua</File>

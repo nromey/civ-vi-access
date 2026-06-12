@@ -127,6 +127,19 @@ InputActions remain in `RemapForHexCursor.xml` but the wrap suppresses them
   Civ V's `Ctrl+[`/`]` (oldest/newest) and `Shift+[`/`]` (filter) ladder is
   still future work.
 
+### The Pager (NEW 2026-06-12) — long-text reader
+
+Opens automatically when a speech-history entry over ~240 chars is recalled
+(Shift+R / Ctrl+R), and via `LuaEvents.CivViAccess_OpenPager(title, text)`
+for future feeds (context `?`, empire report, Civilopedia). Modal — owns the
+keyboard while open (BuildImprovementPicker shell):
+
+- **Down / N** next part, **Up / P** previous (sentence-sized parts)
+- **Home / End** first / last part
+- **Ctrl+T** re-read the current part
+- **A** read everything from here as one piece
+- **Escape** close
+
 ### Speech history — Shift+R (UPGRADED 2026-06-12)
 
 - **Shift+R** (once) — repeat the last announce verbatim, any kind, from any
