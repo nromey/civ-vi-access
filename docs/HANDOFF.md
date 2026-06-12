@@ -4,7 +4,28 @@
 Full history is in `git log` — don't make dated copies. The ordered plan is in
 `docs/TASK_PLAN.md`; durable facts are in memory.
 
-_Last updated: 2026-06-12 (afternoon — post live test)._
+_Last updated: 2026-06-12 (end of day)._
+
+## RESUME HERE — next session
+
+**Start the PAGER + SPEECH HISTORY arc** — design settled in
+`docs/TASK_PLAN.md` ("NEXT UP" block): (1) repeat-last key first, (2) history
+ring buffer w/ cross-VM collector in the addin VM, (3) the sentence-paged
+reader. Three speech losses in one day (Robert's diplo line, the reveal
+payload, notification detail) drove the priority.
+
+**End-of-day test status (everything relaunch-tested by Noel unless noted):**
+GREEN — nav migration + queued-move announce + arrival; Ctrl+D vocab;
+movement costs + exits ring; territory speech; combat preview/confirm/kill;
+overnight briefing (recovery + anchored enemy moves); heal-first R (falls to
+fortified outside friendly land — open question whether HEAL ever accepts in
+the field); production replace + confirmation WITH turns-left; completion
+hand-offs; bare G → government hub (full chain incl. real policy commit);
+Shift+P city-under-cursor; reveal announce (content fine — delivery is the
+pager's job). SOFT-GREEN — Shift+Enter notification activation (Noel reports
+working; no log line captured this session). STILL UNVERIFIED — river-edge
+side correctness; 0-MP attack refusal; own-loss kill announce; city-damage
+event shape (BT_DEBUG logging, awaiting a siege).
 
 ## AFTERNOON TEST RESULTS (Noel, Lua.log 12:33) — nearly all GREEN
 
