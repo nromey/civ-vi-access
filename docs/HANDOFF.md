@@ -137,6 +137,12 @@ engine default APPENDS — vanilla's normal pick sends `VALUE_REPLACE_AT` at
 slot 0. Fixes:
 - **Picker commits now REPLACE the current build** (vanilla's exact pair).
   Queue-append becomes an explicit gesture later if wanted.
+- **Replace-confirmation latch (Noel 2026-06-12):** picking while another
+  build is in progress warns first — "Granary is in progress, 2 turns to
+  complete. Press Enter again to replace it with Builder." Second Enter on
+  the same item commits; picking the already-building item says so; idle
+  city commits immediately (the common blocker flow stays one press). Same
+  preview->confirm idiom as Ctrl+A. Arm cleared on picker close.
 - **Overnight briefing announces completions:** "Amsterdam completed Warrior,
   now building Granary" / ", production needed" (arg shape confirmed from
   vanilla TutorialUIRoot: ORDER_TRAIN/CONSTRUCT/ZONE index Units/Buildings/

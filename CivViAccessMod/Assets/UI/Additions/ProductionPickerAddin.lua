@@ -248,7 +248,76 @@ local COMMIT_VERB_BY_PARAM = {
     [CityOperationTypes.PARAM_PROJECT_TYPE]  = "Starting project",
 };
 
+-- Resolve a production-type hash to (localized name, type string). Used by
+-- the replace-confirmation to name what's currently building.
+local function hashToNameAndType(hash)
+    if hash == nil or hash == 0 then return nil, nil; end
+    local name, typeString = nil, nil;
+    pcall(function()
+        local tables = {
+            { t = "Units",     f = "UnitType" },
+            { t = "Buildings", f = "BuildingType" },
+            { t = "Districts", f = "DistrictType" },
+            { t = "Projects",  f = "ProjectType" },
+        };
+        for _, spec in ipairs(tables) do
+            local t = GameInfo[spec.t];
+            if t ~= nil then
+                for row in t() do
+                    if row.Hash == hash then
+                        if row.Name ~= nil then name = Locale.Lookup(row.Name); end
+                        typeString = row[spec.f];
+                        return;
+                    end
+                end
+            end
+        end
+    end);
+    return name, typeString;
+end
+
+-- Replace-confirmation latch (Noel 2026-06-12): committing while another
+-- build is IN PROGRESS discards its accumulated production — warn first
+-- ("Granary is in progress, 2 turns to complete. Press Enter again to
+-- replace it with Builder."); a second activation of the SAME item commits.
+-- Keyed by city+item; any other activation re-arms for that item instead,
+-- and close() clears it so a stale arm can't auto-commit a later session.
+-- Same preview->confirm idiom as combat's Ctrl+A.
+local _replaceArm = nil;
+
+function ProductionPicker.clearReplaceArm()
+    _replaceArm = nil;
+end
+
 local function commitBuild(pCity, paramKey, hash, displayName, turnsStr)
+    local curHash = nil;
+    pcall(function()
+        local q = pCity:GetBuildQueue();
+        if q ~= nil and q.GetCurrentProductionTypeHash ~= nil then
+            local h = q:GetCurrentProductionTypeHash();
+            if h ~= nil and h ~= 0 then curHash = h; end
+        end
+    end);
+    if curHash ~= nil and curHash == hash then
+        _replaceArm = nil;
+        Speech.emit(displayName .. " is already building.", "status");
+        return;
+    end
+    if curHash ~= nil then
+        local armKey = tostring(pCity:GetID()) .. ":" .. tostring(hash);
+        if _replaceArm ~= armKey then
+            _replaceArm = armKey;
+            local curName, curType = hashToNameAndType(curHash);
+            local msg = (curName or "Another build") .. " is in progress";
+            local left = nil;
+            pcall(function() left = turnsString(pCity:GetBuildQueue(), curType); end);
+            if left ~= nil then msg = msg .. ", " .. left .. " to complete"; end
+            Speech.emit(msg .. ". Press Enter again to replace it with "
+                .. displayName .. ".", "status");
+            return;
+        end
+        _replaceArm = nil;
+    end
     local tParameters = {};
     tParameters[paramKey] = hash;
     -- REPLACE the current build, don't append (Noel 2026-06-12: picking
@@ -1007,6 +1076,7 @@ end
 
 function ProductionPicker.close()
     if not _state.open then return; end
+    ProductionPicker.clearReplaceArm();
     local closingSilently = _state.closingSilently == true;
     _state.closingSilently = false;
     _state.open = false;
