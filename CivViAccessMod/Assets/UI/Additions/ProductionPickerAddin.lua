@@ -309,8 +309,16 @@ local function commitBuild(pCity, paramKey, hash, displayName, turnsStr)
             _replaceArm = armKey;
             local curName, curType = hashToNameAndType(curHash);
             local msg = (curName or "Another build") .. " is in progress";
+            -- Turns left INLINE — the shared turnsString local is defined
+            -- BELOW this function, so it's not in scope here (calling it was
+            -- a silent nil — Noel heard no turns, Lua.log 2026-06-12).
             local left = nil;
-            pcall(function() left = turnsString(pCity:GetBuildQueue(), curType); end);
+            pcall(function()
+                local t = pCity:GetBuildQueue():GetTurnsLeft(curType);
+                if t ~= nil and t > 0 then
+                    left = (t == 1) and "1 turn" or (tostring(t) .. " turns");
+                end
+            end);
             if left ~= nil then msg = msg .. ", " .. left .. " to complete"; end
             Speech.emit(msg .. ". Press Enter again to replace it with "
                 .. displayName .. ".", "status");
@@ -559,33 +567,42 @@ local function buildQueueEntries(pCity)
     if pQueue.GetCurrentProductionTypeHash == nil then return entries; end
     local currentHash = pQueue:GetCurrentProductionTypeHash();
     if currentHash == nil or currentHash == 0 then return entries; end
-    -- Resolve hash to a human-readable name by checking GameInfo tables.
+    -- Resolve hash to a human-readable name + type string (the type string
+    -- feeds GetTurnsLeft so the line carries time remaining — Noel 2026-06-12:
+    -- "I don't hear how much time is left for the current build").
     local name = "current production";
+    local typeString = nil;
     for row in GameInfo.Units() do
         if row.Hash == currentHash then
             name = (row.Name ~= nil) and Locale.Lookup(row.Name) or tostring(row.UnitType);
+            typeString = row.UnitType;
             break;
         end
     end
-    if name == "current production" then
+    if typeString == nil then
         for row in GameInfo.Buildings() do
             if row.Hash == currentHash then
                 name = (row.Name ~= nil) and Locale.Lookup(row.Name) or tostring(row.BuildingType);
+                typeString = row.BuildingType;
                 break;
             end
         end
     end
-    if name == "current production" then
+    if typeString == nil then
         for row in GameInfo.Districts() do
             if row.Hash == currentHash then
                 name = (row.Name ~= nil) and Locale.Lookup(row.Name) or tostring(row.DistrictType);
+                typeString = row.DistrictType;
                 break;
             end
         end
     end
+    local label = "Currently building " .. name;
+    local left = turnsString(pQueue, typeString);
+    if left ~= nil then label = label .. " — " .. left .. " left"; end
     entries[#entries + 1] = {
         kind  = ITEM_TEXT,
-        label = "Currently building " .. name,
+        label = label,
     };
     return entries;
 end
