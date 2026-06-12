@@ -295,10 +295,18 @@ local function composeLongForm(pPlayer, pTechs, row, status)
                             return pTechs:HasBoostBeenTriggered(row.Index);
                         end);
                         if ok and t == true then triggered = true; end
+                        -- Phrase the CONDITION as a condition (Noel 2026-06-12
+                        -- heard "Improve 3 tiles" as an effect of studying it).
+                        -- boost.Boost = the percent the eureka grants.
+                        local pct = (boost.Boost ~= nil) and (tostring(boost.Boost) .. " percent") or nil;
                         if triggered then
-                            parts[#parts + 1] = "Boosted: " .. stripPickerFormatting(trig);
+                            parts[#parts + 1] = "Boost earned"
+                                .. (pct ~= nil and (", " .. pct .. " saved") or "")
+                                .. " (" .. stripPickerFormatting(trig) .. ")";
                         else
-                            parts[#parts + 1] = "Boost: " .. stripPickerFormatting(trig);
+                            parts[#parts + 1] = "Boost"
+                                .. (pct ~= nil and (", saves " .. pct) or "")
+                                .. " — to earn it: " .. stripPickerFormatting(trig);
                         end
                         break;
                     end

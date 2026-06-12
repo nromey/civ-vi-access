@@ -258,10 +258,18 @@ local function composeLongForm(pPlayer, pCulture, row, status)
                             return pCulture:HasBoostBeenTriggered(row.Index);
                         end);
                         if ok and t == true then triggered = true; end
+                        -- Phrase the CONDITION as a condition (Noel 2026-06-12
+                        -- heard Craftsmanship's "Improve 3 tiles" as an effect
+                        -- of studying it). boost.Boost = the percent granted.
+                        local pct = (boost.Boost ~= nil) and (tostring(boost.Boost) .. " percent") or nil;
                         if triggered then
-                            parts[#parts + 1] = "Inspired: " .. stripPickerFormatting(trig);
+                            parts[#parts + 1] = "Inspiration earned"
+                                .. (pct ~= nil and (", " .. pct .. " saved") or "")
+                                .. " (" .. stripPickerFormatting(trig) .. ")";
                         else
-                            parts[#parts + 1] = "Inspiration: " .. stripPickerFormatting(trig);
+                            parts[#parts + 1] = "Inspiration boost"
+                                .. (pct ~= nil and (", saves " .. pct) or "")
+                                .. " — to earn it: " .. stripPickerFormatting(trig);
                         end
                         break;
                     end
