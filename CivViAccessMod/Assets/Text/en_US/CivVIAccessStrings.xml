@@ -412,9 +412,9 @@
         <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_SW"><Text>southwest</Text></Row>
         <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_W"><Text>west</Text></Row>
         <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_NW"><Text>northwest</Text></Row>
-        <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_PHRASE"><Text>{2_Dir}, {1_Dist} hexes</Text></Row>
-        <Row Tag="LOC_CIVVIACCESS_DIR_CLOCK_PHRASE"><Text>{2_Dir} o'clock, {1_Dist} hexes</Text></Row>
-        <Row Tag="LOC_CIVVIACCESS_DIR_DEGREES_PHRASE"><Text>{2_Dir} degrees, {1_Dist} hexes</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_COMPASS_PHRASE"><Text>{2_Dir}, {1_Dist} {1_Dist : plural 1?hex; other?hexes;}</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_CLOCK_PHRASE"><Text>{2_Dir} o'clock, {1_Dist} {1_Dist : plural 1?hex; other?hexes;}</Text></Row>
+        <Row Tag="LOC_CIVVIACCESS_DIR_DEGREES_PHRASE"><Text>{2_Dir} degrees, {1_Dist} {1_Dist : plural 1?hex; other?hexes;}</Text></Row>
         <Row Tag="LOC_CIVVIACCESS_DIR_MODE_HEX"><Text>Direction mode: hex</Text></Row>
         <Row Tag="LOC_CIVVIACCESS_DIR_MODE_COMPASS"><Text>Direction mode: compass</Text></Row>
         <Row Tag="LOC_CIVVIACCESS_DIR_MODE_CLOCK"><Text>Direction mode: clock</Text></Row>

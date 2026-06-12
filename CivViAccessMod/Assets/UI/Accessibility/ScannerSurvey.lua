@@ -136,8 +136,8 @@ local function entriesInRange(cx, cy, radius)
     return out;
 end
 
--- "Warrior 3 o'clock, 2 hexes" — name + direction + distance from the cursor.
--- At distance 0 (on the cursor) the direction is dropped ("here").
+-- "Warrior, 3 o'clock, 2 hexes" — name + direction (directionString carries the
+-- distance itself, in every vocab mode). At distance 0 the direction drops ("here").
 local function describeEntry(cx, cy, e)
     local name = e.itemName or "unknown";
     if e.backend ~= nil and e.backend.FormatName ~= nil then
@@ -148,7 +148,7 @@ local function describeEntry(cx, cy, e)
         return name .. ", here";
     end
     local dir = HexGeom.directionString(cx, cy, e._ex, e._ey);
-    return name .. ", " .. (dir or "") .. ", " .. e._dist .. " hexes";
+    return name .. ", " .. (dir or "");
 end
 
 local MAX_LISTED = 8;   -- firehose guard for instance lists

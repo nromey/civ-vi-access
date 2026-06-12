@@ -74,6 +74,85 @@ local function roundMp(mp)
     return math.floor(mp + 0.5);
 end
 
+-- ── Exits ring (Noel 2026-06-12) ─────────────────────────────────────────────
+-- Slash appends the six adjacent tiles with entry costs after the stats, in
+-- movement-key order NW NE W E SW SE so each spoken exit maps onto Q E A D Z C
+-- ("which key can I afford to press"). Hex direction names on purpose — the
+-- exits ARE the six hex directions, independent of the Ctrl+D vocab. Pairing
+-- with the "N of M moves" just spoken: any exit costing more than the moves
+-- left waits a turn (Civ VI charges the full entry cost up front).
+local EXIT_DIRS = {
+    { dir = DirectionTypes.DIRECTION_NORTHWEST, name = "northwest" },
+    { dir = DirectionTypes.DIRECTION_NORTHEAST, name = "northeast" },
+    { dir = DirectionTypes.DIRECTION_WEST,      name = "west" },
+    { dir = DirectionTypes.DIRECTION_EAST,      name = "east" },
+    { dir = DirectionTypes.DIRECTION_SOUTHWEST, name = "southwest" },
+    { dir = DirectionTypes.DIRECTION_SOUTHEAST, name = "southeast" },
+};
+
+-- Rivers sit on hex EDGES, stored on a plot's NW/W/NE sides — same scheme as
+-- cliffs, so this mirrors UnitMovement.blockedReason's cliff mapping. A river
+-- crossing adds MOVEMENT_RIVER_COST (+2) unless bridged, so it's flagged by
+-- name rather than folded into the number. (Edge convention not yet verified
+-- against a live river — if "river" speaks on the wrong side, swap the
+-- fromPlot/toPlot halves here AND in the cliff check it copies.)
+local function riverBetween(fromPlot, toPlot, direction)
+    local DT = DirectionTypes;
+    local river = false;
+    pcall(function()
+        if     direction == DT.DIRECTION_NORTHWEST then river = fromPlot:IsNWOfRiver();
+        elseif direction == DT.DIRECTION_WEST      then river = fromPlot:IsWOfRiver();
+        elseif direction == DT.DIRECTION_NORTHEAST then river = fromPlot:IsNEOfRiver();
+        elseif direction == DT.DIRECTION_SOUTHEAST then river = toPlot:IsNWOfRiver();
+        elseif direction == DT.DIRECTION_EAST      then river = toPlot:IsWOfRiver();
+        elseif direction == DT.DIRECTION_SOUTHWEST then river = toPlot:IsNEOfRiver();
+        end
+    end);
+    return river;
+end
+
+local function exitsRing(pUnit)
+    if Map == nil or Map.GetPlot == nil or Map.GetAdjacentPlot == nil then return nil; end
+    local ux, uy = pUnit:GetX(), pUnit:GetY();
+    local fromPlot = Map.GetPlot(ux, uy);
+    if fromPlot == nil then return nil; end
+    -- blockedReason assumes a land unit (water = wall). For sea units water IS
+    -- the move space and land is the wall. Embark/disembark exits are v2.
+    local isSea = false;
+    pcall(function()
+        local info = GameInfo.Units[pUnit:GetUnitType()];
+        isSea = (info ~= nil and info.Domain == "DOMAIN_SEA");
+    end);
+    local bits = {};
+    for _, d in ipairs(EXIT_DIRS) do
+        local adj = Map.GetAdjacentPlot(ux, uy, d.dir);
+        if adj == nil then
+            bits[#bits + 1] = d.name .. " edge of map";
+        else
+            local why = nil;
+            if UnitMovement ~= nil and UnitMovement.blockedReason ~= nil then
+                why = UnitMovement.blockedReason(fromPlot, adj, d.dir);
+            end
+            if isSea then
+                if why == "water" or why == "ocean" then why = nil; end
+                local isWater = false;
+                pcall(function() isWater = adj:IsWater(); end);
+                if not isWater and why == nil then why = "land"; end
+            end
+            if why ~= nil then
+                bits[#bits + 1] = d.name .. " " .. why;
+            else
+                local cost = (PlotEntryCost ~= nil) and PlotEntryCost(adj) or nil;
+                local item = (cost ~= nil) and (d.name .. " " .. tostring(cost)) or d.name;
+                if riverBetween(fromPlot, adj, d.dir) then item = item .. ", river"; end
+                bits[#bits + 1] = item;
+            end
+        end
+    end
+    if #bits == 0 then return nil; end
+    return "Exits: " .. table.concat(bits, ". ");
+end
+
 function UnitInfo.speakInfo()
     local pUnit = selectedUnit();
     if pUnit == nil then
@@ -116,6 +195,11 @@ function UnitInfo.speakInfo()
         local hp = maxDamage - damage;
         parts[#parts + 1] = tostring(hp) .. " of " .. tostring(maxDamage) .. " HP";
     end
+
+    -- Exits LAST (Noel 2026-06-12): the quick stats check stays unchanged up
+    -- front — keep listening for the ring, or key onward to interrupt it.
+    local ring = exitsRing(pUnit);
+    if ring ~= nil then parts[#parts + 1] = ring; end
 
     -- status: user asked for info (pressed /). Queue politely behind
     -- whatever's in flight rather than clobbering it.

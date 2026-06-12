@@ -83,33 +83,38 @@ nothing); most punctuation; most modifier-combos (audit case by case).
 - **Backspace** — return the cursor to the pre-jump cell. *RECLAIM: Cancel /
   Stop-automation, mouse-first.*
 
-### Hex cursor / world nav — the Q E A D Z C cluster (AUDITED 2026-06-11)
+### Hex cursor / world nav — the Q E A D Z C cluster (MIGRATED TO THE WRAP,
+### verified live 2026-06-11)
 
-The pointy-top hex cluster carries THREE layers by modifier (audited against
-`RemapForHexCursor.xml` + the engine `InputConfiguration.xml`). NW=Q, NE=E, W=A,
-E=D, SW=Z, SE=C.
+The pointy-top hex cluster carries THREE layers by modifier. NW=Q, NE=E, W=A,
+E=D, SW=Z, SE=C. The bare + Shift layers ride the capture-all wrap
+(`NavKeys.dispatch`, forwarded from `WorldInputAccessWrap`) — **verified in
+Lua.log 2026-06-11**: every press speaks.
 
-- **Bare Q/E/A/D/Z/C** — move the **hex CURSOR** one hex; speaks the tile.
-  (`CIVVIACCESS_Cursor*` → `HexCursor.move`.) Civ V Access uses the same bare
-  cluster for its cursor — already Civ V-aligned. (The old "cursor is on Alt+"
-  note was stale; cursor moved to bare letters in 0.5.0.)
+- **Bare Q/E/A/D/Z/C** — move the **hex CURSOR** one hex; speaks the tile
+  (terrain, feature, resource, river, improvement, road, units/city), plus
+  **"costs N" when the entry cost is > 1** — silence means the normal 1, so
+  only turn-eaters (hills, woods) announce; roads flatten the cost back to
+  quiet. (Wrap → `NavKeys` → `HexCursor.move`.) Civ V Access uses the same
+  bare cluster for its cursor — already Civ V-aligned.
 - **Shift+Q/E/A/D/Z/C** — move the selected **UNIT** one hex; speaks
-  "Moved west, N moves" (or the blocked reason). (`CIVVIACCESS_Move*` →
-  `UnitMovement.directMove`.)
+  "Warrior moved east, N moves" / "Warrior blocked northeast, water" /
+  "Warrior moving southeast, not enough moves this turn, arrives next turn"
+  (queued). (Wrap → `NavKeys` → `UnitMovement.directMove`.)
+- **Ctrl+D** — cycle the **direction vocabulary** (hex / compass / clock /
+  degrees). Moved off Shift+D so the D-family mirrors A (bare=cursor,
+  Shift=unit, Ctrl=mode/action). *Code path live; not yet exercised in a log.*
 - **Alt+Q/A/Z/C** — the engine's own letter-actions, rebound here OFF the bare
-  letters so bare is free for the cursor: **Alt+Q** ToggleResources, **Alt+A**
-  Attack, **Alt+Z** Sleep, **Alt+C** ToggleCivicsTree. **These give NO speech**
-  (visual toggles / silent mouse-mode attack) — fat-fingering Alt for Shift lands
-  here silently. **Alt+E** is dormant (bare E intercepts it; auto-explore is
-  Alt+X). **Alt+D** = engine cursor-east.
+  letters: **Alt+Q** ToggleResources, **Alt+A** Attack, **Alt+Z** Sleep,
+  **Alt+C** ToggleCivicsTree. **These give NO speech** (visual toggles / silent
+  mouse-mode attack) — fat-fingering Alt for Shift lands here silently.
+  **Alt+E** is dormant (auto-explore is Alt+X). **Alt+D** = engine cursor-east.
 
-**KNOWN TRAP → task #14.** Cursor + unit-move are still on the unreliable engine
-InputAction path (frozen-gesture / dual-dispatch / the Alt+E dormancy hack), NOT
-the capture-all wrap. Migrating them onto the wrap (like the scanner / survey /
-move-to / combat keys) would: (a) make every directional press reliably speak,
-(b) suppress the silent Alt+letter engine actions (we'd own + announce or eat
-them), (c) drop the `InputSettings.json` first-seen-gesture fragility. This is the
-durable fix for "I pressed a move key and nothing was said."
+**Remaining #14 work:** only the Alt+letter engine-actions above are still on
+the legacy InputAction path — the "map some engine keys, not all" follow-up
+owns + announces (or eats) them. The old `CIVVIACCESS_Cursor*/Move*`
+InputActions remain in `RemapForHexCursor.xml` but the wrap suppresses them
+(revert fallback; clean up later).
 
 - **Shift+V** — verbosity toggle (terse / chatty).
 - Info / readout keys (Ctrl+T re-read, Ctrl+I image, etc.) — **AUDIT TODO**:
@@ -194,8 +199,12 @@ modifier; ranged = `RANGE_ATTACK` operation. One preview→confirm→commit engi
 `/` (`VK_OEM_2`) is engine-FREE on the map. Three split bindings; the wrap only
 captures the Shift case so bare/Ctrl stay on their InputActions:
 
-- **`/`** (bare) — speak the selected unit's stats (`CIVVIACCESS_UnitInfo` →
-  `UnitInfo.speakInfo`). *InputAction path (NOT forwarded by the wrap).*
+- **`/`** (bare) — speak the selected unit's stats, then the **exits ring**:
+  all six adjacent tiles with entry costs in Q/E/A/D/Z/C order ("Exits:
+  northwest 1. northeast 2, river. west water. …"), blocked directions named
+  with the same words the move keys speak (`CIVVIACCESS_UnitInfo` →
+  `UnitInfo.speakInfo`). Stats first so the quick check is uninterrupted; keep
+  listening for the exits. *InputAction path (NOT forwarded by the wrap).*
 - **Ctrl+`/`** — recenter the hex cursor on the selected unit
   (`CIVVIACCESS_RecenterOnUnit`). *InputAction path.*
 - **Shift+`/`** (`?`) — read the scanner cheat-sheet (`ScannerHandler` → ladder).

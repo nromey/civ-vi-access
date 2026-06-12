@@ -253,7 +253,7 @@ function ScannerBackendGeography.FormatName(entry)
     local d = entry.data;
     local name = (d and d.name) or entry.itemName or "area";
     if d and d.count then
-        return name .. ", " .. d.count .. " hexes";
+        return name .. ", " .. d.count .. ((d.count == 1) and " hex" or " hexes");
     end
     return name;
 end

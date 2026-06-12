@@ -130,8 +130,10 @@ routes through it), ongoing diplo interactions.
 
 - **#13 Sighted mode** — input passthrough + per-player designation in game options
   (hotseat with Julian/Dulian). Different use case than solo play.
-- **#14 Key migration** — move keys to capture-all + normalize to Civ V parity
-  (rearranges the whole cluster; finalizes Shift+D etc.).
+- **#14 Key migration** — MOSTLY DONE (verified 2026-06-11/12): the hex cluster
+  (bare + Shift Q/E/A/D/Z/C) + Ctrl+D vocab ride the capture-all wrap via
+  `NavKeys.lua`. Remaining: the Alt+Q/A/Z/C engine letter-actions (silent
+  legacy InputActions) — own + announce or eat them.
 - **#15 Key audit** — classify keys, register in Help, live-test. Should produce a
   real `(key,mods)→description` REGISTRY (not loose Help-label strings) — the spine
   for **learn-key mode** (NVDA/JAWS-style: press a key to hear it, execute nothing)

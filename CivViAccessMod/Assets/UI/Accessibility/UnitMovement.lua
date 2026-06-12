@@ -47,6 +47,7 @@ local _keepSel = nil;
 -- the move-to block) can reach it.
 local _moveToTargets = {};
 local checkMoveToArrival;
+local pathTurns;
 
 local function selectedUnit()
     if UI == nil or UI.GetHeadSelectedUnit == nil then return nil; end
@@ -115,6 +116,9 @@ local function blockedReason(fromPlot, toPlot, direction)
     if toPlot.IsImpassable and toPlot:IsImpassable() then return "impassable terrain"; end
     return nil;
 end
+-- Exported: UnitInfo's exits ring names blocked directions with the same words
+-- the move keys speak, so "west water" on slash matches "blocked west, water".
+UnitMovement.blockedReason = blockedReason;
 
 local function formatMovesRemaining(mp)
     if mp <= 0 then return "out of moves"; end
@@ -180,6 +184,24 @@ function UnitMovement.directMove(direction)
         local msg = "Cannot move " .. unitTypeName(pUnit) .. " " .. DIR_NAMES[direction];
         if reason ~= nil then msg = msg .. ", " .. reason; end
         Speech.emit(msg, "meta");
+        return;
+    end
+    -- The engine ACCEPTS a move the unit can't afford this turn (rough terrain
+    -- after it already moved) by QUEUEING it for next turn — and fires NO
+    -- completion event, so the async resolver below never runs. That made the
+    -- first Shift+dir press into desert hills completely SILENT, and a re-issue
+    -- announced a false "blocked" (Lua.log 2026-06-11). Detect it up front: a
+    -- 1-hex path the pathfinder prices at >1 turn is a queue, not a block.
+    local pathInfo = UnitManager.GetMoveToPathEx ~= nil
+                     and UnitManager.GetMoveToPathEx(pUnit, target:GetIndex()) or nil;
+    if pathInfo ~= nil and pathTurns(pathInfo) > 1 then
+        tParameters[UnitOperationTypes.PARAM_MODIFIERS] = UnitOperationMoveModifiers.NONE;
+        UnitManager.RequestOperation(pUnit, UnitOperationTypes.MOVE_TO, tParameters);
+        -- Track via the move-to arrival machinery so next turn's landing speaks
+        -- ("arrived at destination") instead of happening silently.
+        _moveToTargets[localPlayerID .. ":" .. pUnit:GetID()] = { destX = tx, destY = ty };
+        Speech.emit(unitTypeName(pUnit) .. " moving " .. (DIR_NAMES[direction] or "?")
+            .. ", not enough moves this turn, arrives next turn.", "move_result");
         return;
     end
     -- Stash before commit so the UnitMoveComplete listener has the
@@ -561,8 +583,9 @@ end
 -- ===========================================================================
 
 -- pathInfo = { plots = {plotId,...}, turns = {turnNum,...} }. Total turns to
--- arrive = the largest turn number on the path.
-local function pathTurns(pathInfo)
+-- arrive = the largest turn number on the path. (Forward-declared at the top —
+-- directMove's queued-move detection calls it too.)
+pathTurns = function(pathInfo)
     if pathInfo == nil or pathInfo.turns == nil then return 1; end
     local t = 1;
     for _, n in pairs(pathInfo.turns) do
@@ -629,10 +652,12 @@ function UnitMovement.previewToCursor()
         Speech.emit("No path there for " .. unitTypeName(pUnit) .. ".", "meta"); return;
     end
     local turns = pathTurns(pathInfo);
+    -- directionString carries the distance itself (hex decomposition, or the
+    -- "<dir>, N hexes" LOC phrase in the bearing modes) — appending it here
+    -- doubled it ("northeast, 6 hexes, 6 hexes").
     local dir  = HexGeom.directionString(pUnit:GetX(), pUnit:GetY(), cx, cy) or "";
-    local dist = Map.GetPlotDistance(pUnit:GetX(), pUnit:GetY(), cx, cy);
     local turnWord = (turns == 1) and "1 turn" or (turns .. " turns");
-    local msg = turnWord .. " to " .. dir .. ", " .. dist .. " hexes";
+    local msg = turnWord .. " to " .. dir;
     if pathCrossesWater(pathInfo, pUnit) then msg = msg .. ", crosses water, needs embark"; end
     if pathEntersFog(pathInfo, lp) then msg = msg .. ", enters unexplored"; end
     Speech.emit(msg .. ".", "status");

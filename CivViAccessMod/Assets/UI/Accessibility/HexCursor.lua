@@ -92,9 +92,37 @@ local function resourceName(plot)
     return Locale.Lookup(resourceRow.Name);
 end
 
--- Lean plot announce: terrain + feature + resource + units + city. Skips
--- yields / appeal / continent / defense modifier / movement cost — those
--- live behind Ctrl+T (verbose) per [[feedback-terse-announce-default]].
+local function improvementName(plot)
+    if plot == nil then return ""; end
+    local idx = plot:GetImprovementType();
+    if idx == -1 then return ""; end
+    local row = GameInfo.Improvements[idx];
+    if row == nil or row.Name == nil then return ""; end
+    local name = Locale.Lookup(row.Name);
+    local pillaged = false;
+    pcall(function() pillaged = plot:IsImprovementPillaged(); end);
+    if pillaged then return name .. ", pillaged"; end
+    return name;
+end
+
+local function routeName(plot)
+    if plot == nil then return ""; end
+    local has = false;
+    pcall(function() has = plot:IsRoute(); end);
+    if not has then return ""; end
+    local row = GameInfo.Routes[plot:GetRouteType()];
+    local name = (row ~= nil and row.Name ~= nil) and Locale.Lookup(row.Name) or "Road";
+    local pillaged = false;
+    pcall(function() pillaged = plot:IsRoutePillaged(); end);
+    if pillaged then return name .. ", pillaged"; end
+    return name;
+end
+
+-- Lean plot announce: terrain + feature + resource + river + improvement +
+-- road + cost-if->1 + units + city. Skips yields / appeal / continent /
+-- defense modifier — those live behind Ctrl+T (verbose) per
+-- [[feedback-terse-announce-default]]. Movement cost graduated to the lean
+-- line 2026-06-12 (Noel), exceptions-only: it speaks ONLY when > 1.
 --
 -- Respects fog of war so screen-reader users don't get information
 -- advantage over sighted players. Three states (Civ6Common.lua pattern):
@@ -148,6 +176,22 @@ local function AnnouncePlot(plot)
     -- already saw still reads under fog of war (static terrain memory).
     if plot.IsRiver and plot:IsRiver() then
         parts[#parts + 1] = Locale.Lookup("LOC_TOOLTIP_RIVER");
+    end
+    -- Improvement + road (Noel 2026-06-12, previously never spoken at all).
+    -- Added before the fog branch like terrain: under fog this reads CURRENT
+    -- state, an approximation of the sighted "last seen" memory — good enough
+    -- until a revealed-state cache exists.
+    local improvement = improvementName(plot);
+    if improvement ~= "" then parts[#parts + 1] = improvement; end
+    local route = routeName(plot);
+    if route ~= "" then parts[#parts + 1] = route; end
+    -- Entry cost, exceptions-only (Noel 2026-06-12): "costs N" speaks iff N > 1,
+    -- so flat tiles stay terse and only the turn-eaters (hills, woods, marsh)
+    -- announce themselves. Silence = the normal 1. Roads flatten the cost back
+    -- to <=1 (PlotEntryCost), so a roaded hill goes quiet again.
+    local cost = (PlotEntryCost ~= nil) and PlotEntryCost(plot) or nil;
+    if cost ~= nil and cost > 1 then
+        parts[#parts + 1] = "costs " .. tostring(cost);
     end
 
     if not isVisible then
@@ -671,7 +715,7 @@ local CURSOR_HELP_ENTRIES = {
     { keyLabel = "Shift+Comma",  description = "Cycle to previous unit, any state" },
 
     -- Unit info
-    { keyLabel = "Slash",   description = "Speak selected unit's stats" },
+    { keyLabel = "Slash",   description = "Speak selected unit's stats, then the six exits with move costs" },
     { keyLabel = "Ctrl+Slash", description = "Recenter cursor on selected unit" },
 
     -- Pickers

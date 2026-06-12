@@ -29,16 +29,14 @@ If you're about to ask the user something, check these first — it's probably a
   is on:
   - **ON the wrap (reliable, speaks):** scanner ladder (PageUp/Down/Home/End/
     Backspace), survey+zoom (S, W, Shift+W, Alt+G/U/R, Alt+digits/±), move-to (M /
-    Shift+M / Ctrl+M), combat (Ctrl+A), Shift+/ (`?`).
-  - **JUST MIGRATED onto the wrap (`NavKeys.lua`, committed 2026-06-11, UNVERIFIED —
-    test before trusting):** the hex-cursor move (**bare** Q/E/A/D/Z/C →
-    `HexCursor.move`), the unit one-hex move (**Shift+**Q/E/A/D/Z/C →
-    `UnitMovement.directMove`), and **Ctrl+D = direction-vocab** (moved off Shift+D, so
-    the D-family is now bare=cursor-E / Shift=unit-E / Ctrl=vocab, mirroring A). This was
-    the #14 fix for the DEAD Shift+dir unit-move (Lua.log 2026-06-11: no move/speech/log).
-    The old `CIVVIACCESS_Cursor*/Move*` InputActions still sit in `RemapForHexCursor.xml`
-    but the wrap suppresses them. **If a fresh session sees this UNVERIFIED note, the
-    first job is to live-test it (see `docs/HANDOFF.md`).**
+    Shift+M / Ctrl+M), combat (Ctrl+A), Shift+/ (`?`), and — **verified live in
+    Lua.log 2026-06-11** — the hex cluster via `NavKeys.lua`: hex-cursor move
+    (**bare** Q/E/A/D/Z/C → `HexCursor.move`), unit one-hex move
+    (**Shift+**Q/E/A/D/Z/C → `UnitMovement.directMove`), and **Ctrl+D =
+    direction-vocab** (moved off Shift+D; D-family = bare cursor-E / Shift unit-E /
+    Ctrl vocab, mirroring A). Ctrl+D itself hasn't shown up in a log yet. The old
+    `CIVVIACCESS_Cursor*/Move*` InputActions still sit in `RemapForHexCursor.xml`
+    but the wrap suppresses them (revert fallback).
   - **STILL on the legacy engine InputAction path — FLAKY, SILENT:** only the rebound
     engine letter-actions remain (**Alt+**Q/A/Z/C = resources/attack/sleep/civics). The
     "map some engine keys, not all" follow-up owns + announces (or eats) these.
@@ -60,8 +58,11 @@ If you're about to ask the user something, check these first — it's probably a
   Configurable center (cursor or entered x/y/radius), category filter; output as a
   spoken clock-list OR HRTF/stereo pan; tied to zoom + the direction-vocabulary
   setting. It's P1; search is grouped with it.
-- **Direction vocabulary.** `Shift+D` cycles hex / compass / clock / degrees
+- **Direction vocabulary.** `Ctrl+D` cycles hex / compass / clock / degrees
   globally (`HexGeom.directionString`); used by scanner + cursor where-am-I.
+  **Contract: `directionString` carries the distance itself** (hex mode via the
+  decomposition, bearing modes via the `LOC_*_PHRASE` strings) — callers must
+  NOT append ", N hexes" on top (that double-spoke it, fixed 2026-06-12).
 - **camm submodule + Prism.** The launcher's guts live in `camm/` (the mod is ~glue
   on top). Prism (Tolk-alternative screen reader) is a **pinned** submodule at
   `camm/third_party/prism`, built from source. **Gotcha:** when launcher C# uses a

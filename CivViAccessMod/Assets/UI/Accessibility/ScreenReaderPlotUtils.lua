@@ -19,6 +19,9 @@
 --     "{civilization adjective} city {city name}", e.g. "American city
 --     Boston". LOC_CITY_NAME_BLANK supplies the localized "city" word so
 --     translated builds read correctly in their target language.
+--
+--   PlotEntryCost(plot) -> number | nil
+--     Effective MP cost to ENTER the plot, nil if impassable.
 
 include("ScreenReader");
 
@@ -127,7 +130,7 @@ function StringifyUnit(unit)
         decorated = Locale.Lookup("LOC_CIVVIACCESS_UNIT_DAMAGED", decorated);
     end
     -- En-route status (Noel 2026-06-09): an OWN unit auto-moving to a queued
-    -- destination reads "... moving to <dir>, <dist> hexes, at <x, y>" so a unit
+    -- destination reads "... moving to <dir>, at <x, y>" so a unit
     -- walking over several turns isn't silent in the scanner / selection readouts.
     -- Own units only — we don't (and shouldn't) see a foreign unit's orders.
     -- Guarded: HexGeom may be absent in some VMs; falls back to coords.
@@ -141,10 +144,11 @@ function StringifyUnit(unit)
                 local coords = (HexGeom ~= nil and HexGeom.absoluteCoords)
                                and HexGeom.absoluteCoords(dx, dy) or (dx .. ", " .. dy);
                 local where = nil;
-                if HexGeom ~= nil and HexGeom.directionString and Map.GetPlotDistance then
-                    local dir  = HexGeom.directionString(unit:GetX(), unit:GetY(), dx, dy);
-                    local dist = Map.GetPlotDistance(unit:GetX(), unit:GetY(), dx, dy);
-                    if dir ~= nil and dist ~= nil then where = dir .. ", " .. dist .. " hexes"; end
+                if HexGeom ~= nil and HexGeom.directionString then
+                    -- directionString carries the distance itself (hex decomposition,
+                    -- or the "<dir>, N hexes" LOC phrase) — appending it here doubled
+                    -- it: "moving to 1 southeast, 1 hexes" (Lua.log 2026-06-11).
+                    where = HexGeom.directionString(unit:GetX(), unit:GetY(), dx, dy);
                 end
                 decorated = decorated .. ", moving to "
                             .. (where ~= nil and (where .. ", at " .. coords) or coords);
@@ -206,4 +210,31 @@ function ResourceName(plot)
     local resourceRow = GameInfo.Resources[resourceIdx];
     if resourceRow == nil then return ""; end
     return Locale.Lookup(resourceRow.Name);
+end
+
+-- Effective MP cost to ENTER the plot, or nil if impassable. Base number is the
+-- engine's own per-plot cost (terrain + feature — the same figure the sighted
+-- plot tooltip prints). An unpillaged road overrides it with the route's rate
+-- (Civ VI roads flatten terrain: ancient road = 1, later eras < 1), so a roaded
+-- hill correctly stops costing 2. River crossings are EDGE costs (+2,
+-- MOVEMENT_RIVER_COST), not plot costs — callers flag those separately. Unit-
+-- specific modifiers (promotions, embarked state) are NOT applied.
+function PlotEntryCost(plot)
+    if plot == nil then return nil; end
+    local impassable = false;
+    pcall(function() impassable = plot:IsImpassable(); end);
+    if impassable then return nil; end
+    local cost = nil;
+    pcall(function() cost = plot:GetMovementCost(); end);
+    local routeCost = nil;
+    pcall(function()
+        if plot:IsRoute() and not plot:IsRoutePillaged() then
+            local row = GameInfo.Routes[plot:GetRouteType()];
+            routeCost = (row ~= nil) and row.MovementCost or nil;
+        end
+    end);
+    if routeCost ~= nil and (cost == nil or routeCost < cost) then
+        return routeCost;
+    end
+    return cost;
 end
