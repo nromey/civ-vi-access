@@ -126,6 +126,20 @@ routes through it), ongoing diplo interactions.
 
 ---
 
+## Queue manager (Noel 2026-06-12 — AFTER the pager + empire report)
+
+Unified queue awareness + editing across production / tech / civics (engine
+supports all three natively; GS added research queueing). Two halves, built
+in this order:
+- **Read side rides the empire report:** per-city "Granary 4 turns, then
+  Monument" + "Research: Writing 3 turns, then Currency". Plus completion
+  hand-offs already in the overnight briefing (shipped 2026-06-12).
+- **Edit side rides the pickers:** a real Queue tab (today it shows only the
+  current item) — arrow entries, Delete cancels, reorder, modifier-pick to
+  append instead of replace. PolicyWizard's slot-walk is the interaction
+  cousin. Prereq lesson (the Granary surprise): NO deeper queueing UX until
+  the audibility layer is solid — a queue you can't hear is a trap.
+
 ## Unphased infra (ride alongside / after P1–P3 — not blocking play)
 
 - **#13 Sighted mode** — input passthrough + per-player designation in game options
