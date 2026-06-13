@@ -38,11 +38,24 @@ local function revealed(vis, x, y)
     return (not ok) or (r == true);
 end
 
+-- Tech-reveal gate (Noel 2026-06-12: the scanner listed Coal and Aluminum in
+-- the ANCIENT era — sighted players can't see a strategic resource until its
+-- reveal tech, and neither should we; the tile readout already gates via the
+-- same check). playerResources:IsResourceVisible(hash), per the engine
+-- PlotToolTip. Fail-open only if the API is missing entirely.
+local function resourceKnown(playerResources, row)
+    if playerResources == nil or playerResources.IsResourceVisible == nil then return true; end
+    local ok, visible = pcall(function() return playerResources:IsResourceVisible(row.Hash); end);
+    return ok and visible == true;
+end
+
 function ScannerBackendResources.Scan(_activePlayer, _activeTeam)
     local out = {};
     local localId = localPlayerId();
     if localId < 0 then return out; end
     local vis = (PlayersVisibility ~= nil) and PlayersVisibility[localId] or nil;
+    local playerResources = nil;
+    pcall(function() playerResources = Players[localId]:GetResources(); end);
 
     local n = plotCount();
     for i = 0, n - 1 do
@@ -51,6 +64,7 @@ function ScannerBackendResources.Scan(_activePlayer, _activeTeam)
             local resId = plot:GetResourceType();
             if resId ~= nil and resId >= 0 and revealed(vis, plot:GetX(), plot:GetY()) then
                 local row = GameInfo.Resources[resId];
+                if row ~= nil and not resourceKnown(playerResources, row) then row = nil; end
                 if row ~= nil then
                     local sub = CLASS_SUB[row.ResourceClassType];
                     if sub ~= nil then
@@ -77,7 +91,11 @@ function ScannerBackendResources.ValidateEntry(entry, _cursorPlotHint)
     local localId = localPlayerId();
     local vis = (PlayersVisibility ~= nil) and PlayersVisibility[localId] or nil;
     if not revealed(vis, plot:GetX(), plot:GetY()) then return false; end
-    return plot:GetResourceType() == entry.data.resId;
+    if plot:GetResourceType() ~= entry.data.resId then return false; end
+    local playerResources = nil;
+    pcall(function() playerResources = Players[localId]:GetResources(); end);
+    local row = GameInfo.Resources[entry.data.resId];
+    return row ~= nil and resourceKnown(playerResources, row);
 end
 
 function ScannerBackendResources.FormatName(entry)
