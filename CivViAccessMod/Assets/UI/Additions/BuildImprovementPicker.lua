@@ -83,14 +83,35 @@ local function hasCivic(civicType)
 end
 
 -- Improvement TYPE strings the given builder unit can ever construct.
+-- Trait-gated uniques (Inca Terrace Farm etc.) are excluded unless THIS
+-- player's civ/leader carries the trait — without the gate every civ's
+-- unique cluttered the locked list (Noel 2026-06-12).
 local function builderImprovementTypes(pUnit)
     local set = {};
     if GameInfo.Improvement_ValidBuildUnits == nil then return set; end
     local uRow = GameInfo.Units and GameInfo.Units[pUnit:GetUnitType()] or nil;
     local uType = uRow and uRow.UnitType or nil;
     if uType == nil then return set; end
+    local playerTraits = {};
+    pcall(function()
+        local cfg = PlayerConfigurations[lp()];
+        local civType = cfg:GetCivilizationTypeName();
+        local leaderType = cfg:GetLeaderTypeName();
+        for r in GameInfo.CivilizationTraits() do
+            if r.CivilizationType == civType then playerTraits[r.TraitType] = true; end
+        end
+        for r in GameInfo.LeaderTraits() do
+            if r.LeaderType == leaderType then playerTraits[r.TraitType] = true; end
+        end
+    end);
     for row in GameInfo.Improvement_ValidBuildUnits() do
-        if row.UnitType == uType then set[row.ImprovementType] = true; end
+        if row.UnitType == uType then
+            local impRow = GameInfo.Improvements[row.ImprovementType];
+            if impRow ~= nil
+               and (impRow.TraitType == nil or playerTraits[impRow.TraitType]) then
+                set[row.ImprovementType] = true;
+            end
+        end
     end
     return set;
 end

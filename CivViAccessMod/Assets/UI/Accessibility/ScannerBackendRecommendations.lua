@@ -106,7 +106,27 @@ function ScannerBackendRecommendations.Scan(_activePlayer, _activeTeam)
             end
             local pTechs  = player.GetTechs   ~= nil and player:GetTechs()   or nil;
             local pCult   = player.GetCulture ~= nil and player:GetCulture() or nil;
+            -- Trait gate (Noel 2026-06-12: the Dutch were offered the INCA
+            -- Terrace Farm — unique improvements carry a TraitType and most
+            -- have no tech prereq, so they all leaked). Collect the player's
+            -- civilization + leader traits; a TraitType'd improvement needs a
+            -- matching trait.
+            local playerTraits = {};
+            pcall(function()
+                local cfg = PlayerConfigurations[localId];
+                local civType = cfg:GetCivilizationTypeName();
+                local leaderType = cfg:GetLeaderTypeName();
+                for r in GameInfo.CivilizationTraits() do
+                    if r.CivilizationType == civType then playerTraits[r.TraitType] = true; end
+                end
+                for r in GameInfo.LeaderTraits() do
+                    if r.LeaderType == leaderType then playerTraits[r.TraitType] = true; end
+                end
+            end);
             local function unlocked(impRow)
+                if impRow.TraitType ~= nil and not playerTraits[impRow.TraitType] then
+                    return false;
+                end
                 if impRow.PrereqTech ~= nil then
                     local t = GameInfo.Technologies[impRow.PrereqTech];
                     if t == nil or pTechs == nil or not pTechs:HasTech(t.Index) then return false; end
