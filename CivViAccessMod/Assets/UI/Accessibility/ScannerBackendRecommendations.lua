@@ -78,6 +78,7 @@ function ScannerBackendRecommendations.Scan(_activePlayer, _activeTeam)
     -- charges, abilities), so it needs a live Builder — without one there are
     -- no work-site entries, exactly like the sighted lens that only lights up
     -- while a Builder is selected. Tiles already improved are skipped.
+    -- Find a live builder-class unit (the lens lights up only with one).
     local pBuilder = nil;
     pcall(function()
         for _, u in player:GetUnits():Members() do
@@ -88,46 +89,129 @@ function ScannerBackendRecommendations.Scan(_activePlayer, _activeTeam)
             end
         end
     end);
-    if pBuilder ~= nil and UnitManager ~= nil and UnitManager.CanStartOperation ~= nil then
-        local op = (UnitOperationTypes ~= nil and UnitOperationTypes.BUILD_IMPROVEMENT) or nil;
-        if op ~= nil and Map.GetPlotCount ~= nil then
-            for i = 0, Map.GetPlotCount() - 1 do
-                local plot = Map.GetPlotByIndex(i);
-                if plot ~= nil then
-                    local owned, improved = false, false;
-                    pcall(function()
-                        owned = (plot:GetOwner() == localId);
-                        improved = (plot:GetImprovementType() ~= -1);
-                    end);
-                    if owned and not improved then
-                        local best = nil;
-                        pcall(function()
-                            local tParameters = {};
-                            tParameters[UnitOperationTypes.PARAM_X] = plot:GetX();
-                            tParameters[UnitOperationTypes.PARAM_Y] = plot:GetY();
-                            local canStart, tResults =
-                                UnitManager.CanStartOperation(pBuilder, op, nil, tParameters, true);
-                            if canStart and tResults ~= nil then
-                                local imps = tResults[UnitOperationResults.IMPROVEMENTS];
-                                if imps ~= nil and #imps > 0 then
-                                    best = tResults[UnitOperationResults.BEST_IMPROVEMENT];
-                                    if best == nil or best == -1 then best = imps[1]; end
-                                end
-                            end
-                        end);
-                        if best ~= nil then
-                            local row = GameInfo.Improvements[best];
-                            local impName = (row ~= nil and row.Name ~= nil)
-                                            and Locale.Lookup(row.Name) or "Improvement";
-                            out[#out + 1] = {
-                                plotIndex   = i,
-                                category    = "recommendations",
-                                subcategory = "all",
-                                itemName    = impName .. " site",
-                                key         = "rec:work:" .. i,
-                                data        = { kind = "work", eImp = best },
-                            };
+    if pBuilder ~= nil and Map.GetPlotCount ~= nil then
+        -- STATIC validity from the game database. The first build probed the
+        -- engine (CanStartOperation with remote PARAM_X/Y) — the engine
+        -- ignored the coords and answered for the builder's CURRENT tile,
+        -- so every owned plot claimed "Lumber Mill" (Noel's log 2026-06-12).
+        -- These are the same tables the Shift+B picker's lockReason reads;
+        -- engine-exotic rules (Polder adjacency etc.) aren't expressible
+        -- here, so the picker on arrival remains ground truth.
+        local candidates = {};   -- array of { row, terrains={}, nTerrains, features={}, resources={} }
+        pcall(function()
+            local buildable = {};
+            local uRow = GameInfo.Units[pBuilder:GetUnitType()];
+            for r in GameInfo.Improvement_ValidBuildUnits() do
+                if uRow ~= nil and r.UnitType == uRow.UnitType then buildable[r.ImprovementType] = true; end
+            end
+            local pTechs  = player.GetTechs   ~= nil and player:GetTechs()   or nil;
+            local pCult   = player.GetCulture ~= nil and player:GetCulture() or nil;
+            local function unlocked(impRow)
+                if impRow.PrereqTech ~= nil then
+                    local t = GameInfo.Technologies[impRow.PrereqTech];
+                    if t == nil or pTechs == nil or not pTechs:HasTech(t.Index) then return false; end
+                end
+                if impRow.PrereqCivic ~= nil then
+                    local c = GameInfo.Civics[impRow.PrereqCivic];
+                    if c == nil or pCult == nil or not pCult:HasCivic(c.Index) then return false; end
+                end
+                return true;
+            end
+            for impRow in GameInfo.Improvements() do
+                if buildable[impRow.ImprovementType] and unlocked(impRow) then
+                    local c = { row = impRow, terrains = {}, nTerrains = 0,
+                                features = {}, resources = {} };
+                    for r in GameInfo.Improvement_ValidTerrains() do
+                        if r.ImprovementType == impRow.ImprovementType then
+                            c.terrains[r.TerrainType] = true;
+                            c.nTerrains = c.nTerrains + 1;
                         end
+                    end
+                    for r in GameInfo.Improvement_ValidFeatures() do
+                        if r.ImprovementType == impRow.ImprovementType then c.features[r.FeatureType] = true; end
+                    end
+                    for r in GameInfo.Improvement_ValidResources() do
+                        if r.ImprovementType == impRow.ImprovementType then c.resources[r.ResourceType] = true; end
+                    end
+                    candidates[#candidates + 1] = c;
+                end
+            end
+        end);
+        local playerResources = nil;
+        pcall(function() playerResources = Players[localId]:GetResources(); end);
+
+        -- Best candidate for one plot. Priority: resource match (the tile's
+        -- visible resource wants ITS improvement) > feature match (woods ->
+        -- Lumber Mill) > terrain match, most-specific candidate first (Mine's
+        -- hills-only beats Farm's everywhere). Tiles whose resource/feature
+        -- has no unlocked match yield NOTHING (don't suggest builds the
+        -- engine would refuse or that need a chop).
+        local function bestFor(plot)
+            local terrainType, featureType, resType = nil, nil, nil;
+            pcall(function()
+                local tr = GameInfo.Terrains[plot:GetTerrainType()];
+                terrainType = tr and tr.TerrainType or nil;
+                local fIdx = plot:GetFeatureType();
+                if fIdx ~= -1 then
+                    local fr = GameInfo.Features[fIdx];
+                    featureType = fr and fr.FeatureType or nil;
+                end
+                local rIdx = plot:GetResourceType();
+                if rIdx ~= -1 then
+                    local rr = GameInfo.Resources[rIdx];
+                    if rr ~= nil then
+                        local visible = true;
+                        if playerResources ~= nil and playerResources.IsResourceVisible ~= nil then
+                            local ok, v = pcall(function() return playerResources:IsResourceVisible(rr.Hash); end);
+                            visible = ok and v == true;
+                        end
+                        if visible then resType = rr.ResourceType; end
+                    end
+                end
+            end);
+            if resType ~= nil then
+                for _, c in ipairs(candidates) do
+                    if c.resources[resType] then return c.row; end
+                end
+                return nil;   -- resource tile, no unlocked harvester yet
+            end
+            if featureType ~= nil then
+                for _, c in ipairs(candidates) do
+                    if c.features[featureType] then return c.row; end
+                end
+                return nil;   -- featured tile needs a chop or a later tech
+            end
+            if terrainType == nil then return nil; end
+            local best = nil;
+            for _, c in ipairs(candidates) do
+                if c.terrains[terrainType] then
+                    if best == nil or c.nTerrains < best.nTerrains then best = c; end
+                end
+            end
+            return best ~= nil and best.row or nil;
+        end
+
+        for i = 0, Map.GetPlotCount() - 1 do
+            local plot = Map.GetPlotByIndex(i);
+            if plot ~= nil then
+                local eligible = false;
+                pcall(function()
+                    eligible = (plot:GetOwner() == localId)
+                           and (plot:GetImprovementType() == -1)
+                           and not plot:IsCity()
+                           and plot:GetDistrictType() == -1;
+                end);
+                if eligible then
+                    local impRow = bestFor(plot);
+                    if impRow ~= nil then
+                        out[#out + 1] = {
+                            plotIndex   = i,
+                            category    = "recommendations",
+                            subcategory = "all",
+                            itemName    = Locale.Lookup(impRow.Name) .. " site",
+                            key         = "rec:work:" .. i,
+                            data        = { kind = "work", eImp = impRow.Index },
+                        };
                     end
                 end
             end

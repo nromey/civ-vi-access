@@ -40,10 +40,13 @@ BUILD_IMPROVEMENT with PARAM_X/Y + results), item-named by best improvement
 ("Farm site" / "Mine site"), needs a live Builder (like the sighted lens).
 Flow: Ctrl+PageDown to Recommendations -> PageDown to "Mine site" -> Home ->
 Ctrl+comma to the Builder -> M -> Shift+B on arrival.
-RISK to verify in the log: whether CanStartOperation honors PARAM_X/Y for
-REMOTE tiles — if every owned plot claims the same improvement as the
-builder's current tile, the engine ignored the params and we need a
-GameInfo-side validity fallback.
+RISK CONFIRMED + FIXED same evening: CanStartOperation ignored remote
+PARAM_X/Y — all 10 owned plots claimed "Lumber Mill" (the builder's own
+woods tile). Rewritten on STATIC GameInfo validity (ValidBuildUnits +
+tech/civic gate + ValidResources > ValidFeatures > ValidTerrains,
+most-specific-terrain wins; resource/feature tiles with no unlocked match
+yield nothing). Engine-exotic rules (Polder adjacency) aren't expressible
+statically — the Shift+B picker on arrival stays ground truth.
 ALSO fixed: scanner resources leaked Coal/Aluminum pre-reveal-tech
 (IsResourceVisible gate added to Scan + Validate).
 
