@@ -79,8 +79,11 @@ is what steps items (Warrior → Builder). Teaching, not a bug.
 ReportWindow (Noel 2026-06-12: reports = web, pager = in-game speech — see
 TASK_PLAN surface rule). First client: per-city yields ("Amsterdam:
 production 8 per turn") so an improvement's effect is audible — Noel's mine
-question is the acceptance test. Pager remainder: threshold into the future
-accessibility tab. — design settled in
+question is the acceptance test. SECOND client (Noel 2026-06-12): a
+TERRITORY section — owned tiles count, improved vs unimproved, what's
+workable, plus the planned exploration stats (% explored, nearest fog —
+`project_map_exploration_report`) so "how much room do I have" is answerable.
+Pager remainder: threshold into the future accessibility tab. — design settled in
 `docs/TASK_PLAN.md` ("NEXT UP" block): (1) repeat-last key first, (2) history
 ring buffer w/ cross-VM collector in the addin VM, (3) the sentence-paged
 reader. Three speech losses in one day (Robert's diplo line, the reveal
