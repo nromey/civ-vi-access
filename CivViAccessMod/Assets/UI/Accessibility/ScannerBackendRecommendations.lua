@@ -69,12 +69,87 @@ function ScannerBackendRecommendations.Scan(_activePlayer, _activeTeam)
             end
         end
     end
+
+    -- WORK SITES (Noel 2026-06-12: "an easier way to find places to build
+    -- stuff, like a sighted person does" — this is the spoken Builder lens).
+    -- Probe every plot the player OWNS with the same engine check the Shift+B
+    -- picker uses: CanStartOperation(BUILD_IMPROVEMENT, PARAM_X/Y, results) ->
+    -- the valid improvement list for that tile. The check is per-UNIT (tech,
+    -- charges, abilities), so it needs a live Builder — without one there are
+    -- no work-site entries, exactly like the sighted lens that only lights up
+    -- while a Builder is selected. Tiles already improved are skipped.
+    local pBuilder = nil;
+    pcall(function()
+        for _, u in player:GetUnits():Members() do
+            local row = GameInfo.Units[u:GetUnitType()];
+            if row ~= nil and row.BuildCharges ~= nil and row.BuildCharges > 0 then
+                pBuilder = u;
+                break;
+            end
+        end
+    end);
+    if pBuilder ~= nil and UnitManager ~= nil and UnitManager.CanStartOperation ~= nil then
+        local op = (UnitOperationTypes ~= nil and UnitOperationTypes.BUILD_IMPROVEMENT) or nil;
+        if op ~= nil and Map.GetPlotCount ~= nil then
+            for i = 0, Map.GetPlotCount() - 1 do
+                local plot = Map.GetPlotByIndex(i);
+                if plot ~= nil then
+                    local owned, improved = false, false;
+                    pcall(function()
+                        owned = (plot:GetOwner() == localId);
+                        improved = (plot:GetImprovementType() ~= -1);
+                    end);
+                    if owned and not improved then
+                        local best = nil;
+                        pcall(function()
+                            local tParameters = {};
+                            tParameters[UnitOperationTypes.PARAM_X] = plot:GetX();
+                            tParameters[UnitOperationTypes.PARAM_Y] = plot:GetY();
+                            local canStart, tResults =
+                                UnitManager.CanStartOperation(pBuilder, op, nil, tParameters, true);
+                            if canStart and tResults ~= nil then
+                                local imps = tResults[UnitOperationResults.IMPROVEMENTS];
+                                if imps ~= nil and #imps > 0 then
+                                    best = tResults[UnitOperationResults.BEST_IMPROVEMENT];
+                                    if best == nil or best == -1 then best = imps[1]; end
+                                end
+                            end
+                        end);
+                        if best ~= nil then
+                            local row = GameInfo.Improvements[best];
+                            local impName = (row ~= nil and row.Name ~= nil)
+                                            and Locale.Lookup(row.Name) or "Improvement";
+                            out[#out + 1] = {
+                                plotIndex   = i,
+                                category    = "recommendations",
+                                subcategory = "all",
+                                itemName    = impName .. " site",
+                                key         = "rec:work:" .. i,
+                                data        = { kind = "work", eImp = best },
+                            };
+                        end
+                    end
+                end
+            end
+        end
+    end
     return out;
 end
 
 function ScannerBackendRecommendations.ValidateEntry(entry, _cursorPlotHint)
     if Map == nil or Map.GetPlotByIndex == nil then return false; end
-    return Map.GetPlotByIndex(entry.plotIndex) ~= nil;
+    local plot = Map.GetPlotByIndex(entry.plotIndex);
+    if plot == nil then return false; end
+    -- A work site that got built (or lost) since the scan is stale.
+    if entry.data ~= nil and entry.data.kind == "work" then
+        local stillValid = false;
+        pcall(function()
+            stillValid = (plot:GetImprovementType() == -1)
+                     and (plot:GetOwner() == localPlayerId());
+        end);
+        return stillValid;
+    end
+    return true;
 end
 
 function ScannerBackendRecommendations.FormatName(entry)

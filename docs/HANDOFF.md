@@ -31,6 +31,22 @@ reveal or the overnight briefing, Shift+R to recall it → reader announces
 "Last announce. Reader, N parts." → walk with Down/Up → Escape. Short
 entries still re-speak directly with their "Back N" prefix.
 
+## NEW (untested): Work sites in the scanner — the spoken Builder lens
+
+Noel: "an easier way to find places to build stuff, like a sighted person."
+`ScannerBackendRecommendations` now also emits WORK SITES: every owned,
+unimproved plot probed via the Shift+B engine check (CanStartOperation
+BUILD_IMPROVEMENT with PARAM_X/Y + results), item-named by best improvement
+("Farm site" / "Mine site"), needs a live Builder (like the sighted lens).
+Flow: Ctrl+PageDown to Recommendations -> PageDown to "Mine site" -> Home ->
+Ctrl+comma to the Builder -> M -> Shift+B on arrival.
+RISK to verify in the log: whether CanStartOperation honors PARAM_X/Y for
+REMOTE tiles — if every owned plot claims the same improvement as the
+builder's current tile, the engine ignored the params and we need a
+GameInfo-side validity fallback.
+ALSO fixed: scanner resources leaked Coal/Aluminum pre-reveal-tech
+(IsResourceVisible gate added to Scan + Validate).
+
 ## PAGER round 3 (untested): Shift+/ = full CONTEXT help in the reader
 
 Shift+/ on the map now composes EVERY HandlerStack-registered binding
