@@ -445,7 +445,12 @@ local function makeChoiceWithState(pCity, paramKey, hash, displayName,
     if isCanStart and _recommendedHashes[hash] then
         label = label .. " — recommended";
     end
-    if requiresPlacement then
+    -- "placement needed (coming soon)" ONLY when placement is genuinely the
+    -- sole obstacle (engine says buildable, our placement picker isn't built
+    -- yet). When the engine REFUSES — "No suitable location" etc. — that
+    -- reason is the truth and the placement tag just muddied it (Noel
+    -- 2026-06-12: "it says we need to place them BUT no suitable land").
+    if requiresPlacement and isCanStart then
         label = label .. " — placement needed (coming soon)";
     end
     if not isCanStart then
