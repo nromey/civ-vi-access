@@ -75,8 +75,12 @@ is what steps items (Warrior → Builder). Teaching, not a bug.
 
 ## RESUME HERE — next session
 
-**Continue the PAGER arc:** route the EOT/empire report + context-sensitive
-`?` through it; pull the threshold into the future accessibility tab. — design settled in
+**Continue the reporting arc:** the empire/economy report builds on the WEB
+ReportWindow (Noel 2026-06-12: reports = web, pager = in-game speech — see
+TASK_PLAN surface rule). First client: per-city yields ("Amsterdam:
+production 8 per turn") so an improvement's effect is audible — Noel's mine
+question is the acceptance test. Pager remainder: threshold into the future
+accessibility tab. — design settled in
 `docs/TASK_PLAN.md` ("NEXT UP" block): (1) repeat-last key first, (2) history
 ring buffer w/ cross-VM collector in the addin VM, (3) the sentence-paged
 reader. Three speech losses in one day (Robert's diplo line, the reveal

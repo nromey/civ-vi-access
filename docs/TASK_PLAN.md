@@ -144,8 +144,12 @@ Two cooperating pieces, built in this order:
    keys.
 3. **Pager for long text:** sentence-paged reader (N/P/re-read/Escape),
    buffers notifications while active; any history entry too long for one
-   utterance opens IN the pager; context-aware `?` and the empire report
-   render through it. (Memory: `project_help_pager_and_context_help`.)
+   utterance opens IN the pager; context-aware `?` renders through it.
+   (Memory: `project_help_pager_and_context_help`.)
+   **SURFACE RULE (Noel 2026-06-12): REPORTS (empire/EOT/economy) go through
+   the WEB ReportWindow (launcher Edge view, real HTML headings — the proven
+   N-key bridge), NOT the pager.** Pager = in-game speech-length content
+   (help, long announces, history, advisor text). Don't re-drift.
 
 ## Advisor + tutorial content (Noel 2026-06-12 — "crucial for new players")
 
