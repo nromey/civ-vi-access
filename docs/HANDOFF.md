@@ -26,12 +26,14 @@ on east + southeast (river lives on neighbor edges), spoken "east 2, river …
 southeast 3, river". Side convention is correct (neighbor W/NW edges are
 unambiguously those physical edges). Diagnostic stripped after.
 
-**FOLLOW-UP (noticed, unresolved): exits-ring cost numbers look off.** Same dump:
-NE GRASS_HILLS read "1" (hills should be 2); the two river tiles read base+1 (plains
-east=2, plains-hills southeast=3). Possible road/route-rate override on NE, or the
-river +1 leaking into `PlotEntryCost`'s number (it's supposed to be flagged by name
-only). Investigate `PlotEntryCost` (ScreenReaderPlotUtils) + `plot:GetMovementCost()`
-semantics; add a cost-focused diagnostic when picked up. SEPARATE from the river flag.
+**Exits-ring cost numbers — investigated, NOT a bug (resolved 2026-06-13).** COST_DEBUG
+dump at (11,30) showed every number is correct: NE grass-hills read 1 because it has
+an ANCIENT ROAD (route rate flattens hills 2->1); east plains read 2 and southeast
+plains-hills read 3 because `GetMovementCost` ALREADY folds in the river-crossing
+surcharge (+1). So "east 2, river" is ideal — true cost + informational flag. Stale
+comments in `PlotEntryCost` (ScreenReaderPlotUtils) and `riverBetween` (UnitInfo)
+claimed GetMovementCost excludes rivers (+2 flagged separately) — corrected. Diagnostic
+stripped.
 
 **Shift+/ help redesign — UNTESTED (`f576bce`).** Reverted round-3 "dump everything
 into the pager." Shift+/ (and F1) now open the navigable Help LIST; long-form TOPIC

@@ -91,11 +91,13 @@ local EXIT_DIRS = {
 };
 
 -- Rivers sit on hex EDGES, stored on a plot's NW/W/NE sides — same scheme as
--- cliffs, so this mirrors UnitMovement.blockedReason's cliff mapping. A river
--- crossing adds MOVEMENT_RIVER_COST (+2) unless bridged, so it's flagged by
--- name rather than folded into the number. (Edge convention not yet verified
--- against a live river — if "river" speaks on the wrong side, swap the
--- fromPlot/toPlot halves here AND in the cliff check it copies.)
+-- cliffs, so this mirrors UnitMovement.blockedReason's cliff mapping. The river
+-- crossing surcharge is ALREADY in the spoken number — plot:GetMovementCost()
+-- folds it in (verified live 2026-06-13 at (11,30): plains-across-a-river read 2,
+-- plains-hills-across-a-river read 3, i.e. terrain +1). So ", river" is an
+-- INFORMATIONAL flag — it tells the user why the cost is elevated and that
+-- terrain's there — NOT a cost we add on top. Edge convention VERIFIED same
+-- session: river flagged correctly on the east + southeast edges.
 local function riverBetween(fromPlot, toPlot, direction)
     local DT = DirectionTypes;
     local river = false;
@@ -110,14 +112,6 @@ local function riverBetween(fromPlot, toPlot, direction)
     end);
     return river;
 end
-
--- TEMP diagnostic (Noel 2026-06-13): the exits-ring cost numbers looked wrong
--- (grass hills read 1, river tiles read base+1). PlotEntryCost just returns
--- plot:GetMovementCost() with a road override, so this dumps the raw components
--- per edge — GetMovementCost, IsRoute/routeCost, riverBetween, final cost — so we
--- can see exactly what GetMovementCost reports vs the expected terrain cost.
--- STRIP after the fix lands.
-local COST_DEBUG = true;
 
 local function exitsRing(pUnit)
     if Map == nil or Map.GetPlot == nil or Map.GetAdjacentPlot == nil then return nil; end
@@ -148,22 +142,6 @@ local function exitsRing(pUnit)
                 if not isWater and why == nil then why = "land"; end
             end
             local hasRiver = riverBetween(fromPlot, adj, d.dir);
-            if COST_DEBUG then
-                local terr, mc, isRoute, rType, rCost = "?", "?", "?", "?", "?";
-                pcall(function() local r = GameInfo.Terrains[adj:GetTerrainType()]; terr = r and r.TerrainType or "?"; end);
-                pcall(function() mc = tostring(adj:GetMovementCost()); end);
-                pcall(function() isRoute = tostring(adj:IsRoute()); end);
-                pcall(function()
-                    if adj:IsRoute() then
-                        local row = GameInfo.Routes[adj:GetRouteType()];
-                        rType = row and row.RouteType or "?";
-                        rCost = row and tostring(row.MovementCost) or "?";
-                    end
-                end);
-                local final = (PlotEntryCost ~= nil) and PlotEntryCost(adj) or nil;
-                Log.info(("COST_DEBUG: %s -> %s GetMovementCost=%s IsRoute=%s route=%s/%s river=%s blocked=%s final=%s")
-                         :format(d.name, terr, mc, isRoute, rType, rCost, tostring(hasRiver), tostring(why), tostring(final)));
-            end
             if why ~= nil then
                 bits[#bits + 1] = d.name .. " " .. why;
             else

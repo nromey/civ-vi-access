@@ -230,9 +230,10 @@ end
 -- engine's own per-plot cost (terrain + feature — the same figure the sighted
 -- plot tooltip prints). An unpillaged road overrides it with the route's rate
 -- (Civ VI roads flatten terrain: ancient road = 1, later eras < 1), so a roaded
--- hill correctly stops costing 2. River crossings are EDGE costs (+2,
--- MOVEMENT_RIVER_COST), not plot costs — callers flag those separately. Unit-
--- specific modifiers (promotions, embarked state) are NOT applied.
+-- hill correctly stops costing 2. NOTE (verified live 2026-06-13): GetMovementCost
+-- ALSO folds in the river-crossing surcharge (+1 here) — the exits ring's ", river"
+-- is an informational flag, NOT an extra cost callers add. Unit-specific modifiers
+-- (promotions, embarked state) are NOT applied.
 function PlotEntryCost(plot)
     if plot == nil then return nil; end
     local impassable = false;
