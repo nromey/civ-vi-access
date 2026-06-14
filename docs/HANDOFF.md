@@ -337,7 +337,8 @@ read the log for what LuaEvent fired and wire that path.
 - Enemy-halt on auto-move still unverified (no enemy tested).
 - Survey perf: `S` runs all backends incl. geography flood-fill each press.
 - Strip `COMBAT_DEBUG` + `DiploDebugMeet` + Alt+M DiploProbe + `POSTFOUND_DIAG`
-  before any public release.
+  + `RIVER_DEBUG` (UnitInfo.lua, added 2026-06-13 to verify exits-ring river
+  flag) before any public release.
 
 ## Heads-up
 
