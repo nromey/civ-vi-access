@@ -226,6 +226,15 @@ local function composeLongForm(row, kind, pCity, pQueue)
                 parts[#parts + 1] = stripped;
             end
         end
+        -- TEMP (Noel 2026-06-14): Ctrl+T on a building (Granary) spoke nothing
+        -- while districts work. Log the components so we see whether row.Description
+        -- is absent, the building tooltip threw, or it came back empty. Fires only
+        -- on Ctrl+T (not spammy). STRIP after the fix.
+        Log.info("LONGFORM_DEBUG: kind=" .. tostring(kind)
+            .. " hasDesc=" .. tostring(row.Description ~= nil and row.Description ~= "")
+            .. " ttOk=" .. tostring(ok)
+            .. " ttLen=" .. tostring(tooltip ~= nil and #tostring(tooltip) or 0)
+            .. " parts=" .. #parts);
     end
 
     if #parts == 0 then return nil; end

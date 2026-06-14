@@ -198,6 +198,13 @@ in this order:
   2026-06-11; memory `project_key_registry_announce_learn`.
 - **#16 Two-tier help** — context-sensitive `?` + searchable F1 (the `?` cheat-sheet
   already exists; move the searchable list to F1).
+- **Engine hotkeys missing from Help (Noel 2026-06-14 — DO BEFORE A BUMP).** The Help
+  list is built from `HandlerStack.collectHelpEntries`, which only sees keys WE own on
+  the wrap. Engine-action keys (e.g. Alt+X auto-explore — Noel went looking for it on
+  his scout — and the Alt+Q/A/Z/C letter-actions) aren't listed at all. Audit every
+  engine hotkey we forward/allow, and surface them in Help (add helpEntries for the
+  ones we own; for pure-engine passthroughs, at minimum list them). Pairs with #15's
+  registry and the "#14 remainder" (own + announce the silent Alt-letter actions).
 - **#18 LOC audit** — ScannerCore category labels + backend itemNames still inline
   English; use the LOC file going forward.
 - **Slim screen-reader bundling (Noel 2026-06-13)** — Prism is the path forward
