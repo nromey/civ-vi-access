@@ -692,6 +692,21 @@ function HexCursor.openHelp()
     -- raw keyboard — gives us arrow-nav + type-to-filter that
     -- HexCursorAddin's InputAction dispatch can't provide.
     local entries = HandlerStack.collectHelpEntries();
+    -- Long-form TOPICS (Noel 2026-06-13): the help LIST stays short — one line
+    -- per key — and any long explanation rides as a single topic item you press
+    -- Enter on to open in the reader (HelpAddin handles the hand-off + return).
+    -- First topic: the scanner guide, which used to shred the list as a giant
+    -- inline part. Body is the same LOC string the scanner cheat sheet uses.
+    local scannerHelp = Locale.Lookup("LOC_CIVVIACCESS_SCANNER_HELP");
+    if scannerHelp ~= nil and scannerHelp ~= "" then
+        entries[#entries + 1] = {
+            keyLabel    = "Enter",
+            description = "Scanner help, description and keys",
+            topic       = true,
+            title       = "Scanner help",
+            body        = scannerHelp,
+        };
+    end
     if LuaEvents ~= nil and LuaEvents.CivViAccess_OpenHelp ~= nil then
         LuaEvents.CivViAccess_OpenHelp(entries);
     else
