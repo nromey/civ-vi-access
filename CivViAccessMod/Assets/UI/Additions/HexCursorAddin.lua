@@ -14,6 +14,13 @@
 include("Log");
 include("HandlerStack");
 include("InputRouter");
+-- EngineHotkeys registers Civ VI's default engine bindings (Alt+X auto-explore,
+-- Tech Tree, lenses, etc.) into THIS VM's HandlerStack.commonHelpEntries so they
+-- surface in the map ? help (openHelp -> collectHelpEntries runs here). It was
+-- in modinfo ImportFiles only, which makes a file includable but never EXECUTES
+-- it, so its registrations never ran and the entire engine-hotkey category was
+-- missing from Help (Noel hit this hunting for auto-explore, 2026-06-14).
+include("EngineHotkeys");
 include("ScreenReader");
 include("Report");
 include("EmpireStatus");

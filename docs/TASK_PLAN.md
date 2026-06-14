@@ -26,15 +26,27 @@ This batch = remaining pre-bump polish + the reporting arc, designed up front fo
 player reaches for (economic log etc.), not just our own sections.
 
 1. **Finish pre-bump.**
-   - **Granary Ctrl+T building-describe fix.** Buildings return nothing on Ctrl+T
-     while districts work (log-confirmed). `LONGFORM_DEBUG` is staged in
-     `ProductionPickerAddin.composeLongForm`; FIRST STEP: relaunch → Shift+P →
-     arrow to Granary → Ctrl+T → read the one log line (tells us empty
-     `row.Description` vs `GetBuildingToolTip` throwing in the addin VM) → fix →
-     STRIP `LONGFORM_DEBUG`.
+   - **Granary Ctrl+T building-describe — FIXED & CONFIRMED (2026-06-14).** Root
+     cause: `ProductionPickerAddin` never `include()`d `ToolTipHelper`, so it was
+     nil in that addin VM and the tooltip block was skipped for EVERY kind; only
+     `row.Description` survived (districts have it, buildings don't → Granary silent).
+     Added the include; log shows `kind=building hasDesc=false ttOk=true ttLen=95`.
+     REMAINING: (a) STRIP `LONGFORM_DEBUG`; (b) optional — pad the building path
+     with yields/maintenance/prereqs (building tooltip is inherently short vs a
+     district's; ttLen=95).
    - **Engine-hotkeys-in-Help audit** (see the #16 block below): surface engine
      actions (auto-explore Alt+X etc.) in Help; own/announce the silent Alt-letter
      actions. Pairs with #15's registry + the #14 remainder.
+   - **Bracket cluster — DECIDED, keep as-is (Noel 2026-06-14).** Reviewed the Civ V
+     model (unified buffer + filter ladder on `[`/`Shift+[`/`Ctrl+[`). Noel prefers
+     VI's split (notifications on `[` `]`, speech history on Shift+R/Ctrl+R, city
+     cycle on Shift+brackets) — keeping the notification channel clean beats V's
+     merge. No swap, no merge, no city-cycle relocation. Two backlog items only:
+       - **Notification-category filter on `Ctrl+[` / `Ctrl+]`** (free combo): cycle
+         filter so a busy stream can be walked by category (combat / diplomacy /
+         city-production / all). ~30-40 LOC; slot into 0.8.0 if time, else park.
+       - **Chat-in-buffer** — defer to multiplayer (only pays off there, needs MP
+         chat plumbing). MP watchpoint, not now.
 2. **Reporting arc core — web ReportWindow** (reports = web, pager = in-game speech).
    Economy (treasury, per-turn gold/sci/culture/faith + ETAs), per-city yields (the
    mine-effect acceptance test), cities. Detail: P5 / [[project_empire_status_expansion]].
