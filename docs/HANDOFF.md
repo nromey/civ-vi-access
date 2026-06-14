@@ -4,31 +4,42 @@
 Full history is in `git log` — don't make dated copies. The ordered plan is in
 `docs/TASK_PLAN.md`; durable facts are in memory.
 
-_Last updated: 2026-06-14 (post-compact start point)._
+_Last updated: 2026-06-14 (mid 0.8.0 batch — economy report built)._
 
 ## ►► CURRENT STATE — start here
 
-**0.7.1 SHIPPED 2026-06-14** (Shift+/ help-as-list + topics→reader, reader polish
-[PageDown/dot/wording], help/reader input lock, founded-replay "Game restored").
-All four were tested green before the tag. No C#/camm change since 0.7.0, so the
-submodule gotcha was N/A.
+**0.7.1 SHIPPED 2026-06-14.** Working the **0.8.0 BATCH** now (task list active in
+the session tracker; ordered plan in `docs/TASK_PLAN.md` `►► 0.8.0 BATCH` block).
 
-**CURRENT FOCUS = the 0.8.0 BATCH** — see the `►► 0.8.0 BATCH` block at the top of
-`docs/TASK_PLAN.md`. Order: (1) finish pre-bump [Granary Ctrl+T building-describe
-fix + engine-hotkeys-in-Help audit], (2) reporting arc core via the web ReportWindow
-[economy + per-city yields + cities, built for Civ V economic-log parity], (3)
-territory + exploration section, (4) LOC sweep of all Speech.emit. Strip
-`LONGFORM_DEBUG` + keep `LOAD_DEBUG` false before tagging 0.8.0.
+**Done this session (committed to main, NOT yet tagged):**
+- **Granary Ctrl+T building-describe — FIXED & CONFIRMED.** Was nil `ToolTipHelper`
+  in `ProductionPickerAddin` VM; added the include. Log confirmed `ttOk=true ttLen=95`.
+  `LONGFORM_DEBUG` STRIPPED (`49ae310`). pcall guards stay, so a throwing tooltip
+  degrades to `row.Description` rather than going silent.
+- **Engine hotkeys in map ? help — FIXED, NEEDS IN-GAME CONFIRM (`a164b2e`).** Root
+  cause: `EngineHotkeys.lua` was only in modinfo ImportFiles (includable ≠ executed),
+  so its `registerCommonHelpEntry` calls never ran → `commonHelpEntries` empty on the
+  map → NO engine hotkey (Alt+X auto-explore, Tech Tree, lenses) in Help. Fix:
+  `include("EngineHotkeys")` in `HexCursorAddin.lua`. CONFIRM: Shift+/ on map → engine
+  hotkeys (esp. Alt+X auto-explore) now listed; Lua.log shows "EngineHotkeys:
+  registered N entries" under HexCursorAddin (~50).
+- **Economy report expansion + per-city yields — BUILT, NEEDS CONFIRM (`4c3de0a`).**
+  `EmpireStatus.lua`: Gold section now has treasury / gross income / EXPENSE breakdown
+  (unit/building/district/WMD maint + inferred residual) / net; sci/culture/faith split
+  out. Cities table gained per-turn Food/Prod/Gold/Sci/Cult/Faith columns
+  (`pCity:GetYield(YieldTypes.X)`). API verified vs Base/Assets/UI ReportScreen.lua +
+  CitySupport.lua. **Civ VI LIMIT (honest): no per-source gold INCOME API — only gross
+  GetGoldYield — so income isn't broken down; expenses are.** UX to verify w/ Noel:
+  the Cities table is now 10 columns (heavy for cell-by-cell SR nav?), and the
+  Gold / "Science, culture, and faith" section split + wording.
 
-**Open thread (batch step 1) — CAUSE FOUND, FIX STAGED, needs a confirming test.**
-Granary Ctrl+T spoke nothing because `ProductionPickerAddin` never `include`d
-`ToolTipHelper`, so it was nil in that VM and the tooltip block was skipped for ALL
-kinds — Ctrl+T fell back to `row.Description` only (districts have it, buildings
-don't). FIX: added `include("ToolTipHelper")`. TEST post-relaunch: Shift+P → Granary
-→ Ctrl+T should now speak the building's effects (and units/districts get richer
-tooltips too). `LONGFORM_DEBUG` is still on — the test log should show `ttOk=true`;
-if `GetBuildingToolTip` instead throws in the VM (`ttOk=false`), add a fallback.
-STRIP `LONGFORM_DEBUG` once green.
+**Bracket cluster — DECIDED (keep VI split, no Civ V merge).** Backlog only:
+Ctrl+bracket notification-category filter; chat-in-buffer for MP. See TASK_PLAN.
+
+**Remaining in batch:** territory + exploration section (#6), LOC sweep of all
+`Speech.emit` (#7), optional building-Ctrl+T enrich (#3). Then 0.8.0: keep
+`LOAD_DEBUG` false (LONGFORM_DEBUG already gone), bump csproj+CHANGELOG, submodule
+check (no C#/camm change this batch so far → gotcha N/A), tag.
 
 ---
 
