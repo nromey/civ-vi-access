@@ -321,6 +321,9 @@ end
 local function OnLoadScreenClose()
     _loadScreenClosed = true;
     flushPendingFirstTurn();
+    -- (founded-replay suppression is armed by a separate LoadScreenClose
+    -- subscriber, armFoundSuppression, added in Initialize — it's defined below
+    -- this function so it can't be called from here directly.)
 end
 
 -- Backstop for OnLoadScreenClose. As of 2026-05-26, LoadScreenClose
@@ -336,6 +339,68 @@ local function OnLocalPlayerTurnBeginBackstop()
     if not _loadScreenClosed then
         _loadScreenClosed = true;
         flushPendingFirstTurn();
+    end
+end
+
+-- ── Load-replay suppression for founded-city speech (Noel 2026-06-14) ────────
+-- On a save load the engine re-fires Events.CityAddedToMap for EVERY existing
+-- city, so OnCityAddedToMap replayed "City of X founded..." once per city (4
+-- cities = 4 false foundings). No founding-turn API exists, and on a mid-turn
+-- resume LocalPlayerTurnBegin does NOT fire, so we can't gate on the turn.
+-- Approach (mirrors RevealAnnounce's load-volley gate): ARM on LoadScreenClose
+-- — which fires on loads but is SILENT for new games, so new-game foundings are
+-- never touched — then SUPPRESS + count foundings and watch
+-- GameCoreEventPublishComplete (fires per game-core batch, many times during the
+-- load flurry before the player has control). The replay burst lands in that
+-- flurry; we settle the gate a few quiet batches after the cities stop (cutoff
+-- backstop in case none come, e.g. a pre-founding load), then speak ONE
+-- "Game restored." Genuine in-play foundings happen long after the gate opens.
+-- LOAD_DEBUG logs the per-batch timing so the settle constants can be tuned
+-- against a real restore. STRIP LOAD_DEBUG once confirmed.
+local LOAD_DEBUG = true;
+local _foundReady        = true;   -- announce foundings? false during the load burst
+local _foundSuppressed   = 0;
+local _foundSeenCity     = false;
+local _foundCityThisPump = false;
+local _foundQuietPumps   = 0;
+local _foundPumpsArmed   = 0;
+local FOUND_SETTLE_QUIET = 3;      -- quiet batches after the burst ends = settled
+local FOUND_LOAD_CUTOFF  = 30;     -- backstop: open after this many batches regardless
+
+local function armFoundSuppression()
+    _foundReady = false; _foundSuppressed = 0; _foundSeenCity = false;
+    _foundCityThisPump = false; _foundQuietPumps = 0; _foundPumpsArmed = 0;
+    if LOAD_DEBUG then print("[CivViAccess][INFO ] LOAD_DEBUG: founded suppression ARMED (load)"); end
+end
+
+local function openFoundGate(reason)
+    if _foundReady then return; end
+    _foundReady = true;
+    if LOAD_DEBUG then
+        print("[CivViAccess][INFO ] LOAD_DEBUG: gate OPEN (" .. tostring(reason)
+            .. ") suppressed=" .. _foundSuppressed .. " pumps=" .. _foundPumpsArmed);
+    end
+    if _foundSuppressed > 0 then
+        Speech.emit("Game restored.", "critical");
+    end
+end
+
+local function OnFoundGameCorePump()
+    if _foundReady then return; end
+    _foundPumpsArmed = _foundPumpsArmed + 1;
+    if _foundCityThisPump then
+        _foundSeenCity = true; _foundQuietPumps = 0; _foundCityThisPump = false;
+    else
+        _foundQuietPumps = _foundQuietPumps + 1;
+    end
+    if LOAD_DEBUG then
+        print("[CivViAccess][INFO ] LOAD_DEBUG: pump=" .. _foundPumpsArmed
+            .. " seenCity=" .. tostring(_foundSeenCity) .. " quiet=" .. _foundQuietPumps
+            .. " suppressed=" .. _foundSuppressed);
+    end
+    if (_foundSeenCity and _foundQuietPumps >= FOUND_SETTLE_QUIET)
+       or (_foundPumpsArmed >= FOUND_LOAD_CUTOFF) then
+        openFoundGate(_foundSeenCity and "settled" or "cutoff");
     end
 end
 
@@ -357,6 +422,18 @@ end
 -- enter to choose").
 local function OnCityAddedToMap(playerID, cityID, x, y)
     if Game == nil or playerID ~= Game.GetLocalPlayer() then return; end
+    -- Load replay: while armed (we just loaded a save), the engine re-adds every
+    -- existing city. Suppress + count; the gate opens after the burst settles and
+    -- speaks one "Game restored." instead (see the suppression block above).
+    if not _foundReady then
+        _foundSuppressed   = _foundSuppressed + 1;
+        _foundCityThisPump = true;
+        if LOAD_DEBUG then
+            print("[CivViAccess][INFO ] LOAD_DEBUG: suppressed founded replay cityID="
+                .. tostring(cityID) .. " count=" .. _foundSuppressed);
+        end
+        return;
+    end
     local pPlayer = Players[playerID];
     if pPlayer == nil then return; end
     local pCities = pPlayer:GetCities();
@@ -394,11 +471,18 @@ local function Initialize()
     Events.UnitSelectionChanged.Add(OnUnitSelectionChanged);
     Events.CitySelectionChanged.Add(OnCitySelectionChanged);
     Events.LoadScreenClose.Add(OnLoadScreenClose);
+    -- Arm founded-replay suppression on load (separate subscriber so it's defined
+    -- before this point; fires only on loads, silent for new games).
+    Events.LoadScreenClose.Add(armFoundSuppression);
     if Events.LocalPlayerTurnBegin ~= nil then
         Events.LocalPlayerTurnBegin.Add(OnLocalPlayerTurnBeginBackstop);
     end
     if Events.CityAddedToMap ~= nil then
         Events.CityAddedToMap.Add(OnCityAddedToMap);
+    end
+    -- Per-batch pump that settles the founded-replay gate after the load burst.
+    if Events.GameCoreEventPublishComplete ~= nil then
+        Events.GameCoreEventPublishComplete.Add(OnFoundGameCorePump);
     end
     print("[CivViAccess][INFO ] ScreenReaderEventHandlers: subscriptions complete");
 end
