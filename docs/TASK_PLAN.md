@@ -200,6 +200,18 @@ in this order:
   already exists; move the searchable list to F1).
 - **#18 LOC audit** — ScannerCore category labels + backend itemNames still inline
   English; use the LOC file going forward.
+- **Slim screen-reader bundling (Noel 2026-06-13)** — Prism is the path forward
+  (default in 0.7.0, no adverse reports, cross-platform). Stop shipping the Tolk
+  bridge DLLs we don't use. The embed glob is in `CivViAccess.csproj`
+  (`..\camm\third_party\tolk\dist\x64\*.dll`), so the quick win is our-side. Three
+  gates: (1) the Prism->Tolk fallback is the real tradeoff — dropping Tolk removes
+  the safety net (no-speech is the worst failure); deliberate call. (2) VERIFY what
+  prism.dll loads at runtime before dropping the whole glob — it likely still needs
+  `nvdaControllerClient.dll` (standard NVDA API); drop `Tolk.dll` + JAWS/SAPI/Dolphin
+  bridges, keep what Prism uses. (3) The clean version = CAMM backend bundling is
+  adopter-selectable (declare `Backends = Prism` once, drives embed + runtime
+  selection) — that's camm-side, so submodule-publish-before-tag applies. Also
+  retires the macOS "Tolk replacement" blocker (`project_cross_platform`).
 
 ---
 
