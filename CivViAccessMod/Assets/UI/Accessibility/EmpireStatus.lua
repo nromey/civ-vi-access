@@ -117,6 +117,39 @@ local function nameForHash(hash)
     return nil;
 end
 
+-- "<name> in N turns" for the player's current research / civic, or nil if
+-- nothing is selected. Lets the economy section's Science / Culture rate lines
+-- point at what the rate is completing — Civ VI doesn't bank science or culture
+-- (it pours into the current tech / civic), so "what's it at now" = progress
+-- toward that goal, not a stored pool (Noel 2026-06-14).
+local function researchBrief(pPlayer, scienceYield)
+    local pt = pPlayer.GetTechs ~= nil and pPlayer:GetTechs() or nil;
+    if pt == nil or pt.GetResearchingTech == nil then return nil; end
+    local idx = pt:GetResearchingTech();
+    if idx == nil or idx < 0 then return nil; end
+    local row = GameInfo.Technologies[idx];
+    if row == nil then return nil; end
+    local prog = pt.GetResearchProgress ~= nil and pt:GetResearchProgress(idx) or 0;
+    local turns = turnsToComplete(row.Cost, prog, scienceYield);
+    local nm = esc(Locale.Lookup(row.Name));
+    if turns ~= nil then return nm .. " in " .. turns .. (turns == 1 and " turn" or " turns"); end
+    return nm;
+end
+
+local function civicBrief(pPlayer, cultureYield)
+    local pc = pPlayer.GetCulture ~= nil and pPlayer:GetCulture() or nil;
+    if pc == nil or pc.GetProgressingCivic == nil then return nil; end
+    local idx = pc:GetProgressingCivic();
+    if idx == nil or idx < 0 then return nil; end
+    local row = GameInfo.Civics[idx];
+    if row == nil then return nil; end
+    local prog = pc.GetCulturalProgress ~= nil and pc:GetCulturalProgress(idx) or 0;
+    local turns = turnsToComplete(row.Cost, prog, cultureYield);
+    local nm = esc(Locale.Lookup(row.Name));
+    if turns ~= nil then return nm .. " in " .. turns .. (turns == 1 and " turn" or " turns"); end
+    return nm;
+end
+
 -- ---------------------------------------------------------------------------
 -- Section builders. Each appends HTML fragments to `b` (a table of strings)
 -- and is wrapped by the caller in pcall.
@@ -178,8 +211,16 @@ local function sectionEconomy(b, pPlayer)
     end
 
     b[#b + 1] = "<h2>Science, culture, and faith</h2><ul>";
-    if science ~= nil then b[#b + 1] = "<li>Science: " .. signed(science) .. " per turn</li>"; end
-    if culture ~= nil then b[#b + 1] = "<li>Culture: " .. signed(culture) .. " per turn</li>"; end
+    if science ~= nil then
+        local rb = researchBrief(pPlayer, science);
+        b[#b + 1] = "<li>Science: " .. signed(science) .. " per turn"
+            .. (rb and (" (" .. rb .. ")") or "") .. "</li>";
+    end
+    if culture ~= nil then
+        local cb = civicBrief(pPlayer, culture);
+        b[#b + 1] = "<li>Culture: " .. signed(culture) .. " per turn"
+            .. (cb and (" (" .. cb .. ")") or "") .. "</li>";
+    end
     if faithY ~= nil then
         local f = "<li>Faith: " .. signed(faithY) .. " per turn";
         if faithB ~= nil then f = f .. " (" .. round(faithB) .. " stored)"; end
@@ -204,7 +245,7 @@ local function sectionResearchCivic(b, pPlayer, scienceYield, cultureYield)
                 local nm = Locale.Lookup(row.Name);
                 local prog = pTechs.GetResearchProgress ~= nil and pTechs:GetResearchProgress(idx) or 0;
                 local turns = turnsToComplete(row.Cost, prog, scienceYield);
-                researchLine = "Research: " .. esc(nm);
+                researchLine = "Research: " .. esc(nm) .. ", " .. round(prog) .. " of " .. row.Cost .. " science";
                 if turns ~= nil then researchLine = researchLine .. ", " .. turns .. " turns left"; end
             end
         end
@@ -222,7 +263,7 @@ local function sectionResearchCivic(b, pPlayer, scienceYield, cultureYield)
                 local nm = Locale.Lookup(row.Name);
                 local prog = pCulture.GetCulturalProgress ~= nil and pCulture:GetCulturalProgress(idx) or 0;
                 local turns = turnsToComplete(row.Cost, prog, cultureYield);
-                civicLine = "Civic: " .. esc(nm);
+                civicLine = "Civic: " .. esc(nm) .. ", " .. round(prog) .. " of " .. row.Cost .. " culture";
                 if turns ~= nil then civicLine = civicLine .. ", " .. turns .. " turns left"; end
             end
         end
@@ -404,6 +445,21 @@ end
 -- how much land we own + have improved, and the nearest fog edge from the
 -- capital so the user knows which way to send a scout. Uses the same
 -- PlayersVisibility / plot APIs the cursor + board query already rely on.
+-- Coarse 8-way compass bucket for "which way is most of the fog". dy is
+-- north-positive, dx east-positive. Avoids atan2 (keep it Havok-safe) — the
+-- 0.4 ratio splits the diagonal octants from the cardinals well enough for a
+-- scouting hint. Ignores map wrap (a coarse direction; the player's explored
+-- area is contiguous around them in practice).
+local function octantOf(dx, dy)
+    local adx, ady = math.abs(dx), math.abs(dy);
+    if adx < 0.4 * ady then
+        return (dy > 0) and "north" or "south";
+    elseif ady < 0.4 * adx then
+        return (dx > 0) and "east" or "west";
+    end
+    return ((dy > 0) and "north" or "south") .. ((dx > 0) and "east" or "west");
+end
+
 local function sectionTerritory(b, pPlayer, pid)
     b[#b + 1] = "<h2>Territory and exploration</h2>";
     if Map == nil or Map.GetGridSize == nil or Map.GetPlot == nil then
@@ -412,8 +468,11 @@ local function sectionTerritory(b, pPlayer, pid)
     end
     local W, H = Map.GetGridSize();
     local pVis = (PlayersVisibility ~= nil) and PlayersVisibility[pid] or nil;
+    local goodyIdx = (GameInfo.Improvements ~= nil and GameInfo.Improvements["IMPROVEMENT_GOODY_HUT"])
+                     and GameInfo.Improvements["IMPROVEMENT_GOODY_HUT"].Index or nil;
+    local contTotal = (Map.GetContinentsInUse ~= nil) and #Map.GetContinentsInUse() or nil;
 
-    -- Capital is the reference point for the nearest fog edge.
+    -- Capital is the reference point for the fog direction + nearest edge.
     local capX, capY;
     local cs = pPlayer.GetCities ~= nil and pPlayer:GetCities() or nil;
     if cs ~= nil and cs.GetCapitalCity ~= nil then
@@ -421,7 +480,9 @@ local function sectionTerritory(b, pPlayer, pid)
         if cap ~= nil and cap.GetX ~= nil then capX, capY = cap:GetX(), cap:GetY(); end
     end
 
-    local total, revealed, owned, improved = 0, 0, 0, 0;
+    local total, revealed, owned, improved, goodyHuts = 0, 0, 0, 0, 0;
+    local contSeen = {};
+    local octTally = {};
     local fogDist, fogX, fogY;
     for y = 0, H - 1 do
         for x = 0, W - 1 do
@@ -432,27 +493,51 @@ local function sectionTerritory(b, pPlayer, pid)
                 if pVis ~= nil and pVis.IsRevealed ~= nil then isRev = pVis:IsRevealed(x, y); end
                 if isRev then
                     revealed = revealed + 1;
+                    local imp = plot.GetImprovementType ~= nil and plot:GetImprovementType() or -1;
+                    if goodyIdx ~= nil and imp == goodyIdx then goodyHuts = goodyHuts + 1; end
+                    local ct = plot.GetContinentType ~= nil and plot:GetContinentType() or -1;
+                    if ct ~= nil and ct >= 0 then contSeen[ct] = true; end
                     local owner = plot.GetOwner ~= nil and plot:GetOwner() or -1;
                     if owner == pid then
                         owned = owned + 1;
-                        local imp = plot.GetImprovementType ~= nil and plot:GetImprovementType() or -1;
                         if imp ~= nil and imp >= 0 then improved = improved + 1; end
                     end
-                elseif capX ~= nil and Map.GetPlotDistance ~= nil then
-                    local d = Map.GetPlotDistance(capX, capY, x, y);
-                    if fogDist == nil or d < fogDist then fogDist = d; fogX = x; fogY = y; end
+                elseif capX ~= nil then
+                    local oct = octantOf(x - capX, y - capY);
+                    octTally[oct] = (octTally[oct] or 0) + 1;
+                    if Map.GetPlotDistance ~= nil then
+                        local d = Map.GetPlotDistance(capX, capY, x, y);
+                        if fogDist == nil or d < fogDist then fogDist = d; fogX = x; fogY = y; end
+                    end
                 end
             end
         end
     end
 
+    local unexplored = total - revealed;
     local pct = (total > 0) and math.floor((revealed / total) * 100 + 0.5) or 0;
+    local contDiscovered = 0;
+    for _ in pairs(contSeen) do contDiscovered = contDiscovered + 1; end
+    local bestOct, bestN;
+    for oct, n in pairs(octTally) do
+        if bestN == nil or n > bestN then bestN = n; bestOct = oct; end
+    end
+
     b[#b + 1] = "<ul>";
     b[#b + 1] = "<li>Map explored: " .. pct .. "% (" .. revealed .. " of " .. total .. " tiles)</li>";
+    b[#b + 1] = "<li>Unexplored: " .. unexplored .. " tiles remain</li>";
     b[#b + 1] = "<li>Tiles owned: " .. owned .. "</li>";
     if owned > 0 then
         local ipct = math.floor((improved / owned) * 100 + 0.5);
         b[#b + 1] = "<li>Tiles improved: " .. improved .. " (" .. ipct .. "% of owned)</li>";
+    end
+    if contDiscovered > 0 then
+        local line = "<li>Continents discovered: " .. contDiscovered;
+        if contTotal ~= nil and contTotal > 0 then line = line .. " of " .. contTotal; end
+        b[#b + 1] = line .. "</li>";
+    end
+    if goodyHuts > 0 then
+        b[#b + 1] = "<li>Goody huts in view: " .. goodyHuts .. " (worth scouting)</li>";
     end
     if fogDist ~= nil then
         local dirStr;
@@ -469,6 +554,10 @@ local function sectionTerritory(b, pPlayer, pid)
         end
     elseif revealed >= total and total > 0 then
         b[#b + 1] = "<li>The whole map is explored.</li>";
+    end
+    if bestOct ~= nil and unexplored > 0 then
+        b[#b + 1] = "<li>Most unexplored land lies to the " .. bestOct
+            .. " (" .. bestN .. " tiles) — send scouts that way</li>";
     end
     b[#b + 1] = "</ul>";
 end
