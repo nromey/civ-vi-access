@@ -54,10 +54,39 @@ Scanner.cursor = {
     end,
 };
 
+-- Modal input lock (Noel 2026-06-14: "I can go to production from within help").
+-- The WorldInput capture-all wrap is a SEPARATE VM and keeps forwarding map keys
+-- even while our Help list or the Pager (reader) is the active modal — so without
+-- this guard the forwarded keys double-dispatch and fire game actions underneath
+-- the modal (Shift+P opens production, R rests a unit, typing to filter triggers
+-- letter actions). The modal owns its OWN input handler for nav, so dropping the
+-- forwarded COPY here costs the modal nothing. Track Help and Pager separately —
+-- a single bool would race on the Help->topic->reader handoff, where HelpClosed
+-- fires AFTER the reader's PagerState(true) and would wrongly clear the lock.
+local _helpOpen  = false;
+local _pagerOpen = false;
+local function modalOpen() return _helpOpen or _pagerOpen; end
+if LuaEvents ~= nil then
+    if LuaEvents.CivViAccess_HelpOpened ~= nil then
+        LuaEvents.CivViAccess_HelpOpened.Add(function() _helpOpen = true; end);
+    end
+    if LuaEvents.CivViAccess_HelpClosed ~= nil then
+        LuaEvents.CivViAccess_HelpClosed.Add(function() _helpOpen = false; end);
+    end
+    if LuaEvents.CivViAccess_PagerState ~= nil then
+        LuaEvents.CivViAccess_PagerState.Add(function(open) _pagerOpen = (open == true); end);
+    end
+end
+
 -- Keys forwarded from the WorldInput wrap (cross-VM, one-way). Route through the
 -- scanner handler; pcall-guarded so a dispatch error can't break the addin.
 if LuaEvents ~= nil and LuaEvents.CivViAccess_ScannerInput ~= nil then
     LuaEvents.CivViAccess_ScannerInput.Add(function(key, mods)
+        if modalOpen() then
+            Log.info("ScannerAddinGlue: modal (help/reader) open — dropping forwarded key="
+                .. tostring(key) .. " mods=" .. tostring(mods));
+            return;
+        end
         local handled = false;
         -- Hex-cluster nav FIRST (bare Q/E/A/D/Z/C = cursor, Shift+cluster = unit move,
         -- Ctrl+D = direction vocab) — the most frequent presses, migrated onto the wrap
