@@ -106,7 +106,7 @@ end
 local function announcePreamble()
     local count = #_state.all;
     Speech.emit("Help. " .. tostring(count) .. " bindings. "
-                .. "Type to filter, up and down to walk, escape to close.",
+                .. "Up and down to navigate, type to filter, escape to close.",
                 "picker");
     if #_state.visible > 0 then
         Speech.emit(currentLine(), "status");

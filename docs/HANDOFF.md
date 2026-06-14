@@ -12,10 +12,12 @@ Everything since v0.6.0 shipped as **0.7.0** (csproj + CHANGELOG bumped). camm
 gitlink (743e9fa = camm v0.6.0, pushed) confirmed before tag — submodule gotcha
 clear. Release CI GREEN, incl. the first-ever Prism build-from-source in CI.
 
-**Shift+/ help-list redesign: re-applied to main (`8660f3d`), TESTED 2026-06-14,
-3 fixes applied — NEEDS A RE-TEST.** Core flow works (list → arrow to scanner topic
-→ Enter → reader → Escape → back to list → Escape → map, all confirmed in the log).
-Noel's test found and we fixed:
+**Shift+/ help-list redesign: GREEN (re-test passed 2026-06-14) — READY for the next
+bump.** Full flow works: list → arrow to scanner topic → Enter → reader → Escape →
+back to list → Escape → map, plus type-to-filter, PageDown/PageUp, and the input
+lock. Local-only on main (`8660f3d`, `be369e2`, `e9b3283`, `d6ecb1c`, handoff commits,
++ preamble-wording fix) — NOT in 0.7.0; ship in the next bump (batch with other work
+per Noel). Noel's test found and we fixed:
 - **Input leak (important, `e9b3283`):** the WorldInput wrap kept forwarding map
   keys while Help/reader was open, so Shift+P opened production from inside Help,
   etc. Now ScannerAddinGlue drops forwarded keys while a modal is open (Help + Pager
