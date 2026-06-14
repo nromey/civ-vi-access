@@ -17,6 +17,37 @@ completeness.
 
 ---
 
+## ►► 0.8.0 BATCH — current focus (Noel 2026-06-14, long session, agreed plan)
+
+**0.7.1 shipped first** (Shift+/ list, reader polish, input lock, "Game restored").
+This batch = remaining pre-bump polish + the reporting arc, designed up front for
+**Civ V key-mode parity** — the reports are the data surfaces that mode needs
+([[project_keymap_profiles_civ_v_compat]]), so build them to cover what a Civ V
+player reaches for (economic log etc.), not just our own sections.
+
+1. **Finish pre-bump.**
+   - **Granary Ctrl+T building-describe fix.** Buildings return nothing on Ctrl+T
+     while districts work (log-confirmed). `LONGFORM_DEBUG` is staged in
+     `ProductionPickerAddin.composeLongForm`; FIRST STEP: relaunch → Shift+P →
+     arrow to Granary → Ctrl+T → read the one log line (tells us empty
+     `row.Description` vs `GetBuildingToolTip` throwing in the addin VM) → fix →
+     STRIP `LONGFORM_DEBUG`.
+   - **Engine-hotkeys-in-Help audit** (see the #16 block below): surface engine
+     actions (auto-explore Alt+X etc.) in Help; own/announce the silent Alt-letter
+     actions. Pairs with #15's registry + the #14 remainder.
+2. **Reporting arc core — web ReportWindow** (reports = web, pager = in-game speech).
+   Economy (treasury, per-turn gold/sci/culture/faith + ETAs), per-city yields (the
+   mine-effect acceptance test), cities. Detail: P5 / [[project_empire_status_expansion]].
+3. **Territory + exploration section** — owned/improved/workable tiles, % explored,
+   nearest fog edge ([[project_map_exploration_report]]).
+4. **LOC sweep** woven through 2-3: ALL `Speech.emit` onto the LOC file + the standing
+   #18 backlog ([[project_localization_approach]]).
+
+Before tagging 0.8.0: strip `LONGFORM_DEBUG`, confirm `LOAD_DEBUG` stays false. The
+Civ V key REMAPPING itself stays a later task; this batch builds the reports it needs.
+
+---
+
 ## P0 — Prism speech backend + user-selectable output  *(SHIPPED 2026-06-09: camm v0.6.0)*
 
 CAMM screen-reader abstraction so users pick their speech library.

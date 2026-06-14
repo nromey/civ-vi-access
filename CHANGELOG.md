@@ -22,6 +22,23 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.7.1 — 2026-06-14 — Help-as-list, reader polish, "Game restored"
+
+Pre-bump polish, all tested live:
+
+- **Shift+/ help is a navigable LIST now, not a pager dump.** One line per binding;
+  long-form TOPIC items (the scanner guide) open in the reader on Enter, and Escape
+  returns you to the list where you left off. F1 opens the same list. Type to filter;
+  PageDown/PageUp page the list.
+- **Reader (pager) polish:** PageDown/PageUp page parts (matching the scanner ladder);
+  no more doubled "." before the "N of M" position; the preamble reads "Up and down to
+  navigate".
+- **Help/reader input lock:** map keys no longer leak through to the game while the
+  Help list or reader is open — pressing Shift+P from inside Help no longer opened
+  production underneath it.
+- **Loading a save no longer replays "City founded" for every existing city** — it
+  speaks "Game restored." once instead (population/count-independent).
+
 ## 0.7.0 — 2026-06-13 — Playable: movement, combat, government, pager + speech history
 
 The big one. The scanner became a playable map and the turn loop closed — you can

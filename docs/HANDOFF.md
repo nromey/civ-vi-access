@@ -4,7 +4,28 @@
 Full history is in `git log` — don't make dated copies. The ordered plan is in
 `docs/TASK_PLAN.md`; durable facts are in memory.
 
-_Last updated: 2026-06-13._
+_Last updated: 2026-06-14 (post-compact start point)._
+
+## ►► CURRENT STATE — start here
+
+**0.7.1 SHIPPED 2026-06-14** (Shift+/ help-as-list + topics→reader, reader polish
+[PageDown/dot/wording], help/reader input lock, founded-replay "Game restored").
+All four were tested green before the tag. No C#/camm change since 0.7.0, so the
+submodule gotcha was N/A.
+
+**CURRENT FOCUS = the 0.8.0 BATCH** — see the `►► 0.8.0 BATCH` block at the top of
+`docs/TASK_PLAN.md`. Order: (1) finish pre-bump [Granary Ctrl+T building-describe
+fix + engine-hotkeys-in-Help audit], (2) reporting arc core via the web ReportWindow
+[economy + per-city yields + cities, built for Civ V economic-log parity], (3)
+territory + exploration section, (4) LOC sweep of all Speech.emit. Strip
+`LONGFORM_DEBUG` + keep `LOAD_DEBUG` false before tagging 0.8.0.
+
+**Open thread (batch step 1):** Granary Ctrl+T speaks nothing (buildings) while
+districts work. `LONGFORM_DEBUG` staged in `ProductionPickerAddin.composeLongForm`;
+Noel captured a log — read it, pin the cause (empty `row.Description` vs
+`GetBuildingToolTip` throwing in the addin VM), fix, strip the debug, Noel re-tests.
+
+---
 
 ## RELEASE: v0.7.0 tagged + pushed 2026-06-13
 
