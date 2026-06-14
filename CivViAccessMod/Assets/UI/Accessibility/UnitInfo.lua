@@ -111,28 +111,11 @@ local function riverBetween(fromPlot, toPlot, direction)
     return river;
 end
 
--- TEMP diagnostic (Noel 2026-06-13): river-edge crossing detection is unverified
--- because blind setup of "unit on a land tile with a river on a crossable edge"
--- is fiddly. With this on, `/` dumps the raw engine river booleans per edge so we
--- can compare ground truth against what the ring speaks. STRIP before release
--- (tracked in docs/HANDOFF.md "strip debug" list alongside COMBAT_DEBUG/BT_DEBUG).
-local RIVER_DEBUG = true;
-
 local function exitsRing(pUnit)
     if Map == nil or Map.GetPlot == nil or Map.GetAdjacentPlot == nil then return nil; end
     local ux, uy = pUnit:GetX(), pUnit:GetY();
     local fromPlot = Map.GetPlot(ux, uy);
     if fromPlot == nil then return nil; end
-    if RIVER_DEBUG then
-        local nw, w, ne = "?", "?", "?";
-        pcall(function() nw = tostring(fromPlot:IsNWOfRiver()); end);
-        pcall(function() w  = tostring(fromPlot:IsWOfRiver());  end);
-        pcall(function() ne = tostring(fromPlot:IsNEOfRiver()); end);
-        local isRiver = "?";
-        pcall(function() isRiver = tostring(fromPlot:IsRiver()); end);
-        Log.info(("RIVER_DEBUG: unit tile (%d,%d) IsRiver=%s | edges NW=%s W=%s NE=%s")
-                 :format(ux, uy, isRiver, nw, w, ne));
-    end
     -- blockedReason assumes a land unit (water = wall). For sea units water IS
     -- the move space and land is the wall. Embark/disembark exits are v2.
     local isSea = false;
@@ -157,12 +140,6 @@ local function exitsRing(pUnit)
                 if not isWater and why == nil then why = "land"; end
             end
             local hasRiver = riverBetween(fromPlot, adj, d.dir);
-            if RIVER_DEBUG then
-                local at = "?";
-                pcall(function() local r = GameInfo.Terrains[adj:GetTerrainType()]; at = r and r.TerrainType or "?"; end);
-                Log.info(("RIVER_DEBUG:   %s -> %s blocked=%s riverBetween=%s")
-                         :format(d.name, at, tostring(why), tostring(hasRiver)));
-            end
             if why ~= nil then
                 bits[#bits + 1] = d.name .. " " .. why;
             else

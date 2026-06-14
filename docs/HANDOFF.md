@@ -4,7 +4,53 @@
 Full history is in `git log` — don't make dated copies. The ordered plan is in
 `docs/TASK_PLAN.md`; durable facts are in memory.
 
-_Last updated: 2026-06-12 (end of day)._
+_Last updated: 2026-06-13._
+
+## 2026-06-13 session
+
+**Pager/history test results (Noel, live):** repeat-last (Shift+R), history
+walk-back, cut-off recovery, new-speech-resets-walk all GREEN; Shift+/ green;
+notification buffering green; work-sites green; pre-reveal resources hidden green.
+Shift+Enter notification activate confirmed last night (noted w/ Fable). 0-MP
+attack refusal + own-loss kill announce still BLOCKED (nothing to attack); long-
+entry-opens-pager (#5) unconfirmed (try the overnight briefing).
+
+**Shift+T verbose tile spoke no improvement — FIXED + verified (`aa75191`).**
+`DescribeVerbose` never called `improvementName`/`routeName` (the lean nav announce
+got them 2026-06-12; verbose was missed). Archived log line 715 confirmed: a built
+farm read "Plains. Yields: 2 Food…" with no "Farm". Now grouped after resource.
+
+**River exits-ring (#16) VERIFIED — no fix needed (caveat cleared).** RIVER_DEBUG
+dump on `/` at tile (11,30): IsRiver=true, own NW/W/NE all false, riverBetween TRUE
+on east + southeast (river lives on neighbor edges), spoken "east 2, river …
+southeast 3, river". Side convention is correct (neighbor W/NW edges are
+unambiguously those physical edges). Diagnostic stripped after.
+
+**FOLLOW-UP (noticed, unresolved): exits-ring cost numbers look off.** Same dump:
+NE GRASS_HILLS read "1" (hills should be 2); the two river tiles read base+1 (plains
+east=2, plains-hills southeast=3). Possible road/route-rate override on NE, or the
+river +1 leaking into `PlotEntryCost`'s number (it's supposed to be flagged by name
+only). Investigate `PlotEntryCost` (ScreenReaderPlotUtils) + `plot:GetMovementCost()`
+semantics; add a cost-focused diagnostic when picked up. SEPARATE from the river flag.
+
+**Shift+/ help redesign — UNTESTED (`f576bce`).** Reverted round-3 "dump everything
+into the pager." Shift+/ (and F1) now open the navigable Help LIST; long-form TOPIC
+items (first: the scanner guide) read as one line, Enter opens the body in the reader
+(Pager), reader-Escape reopens the list where you left off ("Back to help"), list-
+Escape closes to map. TEST: Shift+/ → arrow the list (one line per key) → find
+"Scanner help, description and keys. Enter to read." → Enter → reader walks the
+scanner spiel → Escape → back on that list item → Escape → map. Add more topics
+(navigation walkthrough, direction modes, combat) once the pattern reads right.
+
+**MP parity watchpoints recorded** (`project_mp_parity_watchpoints`) from Civ V
+Access v1.4.4: (1) our HandlerStack lacks their dead-env `_envProbe` guard — verify
+our Context lifecycle before MP; (2) we use `GetMoveToPathEx` in 4+ preview spots —
+test "preview a path on a unit with a queued move" in MP + save-load before shipping
+routes (we can't patch the engine like they did if it clobbers).
+
+---
+
+_Prior: 2026-06-12 (end of day)._
 
 ## NEW (late evening, untested): Shift+R speech history (pager deliverable 1)
 
@@ -337,8 +383,8 @@ read the log for what LuaEvent fired and wire that path.
 - Enemy-halt on auto-move still unverified (no enemy tested).
 - Survey perf: `S` runs all backends incl. geography flood-fill each press.
 - Strip `COMBAT_DEBUG` + `DiploDebugMeet` + Alt+M DiploProbe + `POSTFOUND_DIAG`
-  + `RIVER_DEBUG` (UnitInfo.lua, added 2026-06-13 to verify exits-ring river
-  flag) before any public release.
+  before any public release. (`RIVER_DEBUG` added + removed 2026-06-13 — river
+  exits-ring verified, see below.)
 
 ## Heads-up
 
