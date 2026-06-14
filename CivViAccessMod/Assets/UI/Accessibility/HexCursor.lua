@@ -741,6 +741,7 @@ local CURSOR_HELP_ENTRIES = {
 
     -- Unit actions
     { keyLabel = "B",       description = "Found city with selected Settler" },
+    { keyLabel = "Shift+B", description = "Build with selected Builder: open the build menu (Farm, Mine, Quarry, etc.)" },
     { keyLabel = "R",       description = "Rest: fortify military or sleep civilians" },
     { keyLabel = "Alt+Z",   description = "Strict sleep (civilians only; military redirected to R)" },
 
@@ -770,6 +771,13 @@ local CURSOR_HELP_ENTRIES = {
     { keyLabel = "S",       description = "Where am I — bearing from capital and coordinates" },
     { keyLabel = "Shift+S", description = "Survey — bearing from capital, terrain, nearest city, and coordinates" },
     { keyLabel = "Shift+V", description = "Toggle verbose / terse announce mode" },
+
+    -- Tile / reveal info + repeat (mod hotkeys; Shift+T was mislabeled "say
+    -- again" in EngineHotkeys — that moved to Shift+R on 2026-06-01).
+    { keyLabel = "Shift+T", description = "Verbose tile readout: full mechanics of the hex under the cursor" },
+    { keyLabel = "Shift+R", description = "Say again: repeat the last announcement; press again to walk back through history" },
+    { keyLabel = "Ctrl+R",  description = "Speech history: step forward through recent announcements" },
+    { keyLabel = "Shift+I", description = "Read the full visual description of the last reveal (hero / society)" },
 
     -- Help itself
     { keyLabel = "Question mark", description = "Open this help overlay" },

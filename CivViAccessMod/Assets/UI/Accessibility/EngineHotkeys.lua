@@ -46,8 +46,9 @@ HandlerStack.registerCommonHelpEntry({ keyLabel = "F4",        description = "Op
 HandlerStack.registerCommonHelpEntry({ keyLabel = "F9",        description = "Open Civilopedia" });
 -- End (full-screen map) is the scanner ladder now — excluded.
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Ctrl+F",    description = "Open map search (in-game only)" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Shift+T",   description = "Say again (repeat the last announcement)" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Shift+I",   description = "Read the full visual description of the last reveal popup (hero / society)" });
+-- Shift+T (verbose tile readout) and Shift+I (last-reveal visual description)
+-- are MOD actions, listed by the cursor handler — not engine defaults. The old
+-- "Shift+T = say again" here was stale (say-again moved to Shift+R 2026-06-01).
 
 -- ----------------------------------------------------------------------
 -- UNIT category — actions on the selected unit
@@ -59,7 +60,8 @@ HandlerStack.registerCommonHelpEntry({ keyLabel = "Delete",    description = "De
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Alt+A",     description = "Attack (rebound from A)" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "R",         description = "Ranged attack" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Alt+X",     description = "Auto-explore selected unit (eXplore)" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Shift+B",   description = "Build recommended improvement (selected builder)" });
+-- Shift+B is NOT an engine default — it's our CIVVIACCESS_BuildImprovement
+-- (opens the builder's build menu). Listed by the cursor handler, not here.
 HandlerStack.registerCommonHelpEntry({ keyLabel = "H",         description = "Fortify until healed" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Space",     description = "Skip turn for selected unit" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Alt+Z",     description = "Sleep selected unit (rebound from Z)" });
