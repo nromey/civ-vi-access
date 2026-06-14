@@ -58,6 +58,38 @@ local function round(n)
     return math.floor((n or 0) + 0.5);
 end
 
+-- Gold / yield magnitude to 1 decimal, trailing ".0" dropped, U+2212 minus
+-- for negatives. Gold maintenance is fractional and the expense breakdown
+-- rows must sum to the total, so we keep one decimal rather than whole-
+-- rounding each (which would drift the children off the parent). City
+-- yields (food / gold) can go negative, hence the sign handling.
+local function yld(n)
+    local v = math.floor((n or 0) * 10 + 0.5) / 10;
+    local neg = v < 0;
+    if neg then v = -v; end
+    local s;
+    if v == math.floor(v) then s = tostring(math.floor(v)); else s = string.format("%.1f", v); end
+    if neg then return "−" .. s; end
+    return s;
+end
+
+-- Signed 1-decimal gold for per-turn rows ("+5", "−8.2", "0").
+local function goldSigned(n)
+    local v = math.floor((n or 0) * 10 + 0.5) / 10;
+    if v > 0 then return "+" .. yld(v); end
+    return yld(v); -- yld() already prefixes − for negatives, and gives "0" for 0
+end
+
+-- One city's per-turn yield as a table cell, or "—" if unavailable. Uses the
+-- same pCity:GetYield(YieldTypes.X) the engine Reports screen reads
+-- (CitySupport.lua:316-332); values are plain floats, so yld() keeps a decimal.
+local function cityYieldCell(pCity, yt)
+    if yt == nil or pCity == nil or pCity.GetYield == nil then return "—"; end
+    local ok, v = pcall(function() return pCity:GetYield(yt); end);
+    if not ok or v == nil then return "—"; end
+    return yld(v);
+end
+
 -- ceil((cost - progress) / perTurn), or nil if it can't be computed
 -- (no cost, or zero/negative per-turn yield => "never at this rate").
 local function turnsToComplete(cost, progress, perTurn)
@@ -90,8 +122,51 @@ end
 -- and is wrapped by the caller in pcall.
 -- ---------------------------------------------------------------------------
 
-local function sectionYields(b, pPlayer)
-    local science, culture, faithY, faithB, goldNet, goldBal;
+-- Economy section. Gold gets the Civ V "economic log" treatment: treasury,
+-- gross income, the EXPENSE breakdown, and net. Civ VI exposes the expense
+-- split (GetBuildingMaintenance / GetDistrictMaintenance / GetUnitMaintenance
+-- / GetWMDMaintenance, plus an inferred residual) but NOT a per-source INCOME
+-- breakdown — GetGoldYield is a single gross number (ReportScreen.lua confirms
+-- no per-source income API). So we surface gross income + where the gold goes
+-- + net, and don't fabricate income sources. Science / culture / faith follow.
+local function sectionEconomy(b, pPlayer)
+    local pTreasury = pPlayer.GetTreasury ~= nil and pPlayer:GetTreasury() or nil;
+
+    b[#b + 1] = "<h2>Gold</h2>";
+    if pTreasury == nil then
+        b[#b + 1] = "<p class='muted'>Treasury unavailable.</p>";
+    else
+        local bal     = pTreasury.GetGoldBalance ~= nil and pTreasury:GetGoldBalance() or nil;
+        local income  = pTreasury.GetGoldYield ~= nil and pTreasury:GetGoldYield() or nil;       -- gross
+        local expense = pTreasury.GetTotalMaintenance ~= nil and pTreasury:GetTotalMaintenance() or nil;
+        local net = (income ~= nil and expense ~= nil) and (income - expense) or nil;
+
+        b[#b + 1] = "<ul>";
+        if bal ~= nil then b[#b + 1] = "<li>Treasury: " .. yld(bal) .. " gold</li>"; end
+        if income ~= nil then b[#b + 1] = "<li>Income: " .. goldSigned(income) .. " per turn</li>"; end
+        if expense ~= nil then b[#b + 1] = "<li>Expenses: " .. goldSigned(-expense) .. " per turn</li>"; end
+        if net ~= nil then b[#b + 1] = "<li>Net: <strong>" .. goldSigned(net) .. "</strong> per turn</li>"; end
+        b[#b + 1] = "</ul>";
+
+        -- Expense breakdown (only the categories that are non-zero).
+        if expense ~= nil and expense > 0 then
+            local mUnit = pTreasury.GetUnitMaintenance ~= nil and pTreasury:GetUnitMaintenance() or 0;
+            local mBld  = pTreasury.GetBuildingMaintenance ~= nil and pTreasury:GetBuildingMaintenance() or 0;
+            local mDis  = pTreasury.GetDistrictMaintenance ~= nil and pTreasury:GetDistrictMaintenance() or 0;
+            local mWMD  = pTreasury.GetWMDMaintenance ~= nil and pTreasury:GetWMDMaintenance() or 0;
+            local mOther = expense - mUnit - mBld - mDis - mWMD;
+            b[#b + 1] = "<h3>Where the gold goes</h3><ul>";
+            if mUnit > 0 then b[#b + 1] = "<li>Unit maintenance: " .. yld(mUnit) .. "</li>"; end
+            if mBld  > 0 then b[#b + 1] = "<li>Building maintenance: " .. yld(mBld) .. "</li>"; end
+            if mDis  > 0 then b[#b + 1] = "<li>District maintenance: " .. yld(mDis) .. "</li>"; end
+            if mWMD  > 0 then b[#b + 1] = "<li>WMD maintenance: " .. yld(mWMD) .. "</li>"; end
+            if mOther > 0.05 then b[#b + 1] = "<li>Other: " .. yld(mOther) .. "</li>"; end
+            b[#b + 1] = "</ul>";
+        end
+    end
+
+    -- Science / culture / faith per turn.
+    local science, culture, faithY, faithB;
     local pTechs = pPlayer:GetTechs();
     if pTechs ~= nil and pTechs.GetScienceYield ~= nil then science = pTechs:GetScienceYield(); end
     local pCulture = pPlayer:GetCulture();
@@ -101,26 +176,14 @@ local function sectionYields(b, pPlayer)
         faithY = pReligion:GetFaithYield();
         if pReligion.GetFaithBalance ~= nil then faithB = pReligion:GetFaithBalance(); end
     end
-    local pTreasury = pPlayer:GetTreasury();
-    if pTreasury ~= nil and pTreasury.GetGoldYield ~= nil then
-        goldNet = pTreasury:GetGoldYield() - (pTreasury.GetTotalMaintenance ~= nil
-                  and pTreasury:GetTotalMaintenance() or 0);
-        if pTreasury.GetGoldBalance ~= nil then goldBal = pTreasury:GetGoldBalance(); end
-    end
 
-    b[#b + 1] = "<h2>Yields per turn</h2>";
-    b[#b + 1] = "<ul>";
+    b[#b + 1] = "<h2>Science, culture, and faith</h2><ul>";
     if science ~= nil then b[#b + 1] = "<li>Science: " .. signed(science) .. " per turn</li>"; end
     if culture ~= nil then b[#b + 1] = "<li>Culture: " .. signed(culture) .. " per turn</li>"; end
     if faithY ~= nil then
         local f = "<li>Faith: " .. signed(faithY) .. " per turn";
         if faithB ~= nil then f = f .. " (" .. round(faithB) .. " stored)"; end
         b[#b + 1] = f .. "</li>";
-    end
-    if goldNet ~= nil then
-        local g = "<li>Gold: " .. signed(goldNet) .. " per turn";
-        if goldBal ~= nil then g = g .. " (" .. round(goldBal) .. " in treasury)"; end
-        b[#b + 1] = g .. "</li>";
     end
     b[#b + 1] = "</ul>";
 end
@@ -215,7 +278,20 @@ local function sectionCities(b, pPlayer)
                 if okG and g ~= nil and g > 0 then growCell = g .. " turns"; end
             end
 
+            -- Per-turn yields (Civ V Economic Overview's Cities tab). The
+            -- Production column is the mine-effect acceptance test: improving a
+            -- worked tile lifts the city's production rate here.
+            local YT = YieldTypes or {};
+            local foodC  = cityYieldCell(pCity, YT.FOOD);
+            local prodYC = cityYieldCell(pCity, YT.PRODUCTION);
+            local goldC  = cityYieldCell(pCity, YT.GOLD);
+            local sciC   = cityYieldCell(pCity, YT.SCIENCE);
+            local cultC  = cityYieldCell(pCity, YT.CULTURE);
+            local faithC = cityYieldCell(pCity, YT.FAITH);
+
             rows[#rows + 1] = "<tr><td>" .. esc(name) .. "</td><td>" .. tostring(pop)
+                .. "</td><td>" .. foodC .. "</td><td>" .. prodYC .. "</td><td>" .. goldC
+                .. "</td><td>" .. sciC .. "</td><td>" .. cultC .. "</td><td>" .. faithC
                 .. "</td><td>" .. prodCell .. "</td><td>" .. growCell .. "</td></tr>";
         end
     end
@@ -223,7 +299,9 @@ local function sectionCities(b, pPlayer)
     if count == 0 then
         b[#b + 1] = "<p>No cities founded yet.</p>";
     else
-        b[#b + 1] = "<table><tr><th>City</th><th>Pop</th><th>Producing (turns)</th><th>Grows in</th></tr>";
+        b[#b + 1] = "<table><tr><th>City</th><th>Pop</th><th>Food</th><th>Prod</th>"
+            .. "<th>Gold</th><th>Sci</th><th>Cult</th><th>Faith</th>"
+            .. "<th>Producing (turns)</th><th>Grows in</th></tr>";
         for _, r in ipairs(rows) do b[#b + 1] = r; end
         b[#b + 1] = "</table>";
     end
@@ -369,7 +447,7 @@ function EmpireStatus.show()
     -- needs-attention summary references), then splice the summary in at
     -- the top by building it into a separate table and concatenating.
     local detail = {};
-    run(detail, "Yields", function() sectionYields(detail, pPlayer); end);
+    run(detail, "Economy", function() sectionEconomy(detail, pPlayer); end);
     run(detail, "Research and civic", function()
         sectionResearchCivic(detail, pPlayer, scienceYield, cultureYield);
     end);
