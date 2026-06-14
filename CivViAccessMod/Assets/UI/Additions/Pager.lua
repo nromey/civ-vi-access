@@ -43,6 +43,8 @@ local VK_T      = (Keys ~= nil and Keys.VK_T)      or 0x54;
 local VK_N      = (Keys ~= nil and Keys.N)         or 0x4E;
 local VK_P      = (Keys ~= nil and Keys.P)         or 0x50;
 local VK_A      = (Keys ~= nil and Keys.A)         or 0x41;
+local VK_NEXT   = (Keys ~= nil and Keys.VK_NEXT)   or 0x22;   -- PageDown
+local VK_PRIOR  = (Keys ~= nil and Keys.VK_PRIOR)  or 0x21;   -- PageUp
 
 local _open  = false;
 local _title = "";
@@ -75,7 +77,11 @@ local function speakPart(prefix)
     local part = _parts[_index];
     if part == nil then return; end
     local pos = _index .. " of " .. #_parts;
-    Speech.emit((prefix or "") .. part .. ". " .. pos, "status");
+    -- Most parts already end in sentence punctuation (splitParts keeps it), so
+    -- don't add another "." before the position — that produced "exploration.. 2
+    -- of 12" (Noel 2026-06-14). Use a bare space after a terminator, ". " otherwise.
+    local sep = part:match("[%.!%?]%s*$") and " " or ". ";
+    Speech.emit((prefix or "") .. part .. sep .. pos, "status");
 end
 
 local function navTo(i)
@@ -118,8 +124,10 @@ local _handler = {
     bindings = {
         bind(VK_DOWN,   MOD_NONE, function() navTo(_index + 1); end, "Next part"),
         bind(VK_N,      MOD_NONE, function() navTo(_index + 1); end, "Next part"),
+        bind(VK_NEXT,   MOD_NONE, function() navTo(_index + 1); end, "Next part"),
         bind(VK_UP,     MOD_NONE, function() navTo(_index - 1); end, "Previous part"),
         bind(VK_P,      MOD_NONE, function() navTo(_index - 1); end, "Previous part"),
+        bind(VK_PRIOR,  MOD_NONE, function() navTo(_index - 1); end, "Previous part"),
         bind(VK_HOME,   MOD_NONE, function() navTo(1); end,          "First part"),
         bind(VK_END,    MOD_NONE, function() navTo(#_parts); end,    "Last part"),
         bind(VK_T,      MOD_CTRL, function() speakPart(); end,       "Re-read current part"),
@@ -127,8 +135,8 @@ local _handler = {
         bind(VK_ESCAPE, MOD_NONE, close,                             "Close the reader"),
     },
     helpEntries = {
-        { keyLabel = "Down or N", description = "Next part" },
-        { keyLabel = "Up or P", description = "Previous part" },
+        { keyLabel = "Down, N, or Page Down", description = "Next part" },
+        { keyLabel = "Up, P, or Page Up", description = "Previous part" },
         { keyLabel = "Home/End", description = "First / last part" },
         { keyLabel = "Ctrl+T", description = "Re-read the current part" },
         { keyLabel = "A", description = "Read everything from here as one piece" },

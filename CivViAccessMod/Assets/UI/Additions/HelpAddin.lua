@@ -47,6 +47,10 @@ local VK_NUMPAD8 = (Keys ~= nil and Keys.VK_NUMPAD8) or 0x68;
 local VK_NUMPAD2 = (Keys ~= nil and Keys.VK_NUMPAD2) or 0x62;
 local VK_NUMPAD7 = (Keys ~= nil and Keys.VK_NUMPAD7) or 0x67;
 local VK_NUMPAD1 = (Keys ~= nil and Keys.VK_NUMPAD1) or 0x61;
+-- PageDown / PageUp as Down / Up aliases (Noel 2026-06-14: "can't page down past
+-- items"). Matches the scanner ladder's PageUp/Down muscle memory.
+local VK_NEXT    = (Keys ~= nil and Keys.VK_NEXT)    or 0x22;
+local VK_PRIOR   = (Keys ~= nil and Keys.VK_PRIOR)   or 0x21;
 
 local _state = {
     open    = false,
@@ -183,7 +187,7 @@ local function handleKeyNav(key)
         return true;
     end
 
-    if key == VK_UP or key == VK_NUMPAD8 then
+    if key == VK_UP or key == VK_NUMPAD8 or key == VK_PRIOR then
         if #_state.visible <= 1 then
             speakCurrent(true);
             return true;
@@ -194,7 +198,7 @@ local function handleKeyNav(key)
         return true;
     end
 
-    if key == VK_DOWN or key == VK_NUMPAD2 then
+    if key == VK_DOWN or key == VK_NUMPAD2 or key == VK_NEXT then
         if #_state.visible <= 1 then
             speakCurrent(true);
             return true;
