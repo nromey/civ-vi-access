@@ -356,8 +356,10 @@ end
 -- backstop in case none come, e.g. a pre-founding load), then speak ONE
 -- "Game restored." Genuine in-play foundings happen long after the gate opens.
 -- LOAD_DEBUG logs the per-batch timing so the settle constants can be tuned
--- against a real restore. STRIP LOAD_DEBUG once confirmed.
-local LOAD_DEBUG = true;
+-- against a real restore. Confirmed clean 2026-06-14 (1-city restore: city
+-- replayed pump 1, settled pump 4, "Game restored." spoke). Left as an off
+-- switch for multi-city diagnosis; flip true if a future load misbehaves.
+local LOAD_DEBUG = false;
 local _foundReady        = true;   -- announce foundings? false during the load burst
 local _foundSuppressed   = 0;
 local _foundSeenCity     = false;
