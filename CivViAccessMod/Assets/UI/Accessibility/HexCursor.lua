@@ -384,6 +384,12 @@ function HexCursor.DescribeVerbose()
     end
 
     add(resourceName(plot));
+    -- What's built on the tile. The lean nav announce got improvement + road
+    -- 2026-06-12 (lines ~184-187); the verbose Shift+T path was missed in the
+    -- same change, so a built farm read on arrow-nav but not on describe-tile
+    -- (Noel 2026-06-13). Grouped here with resource as "what's on this hex".
+    add(improvementName(plot));
+    add(routeName(plot));
     add(appealPhrase(plot));
 
     -- Tail: least decision-critical, spoken last.
