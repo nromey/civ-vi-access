@@ -195,9 +195,14 @@ function HandlerStack._reset()
 end
 
 -- Always-on help entries appended at the bottom of every collected list.
--- For mod-wide hotkeys reachable at every depth (Alt+V, Ctrl+T, ? itself).
--- Authored as {keyLabel, description} LOC keys.
-HandlerStack.commonHelpEntries = {};
+-- For mod-wide hotkeys reachable at every depth (Alt+V, Ctrl+T, ? itself) and
+-- the engine default bindings (EngineHotkeys.lua). MUST be `or {}`, not a bare
+-- `= {}`: if this file's body re-runs in the VM (Civ VI's include behavior),
+-- a bare reset would WIPE entries already registered by EngineHotkeys / BaseMenu
+-- earlier in load — and those files, being include-cached, never re-add them.
+-- That exact wipe made the whole engine-hotkey category vanish from the map ?
+-- help even though EngineHotkeys logged "registered 50 entries" (Noel 2026-06-14).
+HandlerStack.commonHelpEntries = HandlerStack.commonHelpEntries or {};
 
 function HandlerStack.registerCommonHelpEntry(entry)
     HandlerStack.commonHelpEntries[#HandlerStack.commonHelpEntries + 1] = entry;

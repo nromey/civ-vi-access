@@ -12,6 +12,15 @@
 -- our mod loaded. That means Q/E/A/Z/C entries describe the HexCursor
 -- bindings (the rebound versions are at Alt+letter, listed separately).
 --
+-- DO NOT list a key the WorldInput wrap reclaims (WorldInputAccessWrap.lua
+-- SCANNER_KEYS / SCANNER_COMBOS) — pressing it does OUR action, not the
+-- engine one, so advertising the engine function here would be a lie.
+-- Reclaimed and therefore EXCLUDED: S, W, G, End, Home, F1, Backspace,
+-- PageUp/Down, [ and ] (→ notifications; city cycle moved to Shift+[ / ]),
+-- the bare Q/E/A/D/Z/C cluster, M, Ctrl+A, Shift/Ctrl+R, etc. Their mod
+-- meanings are listed by the cursor handler + scanner help, not here.
+-- (Noel 2026-06-14: "we turn off input, so only list what passes through.")
+--
 -- Loaded in both front-end and in-game contexts via modinfo ImportFiles
 -- so ? help in either context shows the engine bindings (they fire only
 -- in-game, but knowing they exist is useful at any time).
@@ -29,13 +38,13 @@ HandlerStack.registerCommonHelpEntry({ keyLabel = "Alt+C",     description = "Op
 HandlerStack.registerCommonHelpEntry({ keyLabel = "F7",        description = "Open Government screen" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "L",         description = "Open Religion screen" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "O",         description = "Open Great People screen" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "W",         description = "Open Great Works screen" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "F1",        description = "Open Rankings screen" });
+-- W (Great Works) and F1 (Rankings) are reclaimed by the wrap (where-am-I /
+-- searchable help) — excluded; reach those screens another way.
 HandlerStack.registerCommonHelpEntry({ keyLabel = "F2",        description = "Open City-States screen" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "F3",        description = "Open Espionage screen" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "F4",        description = "Open Trade Routes screen" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "F9",        description = "Open Civilopedia" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "End",       description = "Open full-screen map" });
+-- End (full-screen map) is the scanner ladder now — excluded.
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Ctrl+F",    description = "Open map search (in-game only)" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Shift+T",   description = "Say again (repeat the last announcement)" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Shift+I",   description = "Read the full visual description of the last reveal popup (hero / society)" });
@@ -60,18 +69,19 @@ HandlerStack.registerCommonHelpEntry({ keyLabel = "V",         description = "Al
 -- GLOBAL category — turn / camera / UI toggles
 -- ----------------------------------------------------------------------
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Enter",     description = "End turn" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "G",         description = "Toggle hex grid overlay" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Home",      description = "Open pause menu" });
+-- G (grid), Home (pause), and [ / ] (the wrap maps these to Government /
+-- scanner / notification cycle) are reclaimed — excluded. City cycle is on
+-- Shift+[ / Shift+] (a mod binding, listed elsewhere).
 HandlerStack.registerCommonHelpEntry({ keyLabel = "F5",        description = "Quick save" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "F6",        description = "Quick load" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Y",         description = "Toggle yield display" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Comma",     description = "Previous unit" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Period",    description = "Next unit" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Left bracket",  description = "Previous city" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Right bracket", description = "Next city" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Alt+Q",     description = "Toggle resource display (rebound from Q)" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Plus",      description = "Toggle 2D / 3D view" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Backslash", description = "Center on capital city" });
+-- Visual-only and low value for a blind player, but accurate (they fire and
+-- do what's described) — kept for completeness; Noel may want them pruned.
+HandlerStack.registerCommonHelpEntry({ keyLabel = "Y",         description = "Toggle yield display" });
+HandlerStack.registerCommonHelpEntry({ keyLabel = "Plus",      description = "Toggle 2D / 3D view" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Arrow keys", description = "Pan camera" });
 
 -- ----------------------------------------------------------------------
