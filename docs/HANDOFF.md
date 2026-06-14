@@ -12,15 +12,23 @@ Everything since v0.6.0 shipped as **0.7.0** (csproj + CHANGELOG bumped). camm
 gitlink (743e9fa = camm v0.6.0, pushed) confirmed before tag — submodule gotcha
 clear. Release CI GREEN, incl. the first-ever Prism build-from-source in CI.
 
-**Shift+/ help-list redesign: held OUT of 0.7.0 (untested), then RE-APPLIED to main
-for morning testing.** It was reverted (`c2cef84`) so it wouldn't ship in the tag,
-then cherry-picked back (`8660f3d`) AFTER the tag — so it's NOT in the 0.7.0 release
-but IS in the current working tree. **FIRST THING TO TEST (relaunch deploys it):**
-Shift+/ → arrow the short list (one line per key) → land on "Scanner help,
-description and keys. Enter to read." → Enter → reader walks the scanner spiel →
-Escape → back ON that list item ("Back to help") → Escape → map. If green, it ships
-in the next bump (0.7.1/0.8.0) + add more topics (nav walkthrough, direction modes,
-combat). NOTE: `8660f3d` is local-only unless pushed.
+**Shift+/ help-list redesign: re-applied to main (`8660f3d`), TESTED 2026-06-14,
+3 fixes applied — NEEDS A RE-TEST.** Core flow works (list → arrow to scanner topic
+→ Enter → reader → Escape → back to list → Escape → map, all confirmed in the log).
+Noel's test found and we fixed:
+- **Input leak (important, `e9b3283`):** the WorldInput wrap kept forwarding map
+  keys while Help/reader was open, so Shift+P opened production from inside Help,
+  etc. Now ScannerAddinGlue drops forwarded keys while a modal is open (Help + Pager
+  tracked separately for the handoff).
+- **`..` double dot + PageDown (`d6ecb1c`):** reader no longer doubles the period
+  before "N of M"; PageDown/PageUp now page both the list and the reader.
+- **Search = type-to-filter (NOT missing):** preamble says "Type to filter"; you
+  just type letters and the list narrows live. Was unsafe before (leaked to game);
+  safe now. Open question: does Noel want clearer wording / a distinct search?
+- **Open: granularity** — scanner help reads as 12 one-sentence parts; re-test after
+  the `..`/PageDown fixes to see if it still feels wrong.
+All local-only (`8660f3d`, `be369e2`, `e9b3283`, `d6ecb1c`) — NOT in 0.7.0, ships
+next bump once the re-test is green.
 
 ## 2026-06-13 session
 
