@@ -10,11 +10,17 @@ _Last updated: 2026-06-13._
 
 Everything since v0.6.0 shipped as **0.7.0** (csproj + CHANGELOG bumped). camm
 gitlink (743e9fa = camm v0.6.0, pushed) confirmed before tag — submodule gotcha
-clear. **The Shift+/ help-list redesign was REVERTED (`c2cef84` reverts `f576bce`)
-and held OUT of the release** — it's untested. To re-apply tomorrow after testing:
-`git cherry-pick f576bce` (or revert the revert), then run the round-trip test in
-the session block below, then ship in the next bump (0.7.1 / 0.8.0). So on a fresh
-checkout the live Shift+/ behavior is the PRIOR round-3 pager dump, not the new list.
+clear. Release CI GREEN, incl. the first-ever Prism build-from-source in CI.
+
+**Shift+/ help-list redesign: held OUT of 0.7.0 (untested), then RE-APPLIED to main
+for morning testing.** It was reverted (`c2cef84`) so it wouldn't ship in the tag,
+then cherry-picked back (`8660f3d`) AFTER the tag — so it's NOT in the 0.7.0 release
+but IS in the current working tree. **FIRST THING TO TEST (relaunch deploys it):**
+Shift+/ → arrow the short list (one line per key) → land on "Scanner help,
+description and keys. Enter to read." → Enter → reader walks the scanner spiel →
+Escape → back ON that list item ("Back to help") → Escape → map. If green, it ships
+in the next bump (0.7.1/0.8.0) + add more topics (nav walkthrough, direction modes,
+combat). NOTE: `8660f3d` is local-only unless pushed.
 
 ## 2026-06-13 session
 
