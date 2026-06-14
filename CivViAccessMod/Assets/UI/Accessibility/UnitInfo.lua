@@ -111,6 +111,14 @@ local function riverBetween(fromPlot, toPlot, direction)
     return river;
 end
 
+-- TEMP diagnostic (Noel 2026-06-13): the exits-ring cost numbers looked wrong
+-- (grass hills read 1, river tiles read base+1). PlotEntryCost just returns
+-- plot:GetMovementCost() with a road override, so this dumps the raw components
+-- per edge — GetMovementCost, IsRoute/routeCost, riverBetween, final cost — so we
+-- can see exactly what GetMovementCost reports vs the expected terrain cost.
+-- STRIP after the fix lands.
+local COST_DEBUG = true;
+
 local function exitsRing(pUnit)
     if Map == nil or Map.GetPlot == nil or Map.GetAdjacentPlot == nil then return nil; end
     local ux, uy = pUnit:GetX(), pUnit:GetY();
@@ -140,6 +148,22 @@ local function exitsRing(pUnit)
                 if not isWater and why == nil then why = "land"; end
             end
             local hasRiver = riverBetween(fromPlot, adj, d.dir);
+            if COST_DEBUG then
+                local terr, mc, isRoute, rType, rCost = "?", "?", "?", "?", "?";
+                pcall(function() local r = GameInfo.Terrains[adj:GetTerrainType()]; terr = r and r.TerrainType or "?"; end);
+                pcall(function() mc = tostring(adj:GetMovementCost()); end);
+                pcall(function() isRoute = tostring(adj:IsRoute()); end);
+                pcall(function()
+                    if adj:IsRoute() then
+                        local row = GameInfo.Routes[adj:GetRouteType()];
+                        rType = row and row.RouteType or "?";
+                        rCost = row and tostring(row.MovementCost) or "?";
+                    end
+                end);
+                local final = (PlotEntryCost ~= nil) and PlotEntryCost(adj) or nil;
+                Log.info(("COST_DEBUG: %s -> %s GetMovementCost=%s IsRoute=%s route=%s/%s river=%s blocked=%s final=%s")
+                         :format(d.name, terr, mc, isRoute, rType, rCost, tostring(hasRiver), tostring(why), tostring(final)));
+            end
             if why ~= nil then
                 bits[#bits + 1] = d.name .. " " .. why;
             else
