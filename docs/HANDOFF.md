@@ -4,42 +4,53 @@
 Full history is in `git log` — don't make dated copies. The ordered plan is in
 `docs/TASK_PLAN.md`; durable facts are in memory.
 
-_Last updated: 2026-06-14 (mid 0.8.0 batch — economy report built)._
+_Last updated: 2026-06-14 (mid 0.8.0 batch — reporting arc + engine-hotkey fix; awaiting Noel's batch test)._
 
 ## ►► CURRENT STATE — start here
 
 **0.7.1 SHIPPED 2026-06-14.** Working the **0.8.0 BATCH** now (task list active in
 the session tracker; ordered plan in `docs/TASK_PLAN.md` `►► 0.8.0 BATCH` block).
+Working style this session: batch fixes, hand off for one test pass (see
+[[feedback_batch_fixes_dont_pause]]).
 
-**Done this session (committed to main, NOT yet tagged):**
-- **Granary Ctrl+T building-describe — FIXED & CONFIRMED.** Was nil `ToolTipHelper`
-  in `ProductionPickerAddin` VM; added the include. Log confirmed `ttOk=true ttLen=95`.
-  `LONGFORM_DEBUG` STRIPPED (`49ae310`). pcall guards stay, so a throwing tooltip
-  degrades to `row.Description` rather than going silent.
-- **Engine hotkeys in map ? help — FIXED, NEEDS IN-GAME CONFIRM (`a164b2e`).** Root
-  cause: `EngineHotkeys.lua` was only in modinfo ImportFiles (includable ≠ executed),
-  so its `registerCommonHelpEntry` calls never ran → `commonHelpEntries` empty on the
-  map → NO engine hotkey (Alt+X auto-explore, Tech Tree, lenses) in Help. Fix:
-  `include("EngineHotkeys")` in `HexCursorAddin.lua`. CONFIRM: Shift+/ on map → engine
-  hotkeys (esp. Alt+X auto-explore) now listed; Lua.log shows "EngineHotkeys:
-  registered N entries" under HexCursorAddin (~50).
-- **Economy report expansion + per-city yields — BUILT, NEEDS CONFIRM (`4c3de0a`).**
-  `EmpireStatus.lua`: Gold section now has treasury / gross income / EXPENSE breakdown
-  (unit/building/district/WMD maint + inferred residual) / net; sci/culture/faith split
-  out. Cities table gained per-turn Food/Prod/Gold/Sci/Cult/Faith columns
-  (`pCity:GetYield(YieldTypes.X)`). API verified vs Base/Assets/UI ReportScreen.lua +
-  CitySupport.lua. **Civ VI LIMIT (honest): no per-source gold INCOME API — only gross
-  GetGoldYield — so income isn't broken down; expenses are.** UX to verify w/ Noel:
-  the Cities table is now 10 columns (heavy for cell-by-cell SR nav?), and the
-  Gold / "Science, culture, and faith" section split + wording.
+**Done this session (committed to main, NOT yet tagged) — AWAITING NOEL'S TEST:**
+- **Granary/building Ctrl+T — fixed last session, debug stripped (`49ae310`).** Engine
+  building tooltip (name + description + GPP + district reqs) now speaks. Noel reported
+  "no change" — log says `ttOk=true ttLen=95`, so it IS speaking; just terse because a
+  Granary is simple. Enrichment (#3) HELD as low-value until Noel says what it actually
+  spoke. pcall guards keep it from going silent on a throw.
+- **Engine hotkeys in map ? help — TWO bugs found via Lua.log, both fixed (`1167ff2`,
+  `a164b2e`). NEEDS RE-TEST.** (1) `EngineHotkeys.lua` was only in ImportFiles
+  (includable ≠ executed) → added `include("EngineHotkeys")` to HexCursorAddin; log
+  then showed "registered 50". (2) But `HelpPicker` still got 0 common — `HandlerStack`
+  line 200 reset `commonHelpEntries` with a bare `= {}` not `or {}`, so a VM re-run
+  WIPED the 50 while EngineHotkeys (cached) never re-added. Fixed to `or {}`. (3) Also
+  pruned 7 LIES from EngineHotkeys (W/F1/End/G/Home/[/]) — the wrap reclaims those, so
+  pressing them does the MOD action, not the listed engine fn (Noel's "we turn off
+  input, only list what passes through"). RE-TEST: Shift+/ on map → Alt+X auto-explore,
+  T, F2-F9, etc. now listed.
+- **Empire-status report (`U`) — big expansion, NEEDS CONFIRM (`4c3de0a`, `11af928`,
+  + enrich commit).** EmpireStatus.lua:
+  - Gold: treasury / gross income / EXPENSE breakdown (unit/building/district/WMD maint
+    + inferred residual) / net. **Civ VI LIMIT (honest): no per-source INCOME API —
+    only gross GetGoldYield — so income isn't broken down; expenses are.**
+  - Sci/culture/faith split into own section; rate lines now name the target
+    ("Science: +4 per turn (Pottery in 3 turns)") via researchBrief/civicBrief.
+  - Research & Civic lines show progress "X of Y science/culture, N turns left".
+  - Cities table: per-turn Food/Prod/Gold/Sci/Cult/Faith columns (10 cols total —
+    **UX to confirm: too heavy for cell-by-cell SR nav?**). Prod col = mine-effect test.
+  - Territory & exploration: % explored (N of M), UNEXPLORED count, tiles owned, tiles
+    improved (%), continents discovered (of total), goody huts in view, nearest fog
+    edge (HexGeom direction), + heaviest-fog octant ("most unexplored land lies to the
+    NE — send scouts that way"). API verified vs Base ReportScreen.lua/CitySupport.lua.
 
 **Bracket cluster — DECIDED (keep VI split, no Civ V merge).** Backlog only:
 Ctrl+bracket notification-category filter; chat-in-buffer for MP. See TASK_PLAN.
 
-**Remaining in batch:** territory + exploration section (#6), LOC sweep of all
-`Speech.emit` (#7), optional building-Ctrl+T enrich (#3). Then 0.8.0: keep
-`LOAD_DEBUG` false (LONGFORM_DEBUG already gone), bump csproj+CHANGELOG, submodule
-check (no C#/camm change this batch so far → gotcha N/A), tag.
+**Remaining in batch:** LOC sweep of all `Speech.emit` (#7, internal, no testable
+behavior — do as a focused pass), optional building-Ctrl+T enrich (#3, held). Then
+0.8.0: keep `LOAD_DEBUG` false (LONGFORM_DEBUG already gone), bump csproj+CHANGELOG,
+submodule check (no C#/camm change this batch → gotcha N/A), tag.
 
 ---
 
