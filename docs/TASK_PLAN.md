@@ -119,6 +119,13 @@ luxuries→amenities, unimproved-in-borders — survey feeds it), cities, map/ex
 then government/civics/law/production/trade/great-people/era/religion. Core v1 =
 economy + resources + cities. Full detail: memory `project_empire_status_expansion`.
 
+**LOC audit while we're here (Noel 2026-06-14):** EOT + empire output mints a lot of
+new speech strings, so use this task to sweep ALL speech output onto the LOC file —
+no inline English in any `Speech.emit` (CLAUDE.md rule). Covers the new report/EOT
+strings AND folds in the standing #18 audit (ScannerCore category labels + backend
+itemNames). Reuse Civ VI `LOC_*` tables where they exist; net-new strings get our own
+LOC keys in `CivVIAccessStrings.xml`. See [[project_localization_approach]].
+
 ## P6 — Diplomacy flesh-out  *(#23)*
 
 Beyond first-contact (shipped v0.6.0): deal/trade screen, DeclareWarPopup (war
