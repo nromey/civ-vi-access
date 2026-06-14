@@ -6,6 +6,16 @@ Full history is in `git log` — don't make dated copies. The ordered plan is in
 
 _Last updated: 2026-06-13._
 
+## RELEASE: v0.7.0 tagged + pushed 2026-06-13
+
+Everything since v0.6.0 shipped as **0.7.0** (csproj + CHANGELOG bumped). camm
+gitlink (743e9fa = camm v0.6.0, pushed) confirmed before tag — submodule gotcha
+clear. **The Shift+/ help-list redesign was REVERTED (`c2cef84` reverts `f576bce`)
+and held OUT of the release** — it's untested. To re-apply tomorrow after testing:
+`git cherry-pick f576bce` (or revert the revert), then run the round-trip test in
+the session block below, then ship in the next bump (0.7.1 / 0.8.0). So on a fresh
+checkout the live Shift+/ behavior is the PRIOR round-3 pager dump, not the new list.
+
 ## 2026-06-13 session
 
 **Pager/history test results (Noel, live):** repeat-last (Shift+R), history

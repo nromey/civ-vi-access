@@ -22,6 +22,65 @@ The same number lives in two places and must move together:
 The `version="1"` attribute in `CivViAccessMod.modinfo` is the
 Firaxis mod-system version, not ours — leave it alone.
 
+## 0.7.0 — 2026-06-13 — Playable: movement, combat, government, pager + speech history
+
+The big one. The scanner became a playable map and the turn loop closed — you can
+move, fight, build, govern, and recover speech you missed. Also bundles the
+never-tagged 0.6.1 batch (scanner backends + survey/zoom + move-to + Prism, detailed
+below).
+
+### Movement (P2)
+- Hex cursor + unit movement fully on the capture-all wrap (#14): bare Q/E/A/D/Z/C
+  move the cursor, Shift+direction moves the selected unit, **Ctrl+D** cycles the
+  direction vocabulary (hex / compass / clock / degrees).
+- Queued moves announce up front ("moving northeast, arrives next turn") and speak
+  "arrived at destination" when they land — no more silent first press.
+- Movement-cost speech: cursor tiles append "costs N" when over 1; bare **`/`** adds
+  a six-exit ring with per-exit costs and river-crossing flags.
+- Move-to: **M / Shift+M / Ctrl+M** send the selected unit to the cursor / scanned plot.
+
+### Combat (P3)
+- **Ctrl+A**: attack preview (you-deal / you-take / verdict) → confirm → commit;
+  damage and kill results speak. Refuses up front at 0 moves.
+- Own-unit losses announce ("Your Warrior was destroyed by …").
+- Overnight briefing: your turn opens with net HP changes, recoveries, and nearest
+  enemy movements from the AI turns; heal-first **R** cascade.
+
+### Production & government
+- Production picks now REPLACE the current build (no silent queue-behind); replacing
+  an in-progress build warns with turns-left first; completions announce in the briefing.
+- **Bare G** opens My Government — current government, type chooser, policy wizard
+  (real card commit).
+- The engine's own recommendations are surfaced in the production + tech pickers.
+
+### Speech recovery — pager + history
+- **Shift+R** repeats the last announce, then walks back through a 20-deep history
+  ring; **Ctrl+R** steps forward. Interrupted speech is no longer lost.
+- The Pager: a sentence-paged reader for long text (Down/Up, Home/End, Ctrl+T re-read,
+  A read-rest, Escape). Long history entries open in it; notifications buffer while reading.
+- Two-tier help: **F1** = searchable binding list (type-to-filter); **Shift+/** = context help.
+
+### Scanner (work sites + gating)
+- Work sites in the Recommendations backend: owned unimproved plots named by their
+  best improvement ("Farm site", "Mine site"), via static GameInfo validity.
+- **Alt+/** selects your unit under the cursor (closes the scanner → command loop).
+- Scanner resources gate on reveal tech (no more pre-tech Coal/Aluminum leak).
+
+### Info & detail
+- **Shift+T** verbose tile now speaks the improvement + road (matched the lean nav line).
+- Territory ownership speaks on cursor tiles (exceptions) and on `/`.
+- **Shift+P** targets the city under the cursor first.
+- Detail-speech audits: tech/civic unlock conditions, improvement detail, boost-text phrasing.
+
+### Fixes
+- Unique improvements are trait-gated (the Dutch were wrongly offered the Inca Terrace Farm).
+- River-edge crossing detection and exits-ring costs verified correct against live data.
+- Log archives keep 30 days (was 7) so post-mortems reach back far enough.
+
+### Deferred to a later bump
+- The Shift+/ help-list redesign (navigable list + Enter-to-reader topics) is built but
+  untested, so it's held out of this release and ships in the next one.
+
 ## 0.6.1 — 2026-06-11 — Scanner complete (backends + survey), move-to, Prism
 
 ### Scanner backends finished (P1 #8)
