@@ -37,6 +37,13 @@ include("Log");
 include("ScreenReader");
 include("HandlerStack");
 include("InputRouter");
+-- ToolTipHelper provides the rich engine tooltips composeLongForm reads on Ctrl+T.
+-- Without this include it was nil in this addin VM, so the tooltip block was
+-- skipped for EVERY kind and Ctrl+T fell back to row.Description only — which
+-- districts have but buildings don't, so Granary spoke nothing (Noel 2026-06-14).
+-- It's a pure logic helper (deps: TechAndCivicUnlockables + ToolTipLoader_; no
+-- ContextPtr/Controls), safe to pull into an addin VM.
+include("ToolTipHelper");
 
 ProductionPicker = ProductionPicker or {};
 

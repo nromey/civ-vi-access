@@ -20,10 +20,15 @@ fix + engine-hotkeys-in-Help audit], (2) reporting arc core via the web ReportWi
 territory + exploration section, (4) LOC sweep of all Speech.emit. Strip
 `LONGFORM_DEBUG` + keep `LOAD_DEBUG` false before tagging 0.8.0.
 
-**Open thread (batch step 1):** Granary Ctrl+T speaks nothing (buildings) while
-districts work. `LONGFORM_DEBUG` staged in `ProductionPickerAddin.composeLongForm`;
-Noel captured a log — read it, pin the cause (empty `row.Description` vs
-`GetBuildingToolTip` throwing in the addin VM), fix, strip the debug, Noel re-tests.
+**Open thread (batch step 1) — CAUSE FOUND, FIX STAGED, needs a confirming test.**
+Granary Ctrl+T spoke nothing because `ProductionPickerAddin` never `include`d
+`ToolTipHelper`, so it was nil in that VM and the tooltip block was skipped for ALL
+kinds — Ctrl+T fell back to `row.Description` only (districts have it, buildings
+don't). FIX: added `include("ToolTipHelper")`. TEST post-relaunch: Shift+P → Granary
+→ Ctrl+T should now speak the building's effects (and units/districts get richer
+tooltips too). `LONGFORM_DEBUG` is still on — the test log should show `ttOk=true`;
+if `GetBuildingToolTip` instead throws in the VM (`ttOk=false`), add a fallback.
+STRIP `LONGFORM_DEBUG` once green.
 
 ---
 
