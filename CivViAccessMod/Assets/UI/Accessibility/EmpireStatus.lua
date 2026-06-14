@@ -399,6 +399,80 @@ local function sectionCityStates(b, pPlayer, localPlayerID)
     b[#b + 1] = "</ul>";
 end
 
+-- Territory + exploration. One pass over the map grid (on-demand keypress, so
+-- a full W*H scan is fine — not a per-frame cost): how much is revealed,
+-- how much land we own + have improved, and the nearest fog edge from the
+-- capital so the user knows which way to send a scout. Uses the same
+-- PlayersVisibility / plot APIs the cursor + board query already rely on.
+local function sectionTerritory(b, pPlayer, pid)
+    b[#b + 1] = "<h2>Territory and exploration</h2>";
+    if Map == nil or Map.GetGridSize == nil or Map.GetPlot == nil then
+        b[#b + 1] = "<p class='muted'>Map data unavailable.</p>";
+        return;
+    end
+    local W, H = Map.GetGridSize();
+    local pVis = (PlayersVisibility ~= nil) and PlayersVisibility[pid] or nil;
+
+    -- Capital is the reference point for the nearest fog edge.
+    local capX, capY;
+    local cs = pPlayer.GetCities ~= nil and pPlayer:GetCities() or nil;
+    if cs ~= nil and cs.GetCapitalCity ~= nil then
+        local cap = cs:GetCapitalCity();
+        if cap ~= nil and cap.GetX ~= nil then capX, capY = cap:GetX(), cap:GetY(); end
+    end
+
+    local total, revealed, owned, improved = 0, 0, 0, 0;
+    local fogDist, fogX, fogY;
+    for y = 0, H - 1 do
+        for x = 0, W - 1 do
+            local plot = Map.GetPlot(x, y);
+            if plot ~= nil then
+                total = total + 1;
+                local isRev = true;
+                if pVis ~= nil and pVis.IsRevealed ~= nil then isRev = pVis:IsRevealed(x, y); end
+                if isRev then
+                    revealed = revealed + 1;
+                    local owner = plot.GetOwner ~= nil and plot:GetOwner() or -1;
+                    if owner == pid then
+                        owned = owned + 1;
+                        local imp = plot.GetImprovementType ~= nil and plot:GetImprovementType() or -1;
+                        if imp ~= nil and imp >= 0 then improved = improved + 1; end
+                    end
+                elseif capX ~= nil and Map.GetPlotDistance ~= nil then
+                    local d = Map.GetPlotDistance(capX, capY, x, y);
+                    if fogDist == nil or d < fogDist then fogDist = d; fogX = x; fogY = y; end
+                end
+            end
+        end
+    end
+
+    local pct = (total > 0) and math.floor((revealed / total) * 100 + 0.5) or 0;
+    b[#b + 1] = "<ul>";
+    b[#b + 1] = "<li>Map explored: " .. pct .. "% (" .. revealed .. " of " .. total .. " tiles)</li>";
+    b[#b + 1] = "<li>Tiles owned: " .. owned .. "</li>";
+    if owned > 0 then
+        local ipct = math.floor((improved / owned) * 100 + 0.5);
+        b[#b + 1] = "<li>Tiles improved: " .. improved .. " (" .. ipct .. "% of owned)</li>";
+    end
+    if fogDist ~= nil then
+        local dirStr;
+        if HexGeom ~= nil and HexGeom.directionString ~= nil and capX ~= nil then
+            local okD, ds = pcall(function() return HexGeom.directionString(capX, capY, fogX, fogY); end);
+            if okD and ds ~= nil and ds ~= "" then dirStr = ds; end
+        end
+        -- directionString carries its own distance (hex / bearing modes), so we
+        -- append only the location phrase, never ", N tiles" on top.
+        if dirStr ~= nil then
+            b[#b + 1] = "<li>Nearest unexplored tile: " .. dirStr .. " from your capital</li>";
+        else
+            b[#b + 1] = "<li>Nearest unexplored tile: " .. fogDist .. " tiles from your capital</li>";
+        end
+    elseif revealed >= total and total > 0 then
+        b[#b + 1] = "<li>The whole map is explored.</li>";
+    end
+    b[#b + 1] = "</ul>";
+end
+
 -- Safe section runner: append "(unavailable)" note on failure instead of
 -- aborting the whole report.
 local function run(b, label, fn)
@@ -454,6 +528,7 @@ function EmpireStatus.show()
     local blockedCities = run(detail, "Cities", function() return sectionCities(detail, pPlayer); end);
     local idleUnits = run(detail, "Units", function() return sectionUnits(detail, pPlayer); end);
     run(detail, "City-states", function() sectionCityStates(detail, pPlayer, pid); end);
+    run(detail, "Territory", function() sectionTerritory(detail, pPlayer, pid); end);
 
     -- Needs-attention summary (only when something actually needs doing).
     local todo = {};
