@@ -46,9 +46,11 @@ HandlerStack.registerCommonHelpEntry({ keyLabel = "F4",        description = "Op
 HandlerStack.registerCommonHelpEntry({ keyLabel = "F9",        description = "Open Civilopedia" });
 -- End (full-screen map) is the scanner ladder now — excluded.
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Ctrl+F",    description = "Open map search (in-game only)" });
--- Shift+T (verbose tile readout) and Shift+I (last-reveal visual description)
--- are MOD actions, listed by the cursor handler — not engine defaults. The old
--- "Shift+T = say again" here was stale (say-again moved to Shift+R 2026-06-01).
+-- Shift+T (verbose tile readout) is a MOD action listed by the cursor handler,
+-- not an engine default. The old "Shift+T = say again" here was stale (say-again
+-- moved to Shift+R 2026-06-01). Shift+I (recall the last reveal's visual
+-- description) is intentionally unlisted everywhere on the map — describe-image
+-- is a reveal-modal feature (bare I in those popups), not a general map key.
 
 -- ----------------------------------------------------------------------
 -- UNIT category — actions on the selected unit

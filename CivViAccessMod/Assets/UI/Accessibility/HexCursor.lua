@@ -772,12 +772,14 @@ local CURSOR_HELP_ENTRIES = {
     { keyLabel = "Shift+S", description = "Survey — bearing from capital, terrain, nearest city, and coordinates" },
     { keyLabel = "Shift+V", description = "Toggle verbose / terse announce mode" },
 
-    -- Tile / reveal info + repeat (mod hotkeys; Shift+T was mislabeled "say
-    -- again" in EngineHotkeys — that moved to Shift+R on 2026-06-01).
+    -- Tile readout + repeat (mod hotkeys; Shift+T was mislabeled "say again" in
+    -- EngineHotkeys — that moved to Shift+R on 2026-06-01). Shift+I (recall the
+    -- last reveal's visual description) is intentionally NOT listed: it's only
+    -- meaningful around the reveal popups, where the description is read with
+    -- bare I inside the modal (Noel 2026-06-14).
     { keyLabel = "Shift+T", description = "Verbose tile readout: full mechanics of the hex under the cursor" },
     { keyLabel = "Shift+R", description = "Say again: repeat the last announcement; press again to walk back through history" },
     { keyLabel = "Ctrl+R",  description = "Speech history: step forward through recent announcements" },
-    { keyLabel = "Shift+I", description = "Read the full visual description of the last reveal (hero / society)" },
 
     -- Help itself
     { keyLabel = "Question mark", description = "Open this help overlay" },
