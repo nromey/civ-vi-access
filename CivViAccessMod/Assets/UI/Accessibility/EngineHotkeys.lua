@@ -78,23 +78,16 @@ HandlerStack.registerCommonHelpEntry({ keyLabel = "Comma",     description = "Pr
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Period",    description = "Next unit" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Alt+Q",     description = "Toggle resource display (rebound from Q)" });
 HandlerStack.registerCommonHelpEntry({ keyLabel = "Backslash", description = "Center on capital city" });
--- Visual-only and low value for a blind player, but accurate (they fire and
--- do what's described) — kept for completeness; Noel may want them pruned.
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Y",         description = "Toggle yield display" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Plus",      description = "Toggle 2D / 3D view" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "Arrow keys", description = "Pan camera" });
 
--- ----------------------------------------------------------------------
--- LENSES category — colored overlays (numbers 1-7, 9)
--- ----------------------------------------------------------------------
-HandlerStack.registerCommonHelpEntry({ keyLabel = "1",         description = "Religion lens" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "2",         description = "Continent lens" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "3",         description = "Appeal lens" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "4",         description = "Settler lens" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "5",         description = "Government lens" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "6",         description = "Political lens" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "7",         description = "Tourism lens" });
-HandlerStack.registerCommonHelpEntry({ keyLabel = "9",         description = "Empire lens" });
+-- VISUAL-ONLY engine bindings deliberately NOT listed: Y (yield display),
+-- Plus (2D/3D view), Arrow keys (pan camera), and the colored map LENSES on
+-- digits 1-7/9 (religion / continent / appeal / settler / government /
+-- political / tourism / empire). They fire, but a blind player gains nothing,
+-- and their key slots — the digits especially — are prime targets for a Civ V
+-- key-continuation profile. The profile-aware key registry is the right home
+-- for what Help shows per profile; listing dead-weight visual keys here would
+-- just clutter the default profile and pre-claim slots Civ V mode wants
+-- (Noel 2026-06-14). See [[project_keymap_profiles_civ_v_compat]].
 
 -- ----------------------------------------------------------------------
 -- ONLINE
