@@ -53,6 +53,12 @@ local function resolveEntry(entry)
             if t ~= nil and t ~= "" and t ~= descText then descText = t; end
         end
     end
+    -- Topic items (Noel 2026-06-13) aren't a key:description pair — they're a
+    -- headline you press Enter on to open the long text in the reader. Render
+    -- as the title plus the action hint, no "Key:" prefix.
+    if entry.topic then
+        return tostring(descText) .. ". Enter to read.";
+    end
     return tostring(keyText) .. ": " .. tostring(descText);
 end
 
