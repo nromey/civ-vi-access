@@ -56,13 +56,6 @@ local _state = {
     index   = 1,
 };
 
--- Resume state for the topic -> reader -> back-to-list round trip (Noel
--- 2026-06-13). When the user presses Enter on a TOPIC item we open the reader
--- (Pager) on top and close this list; on the reader's close we reopen the list
--- where they left off. _resume.pending guards that we only reopen when WE sent
--- them to the reader (not for a reader opened from SpeechHistory etc.).
-local _resume = { pending = false, entries = nil, index = 1, filter = "" };
-
 -- ====================================================================
 -- View management
 -- ====================================================================
@@ -145,26 +138,6 @@ local function appendFilterChar(ch)
     end
 end
 
--- Enter on a TOPIC item: stash where we are, open the long body in the reader
--- (Pager) on top, and close this list quietly. The CivViAccess_PagerState(false)
--- subscription in Initialize reopens the list here when the reader closes.
-local function openTopic(entry)
-    if LuaEvents == nil or LuaEvents.CivViAccess_OpenPager == nil then
-        -- No reader available — don't arm resume (it would wrongly reopen the
-        -- list on the next unrelated pager close); just re-speak the line.
-        speakCurrent(true);
-        return;
-    end
-    _resume.pending = true;
-    _resume.entries = _state.all;
-    _resume.index   = _state.index;
-    _resume.filter  = _state.filter;
-    LuaEvents.CivViAccess_OpenPager(entry.title or "Help",
-                                    entry.body or entry.description or "");
-    -- silent close: the reader's own preamble speaks; no "Help closed" first.
-    HelpPicker.close(true);
-end
-
 local function handleKeyNav(key)
     -- Called on KeyUp. Handles the non-printable nav keys; printable
     -- filter input is handled in onInput's Character branch.
@@ -218,14 +191,7 @@ local function handleKeyNav(key)
     end
 
     if key == VK_RETURN or key == VK_SPACE then
-        -- Enter on a topic opens its body in the reader; Enter/Space on a plain
-        -- binding (and Space on a topic) just re-speaks the current line.
-        local entry = (_state.visible ~= nil) and _state.visible[_state.index] or nil;
-        if key == VK_RETURN and entry ~= nil and entry.topic then
-            openTopic(entry);
-        else
-            speakCurrent(true);
-        end
+        speakCurrent(true);
         return true;
     end
 
@@ -286,22 +252,18 @@ end
 -- Open / close
 -- ====================================================================
 
--- opts (optional): { index, filter, resume } — used when reopening the list
--- after the reader closes (the topic round trip) so we restore the user's spot
--- and skip the long preamble.
-function HelpPicker.open(entries, opts)
-    opts = opts or {};
+function HelpPicker.open(entries)
     Log.info("HelpPicker.open: entry; " ..
              (entries ~= nil and tostring(#entries) or "nil")
-             .. " entries" .. (opts.resume and " (resume)" or ""));
+             .. " entries");
     if entries == nil or #entries == 0 then
         Speech.emit("No help available", "meta");
         return;
     end
     _state.all     = entries;
-    _state.filter  = opts.filter or "";
-    _state.index   = opts.index or 1;
-    rebuildView();   -- builds _state.visible from the filter and clamps index
+    _state.filter  = "";
+    _state.visible = entries;
+    _state.index   = 1;
     _state.open    = true;
 
     pcall(function()
@@ -334,19 +296,11 @@ function HelpPicker.open(entries, opts)
         end
     end);
 
-    if opts.resume then
-        -- Back from the reader: terse re-entry, not the full "Type to filter…"
-        -- preamble. Speak where we landed.
-        Speech.emit("Back to help.", "event");
-        local line = currentLine();
-        if line ~= nil then Speech.emit(line, "status"); end
-    else
-        announcePreamble();
-    end
+    announcePreamble();
     Log.info("HelpPicker.open: complete");
 end
 
-function HelpPicker.close(silent)
+function HelpPicker.close()
     if not _state.open then return; end
     _state.open = false;
 
@@ -385,9 +339,7 @@ function HelpPicker.close(silent)
         end
     end);
 
-    -- silent on the topic hand-off (the reader's preamble speaks instead);
-    -- spoken on a real Escape-to-map close.
-    if not silent then Speech.emit("Help closed", "event"); end
+    Speech.emit("Help closed", "event");
     Log.info("HelpPicker.close: complete");
 end
 
@@ -410,20 +362,6 @@ local function Initialize()
     if LuaEvents ~= nil then
         LuaEvents.CivViAccess_OpenHelp.Add(OnLuaEventOpenHelp);
         Log.info("HelpAddin: subscribed to CivViAccess_OpenHelp");
-        -- Topic round trip: when the reader closes and WE sent the user there
-        -- from a topic, reopen the list where they left off (Noel 2026-06-13).
-        pcall(function()
-            LuaEvents.CivViAccess_PagerState.Add(function(isOpen)
-                if isOpen == false and _resume.pending then
-                    _resume.pending = false;
-                    HelpPicker.open(_resume.entries, {
-                        index  = _resume.index,
-                        filter = _resume.filter,
-                        resume = true,
-                    });
-                end
-            end);
-        end);
     end
     Log.info("HelpAddin.Initialize: input handler installed");
 end

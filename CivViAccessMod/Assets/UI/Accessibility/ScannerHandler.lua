@@ -71,15 +71,26 @@ function ScannerHandler.dispatch(key, mods)
     elseif key == VK_BACK and mods == MOD_NONE then
         speak(ScannerNav.returnToPreJump());    return true;
     elseif key == VK_HELP and mods == MOD_SHIFT then
-        -- Shift+/ (`?`) opens the navigable Help LIST — one line per binding,
-        -- plus long-form TOPIC items (the scanner guide etc.) you press Enter on
-        -- to open in the reader. Reverts the round-3 "compose everything into the
-        -- pager" behavior (Noel 2026-06-13): the up/down list stays short and
-        -- skimmable; long prose is one Enter away, not exploded inline. Same path
-        -- as F1, so both keys land on the same enhanced list (topics appended in
-        -- HexCursor.openHelp; HelpAddin owns the Enter->reader->return hand-off).
-        if HexCursor ~= nil and HexCursor.openHelp ~= nil then
-            HexCursor.openHelp();
+        -- `?` (Shift+/) = CONTEXT HELP in the pager (Noel 2026-06-12: "not only
+        -- scanner help — run context help through the pager"). Composes every
+        -- binding registered with the HandlerStack (common map entries + the
+        -- active handler's) as one part each, then the scanner guide prose
+        -- (sentence-exploded by the pager). History: this key originally
+        -- opened the navigable Help list via CIVVIACCESS_OpenHelp; the wrap
+        -- claiming Shift+/ suppressed that action and left only the scanner
+        -- blob — this restores the full-context intent on the pager surface.
+        if LuaEvents ~= nil and LuaEvents.CivViAccess_OpenPager ~= nil then
+            local parts = {};
+            pcall(function()
+                if HandlerStack ~= nil and HandlerStack.collectHelpEntries ~= nil
+                   and Help ~= nil and Help.resolveEntry ~= nil then
+                    for _, e in ipairs(HandlerStack.collectHelpEntries()) do
+                        parts[#parts + 1] = Help.resolveEntry(e);
+                    end
+                end
+            end);
+            parts[#parts + 1] = CHEAT_SHEET;   -- pager sentence-explodes long parts
+            LuaEvents.CivViAccess_OpenPager("Help", parts);
         else
             speak(CHEAT_SHEET, "picker");
         end
