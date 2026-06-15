@@ -743,7 +743,12 @@ local function Initialize()
     -- Bare Enter on the map: the WorldInput wrap fires this (without consuming
     -- Enter, so the engine still ends the turn when ready). We answer "why can't
     -- I end turn?" by naming the blocking tasks — only when actually blocked.
-    if LuaEvents ~= nil and LuaEvents.CivViAccess_EndTurnPressed ~= nil then
+    -- DO NOT guard on `~= nil`: this cross-VM event is only ever REFERENCED by
+    -- the wrap at FIRE time (runtime, on Enter), which is AFTER our Initialize —
+    -- so at subscribe time it doesn't exist yet and a nil-guard would silently
+    -- skip the .Add, leaving the wrap firing into the void (Noel 2026-06-15:
+    -- "Can't end turn yet" never spoke). Accessing .Add auto-creates the event.
+    if LuaEvents ~= nil then
         LuaEvents.CivViAccess_EndTurnPressed.Add(Notifications.announceEndTurnBlockers);
     end
     -- The pager broadcasts open/close (cross-VM). While it's open we buffer
