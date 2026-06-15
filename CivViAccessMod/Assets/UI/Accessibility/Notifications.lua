@@ -298,6 +298,26 @@ function Notifications.pendingCount(playerID)
     return n;
 end
 
+-- Count of pending ACTIONABLE entries — end-turn blockers only. Informational
+-- notifications (continent discovered, tech boost, natural wonder, historic
+-- moment) are pending + reviewable via the cycle, but they are NOT "things to
+-- do", so they must not inflate the idle "N things to do" reminder. Noel hit
+-- this 2026-06-14: felt stuck on "4 things to do" when the turn was actually
+-- READY — all four were FYI notifications. Mirrors pendingCount's engine-blocker
+-- fallback for the cache-vs-engine desync case (the synth entry is a blocker).
+function Notifications.blockerCount(playerID)
+    if playerID == nil or playerID < 0 then return 0; end
+    local n = 0;
+    for _, e in ipairs(sortedListFor(playerID, true)) do
+        if e.blocker then n = n + 1; end
+    end
+    if n == 0 then
+        local synth = synthesizeFromEngineBlocker(playerID);
+        if synth ~= nil then return 1; end
+    end
+    return n;
+end
+
 -- =======================================================================
 -- Layer 1 — inline announce
 -- =======================================================================
@@ -581,7 +601,11 @@ local function maybeFireReminder()
     if S.pagerOpen then return; end   -- never nag someone mid-read
     local pid = localPlayerID();
     if pid < 0 then return; end
-    local count = Notifications.pendingCount(pid);
+    -- Count ACTIONABLE blockers only — informational notifications (continent
+    -- discovered, tech boost, wonder) are reviewable but aren't "things to do",
+    -- so they must not drive the idle nag (Noel 2026-06-14: stuck-feeling on
+    -- "4 things to do" when the turn was actually ready and all four were FYI).
+    local count = Notifications.blockerCount(pid);
     if count == 0 then return; end
     local now = timeNow();
     if now - S.lastUserActivity < S.currentBackoffSeconds then return; end
