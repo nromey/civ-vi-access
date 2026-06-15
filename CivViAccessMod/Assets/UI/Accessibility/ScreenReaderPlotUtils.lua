@@ -209,22 +209,46 @@ end
 -- TECH-HIDDEN even on a revealed tile; plot:GetResourceType returns them
 -- regardless, so every speech path MUST gate on this or we leak e.g. oil at
 -- game start — a resource-level fog-of-war cheat (Noel 2026-06-15). Mirrors the
--- engine's own check (PlotToolTip / WorldViewIconsManager):
--- GetResources():IsResourceVisible(hash). Defaults to TRUE if the API is
--- unavailable (no regression); only a DEFINITIVE false hides the resource.
+-- Two gates, hide if EITHER says hide:
+--   1. AUTHORITATIVE tech gate (primary). A strategic resource with a PrereqTech
+--      (iron -> Bronze Working, uranium -> Combined Arms, niter/coal/oil/aluminum)
+--      is HIDDEN until the local player researches that tech. This is the line
+--      between tech-gated strategics and always-visible luxuries (diamonds) /
+--      bonus (wheat), which have NO PrereqTech. We gate on the tech directly
+--      because GetResources():IsResourceVisible(hash) returned non-false in the
+--      start briefing before the engine's resource-visibility state was ready,
+--      leaking iron + uranium in the Ancient era (Noel 2026-06-15) — HasTech is
+--      deterministic with no init-timing race.
+--   2. The engine's own IsResourceVisible (secondary; PlotToolTip uses it),
+--      covering map-reveal and cases without a PrereqTech.
+-- Defaults to TRUE if both are unavailable (no regression); only a DEFINITIVE
+-- false hides the resource.
 function ResourceVisibleToLocalPlayer(resourceIdx)
     if resourceIdx == nil or resourceIdx == -1 then return false; end
     local row = GameInfo.Resources[resourceIdx];
-    if row == nil or row.Hash == nil then return true; end
+    if row == nil then return true; end
     if Game == nil or Game.GetLocalPlayer == nil or Players == nil then return true; end
     local lp = Game.GetLocalPlayer();
     if lp == nil or lp < 0 then return true; end
     local pPlayer = Players[lp];
-    if pPlayer == nil or pPlayer.GetResources == nil then return true; end
-    local pr = pPlayer:GetResources();
-    if pr == nil or pr.IsResourceVisible == nil then return true; end
-    local ok, vis = pcall(function() return pr:IsResourceVisible(row.Hash); end);
-    if ok and vis == false then return false; end
+    if pPlayer == nil then return true; end
+    -- 1. Tech gate (strategics with a reveal tech).
+    if row.PrereqTech ~= nil then
+        local techRow = GameInfo.Technologies[row.PrereqTech];
+        local pTechs = (pPlayer.GetTechs ~= nil) and pPlayer:GetTechs() or nil;
+        if techRow ~= nil and pTechs ~= nil and pTechs.HasTech ~= nil then
+            local ok, has = pcall(function() return pTechs:HasTech(techRow.Index); end);
+            if ok and has == false then return false; end
+        end
+    end
+    -- 2. Engine visibility (map-reveal etc.).
+    if row.Hash ~= nil and pPlayer.GetResources ~= nil then
+        local pr = pPlayer:GetResources();
+        if pr ~= nil and pr.IsResourceVisible ~= nil then
+            local ok, vis = pcall(function() return pr:IsResourceVisible(row.Hash); end);
+            if ok and vis == false then return false; end
+        end
+    end
     return true;
 end
 
