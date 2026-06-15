@@ -199,8 +199,17 @@ local function buildItems()
     local best = (ok and tResults ~= nil) and tResults[UnitOperationResults.BEST_IMPROVEMENT] or nil;
 
     local items, validTypes = {}, {};
+    -- Builder improvements require YOUR territory. CanStartOperation lists them
+    -- on UNOWNED tiles too, but RequestOperation then silently rejects the build
+    -- (no charge spent) — which made commit() falsely announce "Built X" with no
+    -- improvement placed and the charge count drifting (Noel 2026-06-15: built 1
+    -- farm but heard four "Built Farm", in neutral land). So only treat them as
+    -- buildable-now when we own the tile; otherwise demote to locked with a
+    -- clear territory reason so commit() routes through the safe locked path.
+    local pPlot    = (Map ~= nil and Map.GetPlot ~= nil) and Map.GetPlot(pUnit:GetX(), pUnit:GetY()) or nil;
+    local ownsPlot = (pPlot ~= nil and pPlot.GetOwner ~= nil and pPlot:GetOwner() == lp());
     -- Buildable now, recommended first.
-    if improvements ~= nil then
+    if improvements ~= nil and ownsPlot then
         if best ~= nil and best ~= -1 then
             for _, e in ipairs(improvements) do
                 if e == best then
@@ -224,6 +233,24 @@ local function buildItems()
 
     -- Locked: builder-buildable improvements not valid here, with reasons.
     local locked = {};
+    -- When the tile isn't ours, the engine-listed improvements are blocked on
+    -- TERRITORY (not tech/resource) — surface that as the lock reason so the
+    -- user learns to move the builder onto their own land.
+    if improvements ~= nil and not ownsPlot then
+        for _, e in ipairs(improvements) do
+            local r = GameInfo.Improvements[e];
+            local t = r and r.ImprovementType or "";
+            if r ~= nil and not validTypes[t] then
+                locked[#locked + 1] = {
+                    label  = impName(e) .. ", locked, this tile is not in your territory",
+                    eImp   = e,
+                    locked = true,
+                    reason = "this tile is not in your territory",
+                };
+                validTypes[t] = true;
+            end
+        end
+    end
     for impType in pairs(builderImprovementTypes(pUnit)) do
         if not validTypes[impType] then
             local r = GameInfo.Improvements[impType];
@@ -293,6 +320,26 @@ local function commit()
         BuildImprovementPicker.close();
         return;
     end
+    -- Verify the build is actually legal BEFORE claiming success. commit() used
+    -- to announce "Built X" and decrement a charge unconditionally — even when
+    -- the engine silently rejected the build, so the user heard success with no
+    -- improvement placed and the charge count drifted (Noel 2026-06-15: built
+    -- one farm, heard four "Built Farm"; Craftsmanship's "improve 3 tiles" never
+    -- tripped). Catch the two real failure modes synchronously: tile not in your
+    -- territory, or already carrying this improvement. (The enumeration now also
+    -- demotes unowned-tile improvements to locked, so this is mainly a safety
+    -- net + the already-built case.) Stay open on failure to pick again/cancel.
+    local pPlot = (Map ~= nil and Map.GetPlot ~= nil) and Map.GetPlot(pUnit:GetX(), pUnit:GetY()) or nil;
+    if pPlot ~= nil then
+        if pPlot.GetOwner ~= nil and pPlot:GetOwner() ~= lp() then
+            Speech.emit("Can't build here. This tile is not in your territory", "meta");
+            return;
+        end
+        if pPlot.GetImprovementType ~= nil and pPlot:GetImprovementType() == item.eImp then
+            Speech.emit("This tile already has a " .. impName(item.eImp), "meta");
+            return;
+        end
+    end
     local op = buildOpHash();
     local tParameters = {};
     tParameters[UnitOperationTypes.PARAM_X] = pUnit:GetX();
@@ -301,19 +348,7 @@ local function commit()
     -- Charges read BEFORE the operation: counts the one being spent now.
     local charges = nil;
     pcall(function() charges = pUnit:GetBuildCharges(); end);
-    local dbgId   = (pUnit.GetID ~= nil) and pUnit:GetID() or -1;
-    local dbgType = (pUnit.GetUnitType ~= nil) and pUnit:GetUnitType() or -1;
     UnitManager.RequestOperation(pUnit, op, tParameters);
-    -- CHARGE_DEBUG (Noel 2026-06-14: "last charge" fired but the Builder
-    -- survived). GetBuildCharges is "remaining" (base game treats >0 as alive),
-    -- so charges==1 here should mean the build consumes it. Re-read AFTER the
-    -- request to learn whether the decrement is synchronous and whether the
-    -- unit still has charges, since the message arithmetic is firing wrong.
-    -- STRIP once the wording is fixed.
-    local after = nil;
-    pcall(function() after = pUnit:GetBuildCharges(); end);
-    Log.info("CHARGE_DEBUG: id=" .. tostring(dbgId) .. " type=" .. tostring(dbgType)
-        .. " before=" .. tostring(charges) .. " after=" .. tostring(after));
     -- Builders work INSTANTLY in Civ VI (no build turns — unlike Civ V
     -- workers) and spend one of their charges. Say where it landed and what's
     -- left (Noel 2026-06-12: "no way to tell where it put it and how long").
