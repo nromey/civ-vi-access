@@ -13,7 +13,26 @@ _Last updated: 2026-06-14 (0.8.0 batch DONE except the builder-charge fix; await
 turn counter, engine-hotkey Help fixes, builder charges on `/`). Working style: batch
 fixes, one test pass ([[feedback_batch_fixes_dont_pause]]).
 
-**0.8.0 IS GATED ON EXACTLY ONE THING — the builder "last charge" fix (#10).**
+**END-TURN UX OVERHAUL this session (committed, awaiting test) — from Noel's stuck-on-turn-1 report:**
+- **Reveal/event popups: Escape-only dismiss, Enter reserved for end-turn.** Root cause of
+  the stuck-ness: Eureka `BoostUnlockedPopup` is `PopupPriority.Low`; bare Enter (engine
+  end-turn gesture) is grabbed upstream before the popup sees it → Enter silently did
+  nothing; Escape worked but `NotifyClose` was silent. Fixed in `RevealPopupAccess`:
+  Escape dismisses + speaks "Dismissed"; Enter/Space consumed with nudge "Press Escape to
+  dismiss"; cinematic still plays on Enter. Convention recorded in [[project_popup_nav_standard]].
+- **"Ending turn"** spoken on `Events.LocalPlayerTurnEnd` (TurnAnnouncements) — confirms a
+  successful end; absence of it = didn't take.
+- **"Can't end turn yet. [tasks]"** — `Notifications.announceEndTurnBlockers` on a blocked
+  Enter (wrap fires `CivViAccess_EndTurnPressed` without consuming Enter; engine still owns
+  end-turn). Lists blocker summaries from the cache.
+- **"4 things to do"** now counts blockers only (`Notifications.blockerCount`), not FYI.
+- **OPEN (#13):** jump-to/activate first blocker on Enter (Civ V parity). FIRST verify whether
+  the engine already jumps when Enter reaches it (post-popup-fix); if not, activate the first
+  blocker (reuse Shift+Enter activation). Noel to observe on the test.
+- **Earcons (roadmap):** turn-change swoosh + blocker tone under the voice cues — earcon batch.
+
+**0.8.0 IS GATED ON the builder "last charge" fix (#10)** (+ confirm the popup/end-turn fixes
+above test clean).
 Noel built a Mine, heard "that was the Builder's last charge," but the Builder SURVIVED.
 `GetBuildCharges` is remaining-charges (base game: >0 = alive), so a read of 1 should
 mean consumption — contradiction, and the log only showed the message, not the number.
