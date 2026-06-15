@@ -301,7 +301,19 @@ local function commit()
     -- Charges read BEFORE the operation: counts the one being spent now.
     local charges = nil;
     pcall(function() charges = pUnit:GetBuildCharges(); end);
+    local dbgId   = (pUnit.GetID ~= nil) and pUnit:GetID() or -1;
+    local dbgType = (pUnit.GetUnitType ~= nil) and pUnit:GetUnitType() or -1;
     UnitManager.RequestOperation(pUnit, op, tParameters);
+    -- CHARGE_DEBUG (Noel 2026-06-14: "last charge" fired but the Builder
+    -- survived). GetBuildCharges is "remaining" (base game treats >0 as alive),
+    -- so charges==1 here should mean the build consumes it. Re-read AFTER the
+    -- request to learn whether the decrement is synchronous and whether the
+    -- unit still has charges, since the message arithmetic is firing wrong.
+    -- STRIP once the wording is fixed.
+    local after = nil;
+    pcall(function() after = pUnit:GetBuildCharges(); end);
+    Log.info("CHARGE_DEBUG: id=" .. tostring(dbgId) .. " type=" .. tostring(dbgType)
+        .. " before=" .. tostring(charges) .. " after=" .. tostring(after));
     -- Builders work INSTANTLY in Civ VI (no build turns — unlike Civ V
     -- workers) and spend one of their charges. Say where it landed and what's
     -- left (Noel 2026-06-12: "no way to tell where it put it and how long").
