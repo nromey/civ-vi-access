@@ -1606,6 +1606,31 @@ function Initialize()
         if LuaEvents.NotificationPanel_GovernmentOpenPolicies ~= nil then LuaEvents.NotificationPanel_GovernmentOpenPolicies.Add(OnOpenPolicyWizard); end
         if LuaEvents.TechCivicCompletedPopup_GovernmentOpenPolicies ~= nil then LuaEvents.TechCivicCompletedPopup_GovernmentOpenPolicies.Add(OnOpenPolicyWizard); end
         if LuaEvents.LaunchBar_GovernmentOpenMyGovernment ~= nil then LuaEvents.LaunchBar_GovernmentOpenMyGovernment.Add(OnOpenGovHub); end
+        -- Historic Moment "Makes History" popup (Expansion1/2 Moments): the
+        -- engine raises a full-screen modal on notable moments (first city,
+        -- wonder, first contact...). Its CONTENT is already spoken via the
+        -- PRIDE_MOMENT notification, so we do NOT re-speak it (Noel 2026-06-15:
+        -- no double-speak, keep the visual flourish for a sighted partner) — we
+        -- only cue the dismiss on open and confirm it on close. Subscribe
+        -- UNCONDITIONALLY: the engine HistoricMoments context fires these and may
+        -- load after us, so a `~= nil` guard would skip the subscription (the
+        -- cross-VM chicken-and-egg seen on CivViAccess_EndTurnPressed). Open
+        -- fires only from the moment popup's Show() (not the manual timeline);
+        -- Close also covers the timeline, where a "Dismissed" is still correct.
+        pcall(function()
+            LuaEvents.HistoricMoments_Opened.Add(function()
+                if Speech ~= nil and Speech.emit ~= nil then
+                    Speech.emit("Press Escape to dismiss", "status");
+                end
+            end);
+        end);
+        pcall(function()
+            LuaEvents.HistoricMoments_Closed.Add(function()
+                if Speech ~= nil and Speech.emit ~= nil then
+                    Speech.emit("Dismissed", "meta");
+                end
+            end);
+        end);
     end
     if Events ~= nil then
         -- NaturalDisaster announce moved to the shadow (Additions/NaturalDisasterPopup.lua,

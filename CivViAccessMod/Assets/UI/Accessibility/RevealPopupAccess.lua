@@ -317,6 +317,15 @@ function RevealPopupAccess.HandleKey(pInputStruct)
         local onClose       = _state.onClose;
         local stopCinematic = (_state.cinematicPlayed and _state.stopCinematic) or nil;
         _state = nil;
+        -- Speak the dismiss confirmation HERE, not in NotifyClose: this Escape
+        -- path clears _state above, so onClose -> ... -> NotifyClose hits its
+        -- `_state == nil` guard and stays silent. That guard made the user-
+        -- Escape dismiss (the common path) never say "Dismissed" (Noel
+        -- 2026-06-15: "still not getting speech that says dismissed"). Emit
+        -- before onClose so a queued next popup's critical announce still wins.
+        if Speech ~= nil and Speech.emit ~= nil then
+            Speech.emit("Dismissed", "meta");
+        end
         if stopCinematic ~= nil then
             local ok, err = pcall(stopCinematic);
             if not ok then
