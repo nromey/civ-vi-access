@@ -622,19 +622,6 @@ local function Initialize()
         Speech.emit(on and "Verbose on" or "Verbose off", "event");
     end);
 
-    -- WebView2 report bridge smoke test (Alt+K). Streams a sample HTML
-    -- report to the launcher's WebView2 window via Report.show. Temporary
-    -- trigger to prove the bridge end-to-end; the real report-open key is
-    -- Noel's call once it's validated.
-    lookupAction("CIVVIACCESS_ShowReportTest", function()
-        if Report == nil or Report.showTest == nil then
-            Speech.emit("Report bridge unavailable", "meta");
-            return;
-        end
-        Speech.emit("Opening test report", "meta");
-        Report.showTest();
-    end);
-
     -- Empire status report (bare U). First real consumer of the report
     -- bridge: yields, research/civic ETA, cities, idle units, city-states,
     -- and an end-turn "needs attention" checklist, rendered in the WebView2

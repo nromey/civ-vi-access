@@ -376,15 +376,6 @@
          Name="LOC_CIVVIACCESS_HOTKEY_VERBOSITY_TOGGLE"
          Description="LOC_CIVVIACCESS_HOTKEY_VERBOSITY_TOGGLE_HELP"
          CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
-    <!-- WebView2 report bridge smoke test (Alt+K). Temporary trigger to
-         validate the Lua -> log -> launcher -> WebView2 pipe; the real
-         report-open hotkey (end-of-turn / empire status) is Noel's call
-         once the bridge is proven. K is in the unbound singleton set
-         (D/I/J/K/N/S/U/X) and Alt+K is otherwise unused. -->
-    <Row ActionId="CIVVIACCESS_ShowReportTest"
-         Name="LOC_CIVVIACCESS_HOTKEY_SHOW_REPORT_TEST"
-         Description="LOC_CIVVIACCESS_HOTKEY_SHOW_REPORT_TEST_HELP"
-         CategoryId="GLOBAL" ContextId="World" LayoutType="PC"/>
     <!-- Empire status report (bare U). First real consumer of the report
          bridge: yields, research/civic ETA, cities, idle units, city-states,
          and an end-turn "needs attention" checklist. Bare U is in the unbound
@@ -569,9 +560,6 @@
          bare-V Alert collision and the menu type-ahead). Noel 2026-06-03. -->
     <Row ActionId="CIVVIACCESS_VerbosityToggle" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_SHIFT+LOC_OPTIONS_KEY_V"/>
-    <!-- Report bridge smoke test on Alt+K (see InputActions note above). -->
-    <Row ActionId="CIVVIACCESS_ShowReportTest" Index="0" GestureType="KBMouse"
-         GestureData="LOC_OPTIONS_KEY_ALT+LOC_OPTIONS_KEY_K"/>
     <!-- Empire status report on bare U (unbound singleton; provisional). -->
     <Row ActionId="CIVVIACCESS_EmpireStatus" Index="0" GestureType="KBMouse"
          GestureData="LOC_OPTIONS_KEY_U"/>

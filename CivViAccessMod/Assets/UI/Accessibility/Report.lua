@@ -103,25 +103,3 @@ function Report.turnPhrase(rawTurn)
     end
     return "Turn " .. tostring(turn);
 end
-
--- Smoke test: a sample report exercising headings, a list, a table, and
--- an external link, so we can confirm the full Lua -> log -> launcher ->
--- WebView2 pipe and that browse-mode navigation works.
-function Report.showTest()
-    local body = {
-        "<p class='muted'>WebView2 report bridge smoke test.</p>",
-        "<h2>Headings, lists, and tables render</h2>",
-        "<ul>",
-        "<li>The screen reader navigates this like a web page (browse mode).</li>",
-        "<li>Jump by heading (H), by link (K), by table (T).</li>",
-        "<li>Escape closes the window and returns you to the game.</li>",
-        "</ul>",
-        "<h2>A small table</h2>",
-        "<table><tr><th>City</th><th>Producing</th><th>Turns</th></tr>",
-        "<tr><td>Capital</td><td>Monument</td><td>3</td></tr>",
-        "<tr><td>Second City</td><td>Warrior</td><td>5</td></tr></table>",
-        "<p>External links open in your browser: ",
-        "<a href='https://github.com/nromey/civ-vi-access'>the project page</a>.</p>",
-    };
-    Report.show("Report bridge test", body);
-end
