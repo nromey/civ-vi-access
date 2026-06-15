@@ -92,6 +92,16 @@ local function announceEndTurnBlockingChanged(prevType, newType)
     Speech.emit(msg, "meta");
 end
 
+-- Confirm the turn is actually ending. Fires on Events.LocalPlayerTurnEnd —
+-- the engine's "end-turn accepted" signal — so it speaks ONLY when the turn
+-- truly ends, never on a blocked Enter press (Noel 2026-06-14: wanted audible
+-- confirmation that pressing Enter took, since on a blocked/popup-trapped turn
+-- Enter silently did nothing). Bookends the "Turn N" begin announce. Critical
+-- tier: it's a primary turn transition the player initiated and must hear.
+local function announceTurnEnd()
+    Speech.emit("Ending turn", "critical");
+end
+
 local function Initialize()
     if Events == nil or Events.LocalPlayerTurnBegin == nil then
         Log.warn("TurnAnnouncements: Events.LocalPlayerTurnBegin not available");
@@ -99,6 +109,10 @@ local function Initialize()
     end
     Events.LocalPlayerTurnBegin.Add(announceTurnBegin);
     Log.info("TurnAnnouncements: subscribed to LocalPlayerTurnBegin");
+    if Events.LocalPlayerTurnEnd ~= nil then
+        Events.LocalPlayerTurnEnd.Add(announceTurnEnd);
+        Log.info("TurnAnnouncements: subscribed to LocalPlayerTurnEnd");
+    end
     if Events.EndTurnBlockingChanged ~= nil then
         Events.EndTurnBlockingChanged.Add(announceEndTurnBlockingChanged);
         Log.info("TurnAnnouncements: subscribed to EndTurnBlockingChanged");
