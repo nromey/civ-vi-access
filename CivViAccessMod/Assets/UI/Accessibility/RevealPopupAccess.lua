@@ -137,11 +137,17 @@ local function buildKeyHint(opts)
         keys[#keys + 1] = "G to " .. (opts.actionHint or "go to it");
     end
     -- When a deferred cinematic is present, Enter PLAYS it (then Enter/Escape
-    -- dismiss); otherwise Enter just dismisses. Sean-Bean pattern.
+    -- dismiss); otherwise Enter/Escape dismiss. Sean-Bean pattern. We name
+    -- ESCAPE alongside Enter because some reveal popups are queued at
+    -- PopupPriority.Low (e.g. BoostUnlockedPopup) — bare Enter is the engine's
+    -- end-turn gesture and gets grabbed by a higher input layer before the
+    -- low-priority popup's handler sees it, so Enter can silently fail to
+    -- dismiss while Escape (no engine gesture) reliably reaches us (Noel
+    -- 2026-06-14: stuck on a Eureka popup, Enter did nothing, Escape worked).
     if opts.playCinematic ~= nil then
         keys[#keys + 1] = (opts.cinematicHint or "Enter to play");
     else
-        keys[#keys + 1] = "Enter to dismiss";
+        keys[#keys + 1] = "Enter or Escape to dismiss";
     end
     return "Press " .. table.concat(keys, ", ") .. ".";
 end
@@ -264,6 +270,14 @@ function RevealPopupAccess.NotifyClose()
     if _state == nil then return; end
     _state = nil;
     Log.info("RevealPopupAccess.NotifyClose");
+    -- Spoken dismiss confirmation. A reveal popup closing returns to the map,
+    -- which does NOT re-announce, so without this the dismiss is silent (Noel
+    -- 2026-06-14: "Escape made a sound with no speech feedback" — he couldn't
+    -- tell the popup had closed). Terse + meta so a queued next popup's own
+    -- critical announce still wins.
+    if Speech ~= nil and Speech.emit ~= nil then
+        Speech.emit("Dismissed", "meta");
+    end
 end
 
 -- Returns true if the key was consumed. The shadowed input handler
