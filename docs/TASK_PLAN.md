@@ -17,46 +17,48 @@ completeness.
 
 ---
 
-## ►► 0.8.0 BATCH — current focus (Noel 2026-06-14, long session, agreed plan)
+## ►► 0.8.0 BATCH — nearly done; gated only on the builder-charge fix (Noel 2026-06-14)
 
-**0.7.1 shipped first** (Shift+/ list, reader polish, input lock, "Game restored").
-This batch = remaining pre-bump polish + the reporting arc, designed up front for
-**Civ V key-mode parity** — the reports are the data surfaces that mode needs
-([[project_keymap_profiles_civ_v_compat]]), so build them to cover what a Civ V
-player reaches for (economic log etc.), not just our own sections.
+**0.7.1 shipped first.** This batch = reporting arc + pre-bump polish, built for
+**Civ V key-mode parity** ([[project_keymap_profiles_civ_v_compat]]).
 
-1. **Finish pre-bump.**
-   - **Granary Ctrl+T building-describe — FIXED & CONFIRMED (2026-06-14).** Root
-     cause: `ProductionPickerAddin` never `include()`d `ToolTipHelper`, so it was
-     nil in that addin VM and the tooltip block was skipped for EVERY kind; only
-     `row.Description` survived (districts have it, buildings don't → Granary silent).
-     Added the include; log shows `kind=building hasDesc=false ttOk=true ttLen=95`.
-     REMAINING: (a) STRIP `LONGFORM_DEBUG`; (b) optional — pad the building path
-     with yields/maintenance/prereqs (building tooltip is inherently short vs a
-     district's; ttLen=95).
-   - **Engine-hotkeys-in-Help audit** (see the #16 block below): surface engine
-     actions (auto-explore Alt+X etc.) in Help; own/announce the silent Alt-letter
-     actions. Pairs with #15's registry + the #14 remainder.
-   - **Bracket cluster — DECIDED, keep as-is (Noel 2026-06-14).** Reviewed the Civ V
-     model (unified buffer + filter ladder on `[`/`Shift+[`/`Ctrl+[`). Noel prefers
-     VI's split (notifications on `[` `]`, speech history on Shift+R/Ctrl+R, city
-     cycle on Shift+brackets) — keeping the notification channel clean beats V's
-     merge. No swap, no merge, no city-cycle relocation. Two backlog items only:
-       - **Notification-category filter on `Ctrl+[` / `Ctrl+]`** (free combo): cycle
-         filter so a busy stream can be walked by category (combat / diplomacy /
-         city-production / all). ~30-40 LOC; slot into 0.8.0 if time, else park.
-       - **Chat-in-buffer** — defer to multiplayer (only pays off there, needs MP
-         chat plumbing). MP watchpoint, not now.
-2. **Reporting arc core — web ReportWindow** (reports = web, pager = in-game speech).
-   Economy (treasury, per-turn gold/sci/culture/faith + ETAs), per-city yields (the
-   mine-effect acceptance test), cities. Detail: P5 / [[project_empire_status_expansion]].
-3. **Territory + exploration section** — owned/improved/workable tiles, % explored,
-   nearest fog edge ([[project_map_exploration_report]]).
-4. **LOC sweep** woven through 2-3: ALL `Speech.emit` onto the LOC file + the standing
-   #18 backlog ([[project_localization_approach]]).
+**DONE this session (committed to main, NOT tagged):**
+- **Reporting arc (empire status `U`):** Gold breakdown (treasury / gross income /
+  EXPENSE split — Civ VI has no per-source INCOME API, only gross GetGoldYield);
+  sci/culture/faith section with research/civic progress ("Pottery, 23 of 80 science,
+  3 turns") + rate-line targets; per-city yield columns (Food/Prod/Gold/Sci/Cult/Faith
+  — Prod = mine-effect test); Territory & exploration (% explored, unexplored count,
+  owned/improved tiles, continents discovered, goody huts, nearest fog + heaviest-fog
+  octant). "Turn X of Y" in BOTH empire + EOT report titles (Report.turnPhrase mirrors
+  TopPanel). API verified vs Base ReportScreen.lua/CitySupport.lua.
+- **Engine-hotkeys-in-Help:** FIXED (2 bugs — HandlerStack line-200 wipe + EngineHotkeys
+  never include()d) and confirmed live (HelpPicker 61 entries). Pruned keys the wrap
+  reclaims (W/F1/End/G/Home/[ ]) and visual-only keys (lenses/Y/Plus/arrows). Corrected
+  Shift+B (Builder build menu) / Shift+T (verbose tile); added Shift+R/Ctrl+R; scoped
+  Shift+I (describe-image) to the reveal modals (bare I there).
+- **Granary Ctrl+T** confirmed working ("+1 prod +2 housing"); `LONGFORM_DEBUG` stripped.
+- **Builder charges on `/`** ("N build charges") — Noel's idea; feature + charge debug aid.
+- **Bracket cluster DECIDED** keep VI split; backlog: Ctrl+bracket notif filter (#8),
+  chat-in-buffer (MP).
 
-Before tagging 0.8.0: strip `LONGFORM_DEBUG`, confirm `LOAD_DEBUG` stays false. The
-Civ V key REMAPPING itself stays a later task; this batch builds the reports it needs.
+**ONLY REMAINING for 0.8.0 (critical path):**
+1. **Builder "last charge" fix (#10)** — said "last charge" but builder survived. `CHARGE_DEBUG`
+   staged (logs before/after/unit). Needs Noel's next build log (relaunch first to deploy).
+   Fix wording, STRIP `CHARGE_DEBUG`.
+2. **Tag 0.8.0 (#9):** confirm `LOAD_DEBUG` false, bump csproj + CHANGELOG, submodule check
+   (N/A — all Lua this batch), tag + push, CI green.
+
+**LOC sweep MOVED OUT of 0.8.0 (#11, deferred).** ~367 inline-English Speech.emit/speak
+across 30+ files — big invisible plumbing, risky with no Lua linter, and translation infra
+isn't set up until closer to a first release. Its own batch (or thread into 0.9.0): subagent
+enumerates + proposes keys, then a reviewable batch-convert. Report HTML stays inline (web
+content). [[project_localization_approach]]
+
+**NEXT MAJOR BATCH = 0.9.0 District & Wonder placement** (Noel's flag). Currently the
+production picker STUBS districts/wonders as "placement needed (coming soon)" and refuses
+to commit them — the top playability blocker (no Campus/Holy Site/wonders). Assemble from
+parts we have: BuildImprovementPicker's pick-tile-preview-confirm pattern + board-query
+flood-fill + placement-preview adjacency yields. Then 0.10.0 = city management / CityView.
 
 ---
 
