@@ -136,18 +136,15 @@ local function buildKeyHint(opts)
     if opts.action ~= nil then
         keys[#keys + 1] = "G to " .. (opts.actionHint or "go to it");
     end
-    -- When a deferred cinematic is present, Enter PLAYS it (then Enter/Escape
-    -- dismiss); otherwise Enter/Escape dismiss. Sean-Bean pattern. We name
-    -- ESCAPE alongside Enter because some reveal popups are queued at
-    -- PopupPriority.Low (e.g. BoostUnlockedPopup) — bare Enter is the engine's
-    -- end-turn gesture and gets grabbed by a higher input layer before the
-    -- low-priority popup's handler sees it, so Enter can silently fail to
-    -- dismiss while Escape (no engine gesture) reliably reaches us (Noel
-    -- 2026-06-14: stuck on a Eureka popup, Enter did nothing, Escape worked).
+    -- Dismiss is ESCAPE ONLY (Noel 2026-06-14): Enter is the engine's end-turn
+    -- key and must never double as popup-dismiss — that ambiguity trapped him on
+    -- a low-priority boost popup where bare Enter is grabbed by the end-turn
+    -- layer and silently does nothing. A deferred cinematic still plays on Enter
+    -- (a real PLAY action, not a dismiss); everything else dismisses on Escape.
     if opts.playCinematic ~= nil then
-        keys[#keys + 1] = (opts.cinematicHint or "Enter to play");
+        keys[#keys + 1] = (opts.cinematicHint or "Enter to play, Escape to dismiss");
     else
-        keys[#keys + 1] = "Enter or Escape to dismiss";
+        keys[#keys + 1] = "Escape to dismiss";
     end
     return "Press " .. table.concat(keys, ", ") .. ".";
 end
@@ -298,21 +295,25 @@ function RevealPopupAccess.HandleKey(pInputStruct)
     -- stay open; Escape skips straight to dismiss. Once it's played (or if
     -- there's no cinematic) all three dismiss — tearing the cinematic down on
     -- the way out if we started it.
-    if key == VK_RETURN or key == VK_SPACE or key == VK_ESCAPE then
-        -- Gate: first Enter/Space plays the held cinematic.
-        if _state.playCinematic ~= nil and not _state.cinematicPlayed
-           and (key == VK_RETURN or key == VK_SPACE) then
-            _state.cinematicPlayed = true;
-            local ok, err = pcall(_state.playCinematic);
-            if not ok then
-                Log.warn("RevealPopupAccess.HandleKey: playCinematic failed: " .. tostring(err));
-            end
-            return true;   -- stay open; next Enter/Esc dismisses
+    -- Cinematic gate: a deferred cinematic PLAYS on Enter/Space (a real action,
+    -- not a dismiss); the popup stays open and Escape then dismisses.
+    if _state.playCinematic ~= nil and not _state.cinematicPlayed
+       and (key == VK_RETURN or key == VK_SPACE) then
+        _state.cinematicPlayed = true;
+        local ok, err = pcall(_state.playCinematic);
+        if not ok then
+            Log.warn("RevealPopupAccess.HandleKey: playCinematic failed: " .. tostring(err));
         end
+        return true;   -- stay open; Escape dismisses
+    end
 
-        -- Dismiss. Clear state BEFORE firing close so onClose's hide handler
-        -- (which calls NotifyClose) doesn't double-clear. Tear the cinematic
-        -- down first if we actually started it.
+    -- DISMISS = ESCAPE ONLY. Enter is the engine's end-turn key and must never
+    -- double as popup-dismiss (Noel 2026-06-14): on a low-priority boost popup
+    -- bare Enter is grabbed by the end-turn layer and silently does nothing.
+    if key == VK_ESCAPE then
+        -- Clear state BEFORE firing close so onClose's hide handler (which calls
+        -- NotifyClose) doesn't double-clear. Tear the cinematic down first if we
+        -- actually started it.
         local onClose       = _state.onClose;
         local stopCinematic = (_state.cinematicPlayed and _state.stopCinematic) or nil;
         _state = nil;
@@ -328,6 +329,15 @@ function RevealPopupAccess.HandleKey(pInputStruct)
                 Log.warn("RevealPopupAccess.HandleKey: onClose failed: " .. tostring(err));
             end
         end
+        return true;
+    end
+
+    -- Enter/Space on a reveal popup: consume them and NUDGE to Escape (Noel's
+    -- idea) so a habitual end-turn press isn't dead air — it tells the user the
+    -- dismiss key instead of leaving them stuck. We swallow rather than let
+    -- Enter fall through so it can't end the turn while the reveal is still up.
+    if key == VK_RETURN or key == VK_SPACE then
+        Speech.emit("Press Escape to dismiss", "status");
         return true;
     end
 
