@@ -4,53 +4,47 @@
 Full history is in `git log` — don't make dated copies. The ordered plan is in
 `docs/TASK_PLAN.md`; durable facts are in memory.
 
-_Last updated: 2026-06-14 (mid 0.8.0 batch — reporting arc + engine-hotkey fix; awaiting Noel's batch test)._
+_Last updated: 2026-06-14 (0.8.0 batch DONE except the builder-charge fix; awaiting Noel's build log)._
 
 ## ►► CURRENT STATE — start here
 
-**0.7.1 SHIPPED 2026-06-14.** Working the **0.8.0 BATCH** now (task list active in
-the session tracker; ordered plan in `docs/TASK_PLAN.md` `►► 0.8.0 BATCH` block).
-Working style this session: batch fixes, hand off for one test pass (see
-[[feedback_batch_fixes_dont_pause]]).
+**0.7.1 SHIPPED 2026-06-14.** The **0.8.0 batch is essentially complete** — see the
+`►► 0.8.0 BATCH` block in `docs/TASK_PLAN.md` for the full committed done-list (reports,
+turn counter, engine-hotkey Help fixes, builder charges on `/`). Working style: batch
+fixes, one test pass ([[feedback_batch_fixes_dont_pause]]).
 
-**Done this session (committed to main, NOT yet tagged) — AWAITING NOEL'S TEST:**
-- **Granary/building Ctrl+T — fixed last session, debug stripped (`49ae310`).** Engine
-  building tooltip (name + description + GPP + district reqs) now speaks. Noel reported
-  "no change" — log says `ttOk=true ttLen=95`, so it IS speaking; just terse because a
-  Granary is simple. Enrichment (#3) HELD as low-value until Noel says what it actually
-  spoke. pcall guards keep it from going silent on a throw.
-- **Engine hotkeys in map ? help — TWO bugs found via Lua.log, both fixed (`1167ff2`,
-  `a164b2e`). NEEDS RE-TEST.** (1) `EngineHotkeys.lua` was only in ImportFiles
-  (includable ≠ executed) → added `include("EngineHotkeys")` to HexCursorAddin; log
-  then showed "registered 50". (2) But `HelpPicker` still got 0 common — `HandlerStack`
-  line 200 reset `commonHelpEntries` with a bare `= {}` not `or {}`, so a VM re-run
-  WIPED the 50 while EngineHotkeys (cached) never re-added. Fixed to `or {}`. (3) Also
-  pruned 7 LIES from EngineHotkeys (W/F1/End/G/Home/[/]) — the wrap reclaims those, so
-  pressing them does the MOD action, not the listed engine fn (Noel's "we turn off
-  input, only list what passes through"). RE-TEST: Shift+/ on map → Alt+X auto-explore,
-  T, F2-F9, etc. now listed.
-- **Empire-status report (`U`) — big expansion, NEEDS CONFIRM (`4c3de0a`, `11af928`,
-  + enrich commit).** EmpireStatus.lua:
-  - Gold: treasury / gross income / EXPENSE breakdown (unit/building/district/WMD maint
-    + inferred residual) / net. **Civ VI LIMIT (honest): no per-source INCOME API —
-    only gross GetGoldYield — so income isn't broken down; expenses are.**
-  - Sci/culture/faith split into own section; rate lines now name the target
-    ("Science: +4 per turn (Pottery in 3 turns)") via researchBrief/civicBrief.
-  - Research & Civic lines show progress "X of Y science/culture, N turns left".
-  - Cities table: per-turn Food/Prod/Gold/Sci/Cult/Faith columns (10 cols total —
-    **UX to confirm: too heavy for cell-by-cell SR nav?**). Prod col = mine-effect test.
-  - Territory & exploration: % explored (N of M), UNEXPLORED count, tiles owned, tiles
-    improved (%), continents discovered (of total), goody huts in view, nearest fog
-    edge (HexGeom direction), + heaviest-fog octant ("most unexplored land lies to the
-    NE — send scouts that way"). API verified vs Base ReportScreen.lua/CitySupport.lua.
+**0.8.0 IS GATED ON EXACTLY ONE THING — the builder "last charge" fix (#10).**
+Noel built a Mine, heard "that was the Builder's last charge," but the Builder SURVIVED.
+`GetBuildCharges` is remaining-charges (base game: >0 = alive), so a read of 1 should
+mean consumption — contradiction, and the log only showed the message, not the number.
+`CHARGE_DEBUG` is staged in `BuildImprovementPicker.commit()` (logs `before=` / `after=`
+/ unit `type=`). To get the data:
+  1. `dotnet run` (relaunch — deploys all of today's Lua; CHARGE_DEBUG is NOT live in any
+     already-running session).
+  2. Build with a builder that has **>1 charge** (a fresh 3-charge builder — the 1-charge
+     case is the legitimate "last charge" and won't reproduce the misfire).
+  3. `/` before and after the build (now speaks "N build charges" — verifies deploy + gives
+     the live count).
+  4. Read the `CHARGE_DEBUG` line → tells me if the read is wrong or the decrement is
+     mistimed. Fix the wording, **STRIP CHARGE_DEBUG**, then tag.
 
-**Bracket cluster — DECIDED (keep VI split, no Civ V merge).** Backlog only:
-Ctrl+bracket notification-category filter; chat-in-buffer for MP. See TASK_PLAN.
+**THEN tag 0.8.0 (#9):** confirm `LOAD_DEBUG` false (LONGFORM_DEBUG already stripped),
+bump csproj + CHANGELOG, submodule check (N/A — all Lua this batch), tag + push, CI green.
 
-**Remaining in batch:** LOC sweep of all `Speech.emit` (#7, internal, no testable
-behavior — do as a focused pass), optional building-Ctrl+T enrich (#3, held). Then
-0.8.0: keep `LOAD_DEBUG` false (LONGFORM_DEBUG already gone), bump csproj+CHANGELOG,
-submodule check (no C#/camm change this batch → gotcha N/A), tag.
+**Deferred / next:**
+- **LOC sweep (#11)** — moved OUT of 0.8.0 (~367 inline strings/30+ files; invisible
+  plumbing, risky w/o a linter, translation infra not set up). Own batch near first
+  release; matches the existing "defer to stabilization" call in
+  [[project_localization_approach]].
+- **0.9.0 = District & Wonder placement** (Noel's flag, top playability blocker —
+  production picker currently STUBS districts/wonders as "placement needed (coming soon)").
+  Assemble from BuildImprovementPicker's pick-tile-preview-confirm + board-query flood-fill
+  + placement-preview adjacency. Then 0.10.0 = city management / CityView.
+- **Open UX question to confirm with Noel:** the Cities table in the `U` report is now 10
+  columns — check it's not too heavy for cell-by-cell SR nav.
+
+**Bracket cluster — DECIDED (keep VI split, no Civ V merge).** Backlog (#8): Ctrl+bracket
+notification-category filter; chat-in-buffer for MP.
 
 ---
 
