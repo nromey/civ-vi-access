@@ -785,21 +785,24 @@ function BaseMenuItems.NumberInput(spec)
     item.describe = genericDescribe
 
     function item:activate(menu)
-        -- Seed buffer with the current value so users editing a long
-        -- number (random seed, etc.) don't have to retype the whole
-        -- thing — they Home+Delete to clear or Backspace from the end
-        -- to trim. Cursor at end matches standard edit-line conventions
-        -- and means typing a new digit just appends until you move.
+        -- Buffer starts EMPTY — the user types a FRESH value. (This was changed
+        -- to seed with the current value so long random seeds didn't need
+        -- retyping, but that made typing APPEND to the old value: on a field
+        -- showing "2", typing "3" produced "23", which for a bounded param like
+        -- Disaster Intensity (0-4) is out of range and the engine rejected it to
+        -- 0 — Noel 2026-06-15 "no matter what number I put in, it sets to 0."
+        -- Empty-and-type is the documented design; hand-editing a long seed now
+        -- means retyping it, a rare and acceptable cost vs the silent reset.)
         local current = tostring(self._parameter.Value or "")
         menu._editMode = {
             item = self,
-            buffer = current,
-            cursor = #current,
+            buffer = "",
+            cursor = 0,
             originalValue = self._parameter.Value,
         }
         Speech.emit(
             "edit, current value " .. (current == "" and "(none)" or current)
-            .. ". Use left and right to navigate, backspace to delete, enter to commit, escape to cancel.",
+            .. ". Type the new value, enter to commit, escape to cancel.",
             "picker")
     end
 
@@ -810,6 +813,14 @@ function BaseMenuItems.NumberInput(spec)
                 Network.BroadcastGameConfig()
             end
         end)
+        -- PARAM_DEBUG (Noel 2026-06-15: disaster-intensity edit always set 0).
+        -- Confirms the empty-buffer fix and reveals any value-type mismatch
+        -- (e.g. an enumerated param that rejects a raw int). STRIP once green.
+        local p = self._parameter
+        local vt = (p.Values ~= nil) and tostring(p.Values.Type) or "nil"
+        print("[PARAM_DEBUG] '" .. tostring(p.Name) .. "' domain=" .. tostring(p.Domain)
+            .. " valuesType=" .. vt .. " sent=" .. tostring(newValue)
+            .. " readback=" .. tostring(p.Value) .. " ok=" .. tostring(ok))
         if not ok then
             print("[BaseMenuItems NumberInput] commit failed: " .. tostring(err))
             Speech.emit("commit failed", "meta")
