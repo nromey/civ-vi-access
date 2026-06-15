@@ -148,6 +148,18 @@ function OnInputHandler(pInputStruct)
         if msg == KEYUP or msg == KEYDOWN then
             local key = pInputStruct:GetKey();
             local mods = InputRouter.modifierMaskFromInputStruct(pInputStruct);
+            -- Bare Enter is the engine's end-turn key. DON'T consume it — let the
+            -- engine end the turn when ready (and TurnAnnouncements' "Ending turn"
+            -- confirm) — but notify the addin so it can announce WHY the turn
+            -- can't end when a blocker is present (Noel 2026-06-14: a blocked
+            -- Enter was silent about why). Fire once on KEYUP; Shift+Enter (notif
+            -- activate) is mods~=0 and falls through to the captured-combo path.
+            if Keys ~= nil and key == Keys.VK_RETURN and mods == 0 then
+                if msg == KEYUP and LuaEvents ~= nil and LuaEvents.CivViAccess_EndTurnPressed ~= nil then
+                    LuaEvents.CivViAccess_EndTurnPressed();
+                end
+                return BASE_OnInputHandler(pInputStruct);   -- engine still owns end-turn
+            end
             -- Bare scanner keys (any modifier — the ladder) OR an exact combo.
             if SCANNER_KEYS[key] or matchCombo(key, mods) then
                 if msg == KEYUP then

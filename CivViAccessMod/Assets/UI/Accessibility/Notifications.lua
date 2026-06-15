@@ -318,6 +318,47 @@ function Notifications.blockerCount(playerID)
     return n;
 end
 
+-- Human-readable summaries of the pending end-turn BLOCKERS (cache entries
+-- flagged blocker, plus the engine-blocker fallback for the cache-vs-engine
+-- desync case). Used by the "why can't I end turn?" announce.
+function Notifications.blockerSummaries(playerID)
+    if playerID == nil or playerID < 0 then return {}; end
+    local out = {};
+    for _, e in ipairs(sortedListFor(playerID, true)) do
+        if e.blocker and e.summary ~= nil and e.summary ~= "" then
+            out[#out + 1] = e.summary;
+        end
+    end
+    if #out == 0 then
+        local synth = synthesizeFromEngineBlocker(playerID);
+        if synth ~= nil and synth.summary ~= nil and synth.summary ~= "" then
+            out[1] = synth.summary;
+        end
+    end
+    return out;
+end
+
+-- "Why can't I end turn?" — fired when the player presses Enter on the map.
+-- The WorldInput wrap forwards CivViAccess_EndTurnPressed WITHOUT consuming
+-- Enter, so the engine still ends the turn when ready and TurnAnnouncements'
+-- "Ending turn" handles success. Here we ONLY speak when blocked, naming the
+-- tasks in the way (Noel 2026-06-14: a blocked Enter was silent about why).
+local ANNOUNCE_BLOCKER_CAP = 3;
+function Notifications.announceEndTurnBlockers()
+    if S.pagerOpen then return; end   -- never talk over a reader
+    local pid = localPlayerID();
+    if pid < 0 then return; end
+    local list = Notifications.blockerSummaries(pid);
+    if list == nil or #list == 0 then return; end   -- ready: engine ends the turn
+    local shown = {};
+    for i = 1, math.min(#list, ANNOUNCE_BLOCKER_CAP) do shown[i] = list[i]; end
+    local msg = "Can't end turn yet. " .. table.concat(shown, ". ");
+    if #list > ANNOUNCE_BLOCKER_CAP then
+        msg = msg .. " And " .. (#list - ANNOUNCE_BLOCKER_CAP) .. " more.";
+    end
+    Speech.emit(msg, "status");
+end
+
 -- =======================================================================
 -- Layer 1 — inline announce
 -- =======================================================================
@@ -698,6 +739,12 @@ local function Initialize()
     end
     if Events.InputActionTriggered ~= nil then
         Events.InputActionTriggered.Add(onInputActionTriggered);
+    end
+    -- Bare Enter on the map: the WorldInput wrap fires this (without consuming
+    -- Enter, so the engine still ends the turn when ready). We answer "why can't
+    -- I end turn?" by naming the blocking tasks — only when actually blocked.
+    if LuaEvents ~= nil and LuaEvents.CivViAccess_EndTurnPressed ~= nil then
+        LuaEvents.CivViAccess_EndTurnPressed.Add(Notifications.announceEndTurnBlockers);
     end
     -- The pager broadcasts open/close (cross-VM). While it's open we buffer
     -- inline announces and mute the idle reminder — reading is sacred.
