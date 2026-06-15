@@ -154,11 +154,22 @@ function OnInputHandler(pInputStruct)
             -- can't end when a blocker is present (Noel 2026-06-14: a blocked
             -- Enter was silent about why). Fire once on KEYUP; Shift+Enter (notif
             -- activate) is mods~=0 and falls through to the captured-combo path.
-            if Keys ~= nil and key == Keys.VK_RETURN and mods == 0 then
-                if msg == KEYUP and LuaEvents ~= nil and LuaEvents.CivViAccess_EndTurnPressed ~= nil then
-                    LuaEvents.CivViAccess_EndTurnPressed();
+            if Keys ~= nil and key == Keys.VK_RETURN then
+                -- ENDTURN_DEBUG (Noel 2026-06-15): Enter "does nothing" when ready
+                -- and the EndTurn InputAction never fired in the log — so confirm
+                -- the wrap even SEES bare Enter, with what mods, and whether the
+                -- event exists at fire time. STRIP once end-turn is solid.
+                if msg == KEYUP then
+                    Log.info("ENDTURN_DEBUG: wrap saw Enter mods=" .. tostring(mods)
+                        .. " evt=" .. tostring(LuaEvents ~= nil and LuaEvents.CivViAccess_EndTurnPressed ~= nil));
                 end
-                return BASE_OnInputHandler(pInputStruct);   -- engine still owns end-turn
+                if mods == 0 then
+                    if msg == KEYUP and LuaEvents ~= nil then
+                        -- Unguarded fire (subscriber auto-creates the event now).
+                        LuaEvents.CivViAccess_EndTurnPressed();
+                    end
+                    return BASE_OnInputHandler(pInputStruct);   -- engine still owns end-turn
+                end
             end
             -- Bare scanner keys (any modifier — the ladder) OR an exact combo.
             if SCANNER_KEYS[key] or matchCombo(key, mods) then
