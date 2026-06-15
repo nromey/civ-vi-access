@@ -414,6 +414,7 @@
     <File>Assets/UI/Additions/HelpAddin.lua</File>
     <File>Assets/UI/Additions/RevealListeners.xml</File>
     <File>Assets/UI/Additions/RevealListeners.lua</File>
+    <File>Assets/UI/Additions/NaturalDisasterPopup.lua</File>
     <File>Assets/UI/Menus/InGameTopOptionsMenu.lua</File>
     <File>Assets/UI/Accessibility/ScreenReader.lua</File>
     <File>Assets/UI/Accessibility/Report.lua</File>
