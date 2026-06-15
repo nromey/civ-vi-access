@@ -160,10 +160,25 @@
       <!-- Group B: CHOICE popups (navigate + select), via ChoosePopupAccess.
            PantheonChooser is base-game + shadowable like the Group A popups. -->
       <File priority="10001">Assets/UI/Choosers/PantheonChooser.lua</File>
-      <!-- HeroesPopup / SecretSocietyPopup / NaturalDisasterPopup /
-           RockBandMoviePopup / EraCompletePopup are DLC-provided contexts we
-           CANNOT shadow (user mods apply before the DLC creates them). We
-           announce them via the RevealListeners addin (InGameActions) instead. -->
+      <!-- NaturalDisasterPopup IS shadowable after all (the 2026-05-29
+           "can't shadow DLC popups" note was wrong for this one). The active
+           context is the New Frontier Pass replacement
+           DLC/GranColombia_Maya/UI/Replacements/NaturalDisasterPopup_GranColombia_Maya.lua,
+           which is just `include("NaturalDisasterPopup")` + a comet-strike
+           tweak. That include() resolves by filename priority, so our
+           priority-10001 NaturalDisasterPopup.lua wins it (same mechanism as
+           the popup shadows above) and installs our Escape->Close +
+           RevealPopupAccess.HandleKey handler and the impact readout (units /
+           pop / tiles / fertility lost). Without this line the include falls
+           through to vanilla Expansion2's, which only dismisses via a mouse
+           Close-button click -> the modal locks the PopupManager (blocks
+           end-turn) with no keyboard dismiss = the disaster stuck-turn trap.
+           Confirmed via UserInterface.log 2026-06-15. -->
+      <File priority="10001">Assets/UI/Additions/NaturalDisasterPopup.lua</File>
+      <!-- HeroesPopup / SecretSocietyPopup / RockBandMoviePopup /
+           EraCompletePopup are DLC-provided contexts not yet shadowed; we
+           announce them via the RevealListeners addin (InGameActions). Revisit
+           with the include()-priority trick proven on NaturalDisasterPopup. -->
       <File priority="10001">Assets/UI/Accessibility/ScreenReaderPlotUtils.lua</File>
       <File priority="10001">Assets/UI/Accessibility/OptionsAccess.lua</File>
       <File priority="10001">Assets/UI/Accessibility/AdvisorPopupAccess.lua</File>

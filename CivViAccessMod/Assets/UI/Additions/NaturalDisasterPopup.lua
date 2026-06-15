@@ -12,6 +12,11 @@
 
 include("PopupManager");
 include("RevealPopupAccess");
+include("Log");
+-- ENTRY marker: if this prints under context "NaturalDisasterPopup", our
+-- priority-10001 shadow won the GranColombia_Maya include("NaturalDisasterPopup")
+-- and our keyboard dismiss (Escape -> Close) + impact readout are installed.
+Log.info("NaturalDisasterPopupAccess: ENTRY loaded — our shadow won include('NaturalDisasterPopup').");
 
 
 -- ===========================================================================

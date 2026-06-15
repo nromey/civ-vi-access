@@ -1608,7 +1608,14 @@ function Initialize()
         if LuaEvents.LaunchBar_GovernmentOpenMyGovernment ~= nil then LuaEvents.LaunchBar_GovernmentOpenMyGovernment.Add(OnOpenGovHub); end
     end
     if Events ~= nil then
-        if Events.RandomEventOccurred ~= nil then Events.RandomEventOccurred.Add(OnRandomEventOccurred); end
+        -- NaturalDisaster announce moved to the shadow (Additions/NaturalDisasterPopup.lua,
+        -- registered 2026-06-15). The shadow now wins the GranColombia_Maya
+        -- include("NaturalDisasterPopup") and owns the popup IN-CONTEXT: it
+        -- announces with per-occurrence impact (units/pop/tiles/fertility lost),
+        -- and its Escape->Close calls m_kPopupMgr:Unlock() — the actual end-turn
+        -- unblock the cross-VM RaiseLive modal here could NEVER do. Subscribing
+        -- here too would double-announce and fight the shadow for input.
+        --   if Events.RandomEventOccurred ~= nil then Events.RandomEventOccurred.Add(OnRandomEventOccurred); end
         if Events.PostTourismBomb ~= nil then Events.PostTourismBomb.Add(OnRockBandConcert); end
         if Events.PlayerEraChanged ~= nil then Events.PlayerEraChanged.Add(OnPlayerEraChanged); end
         if Events.LoadGameViewStateDone ~= nil then Events.LoadGameViewStateDone.Add(OnLoadGameViewStateDone); end
