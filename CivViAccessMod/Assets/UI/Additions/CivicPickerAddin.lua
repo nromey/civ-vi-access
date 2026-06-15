@@ -726,10 +726,20 @@ function CivicPicker.close()
         end
     end);
 
+    -- PROPERLY CLOSE the engine CivicsTree — do NOT just un-hide it. Same
+    -- full-screen-modal trap as TechTree (see TechPickerAddin.close, screenshot
+    -- 2026-06-15): SetHide(false) left the tree raised, eating Enter + Escape
+    -- with no keyboard dismiss. Fire the LaunchBar close event so it dequeues
+    -- and releases input, then hide the control as backup.
+    pcall(function()
+        if LuaEvents ~= nil and LuaEvents.LaunchBar_CloseCivicsTree ~= nil then
+            LuaEvents.LaunchBar_CloseCivicsTree();
+        end
+    end);
     pcall(function()
         if ContextPtr ~= nil and ContextPtr.LookUpControl ~= nil then
             local tree = ContextPtr:LookUpControl("/InGame/CivicsTree");
-            if tree ~= nil and tree.SetHide ~= nil then tree:SetHide(false); end
+            if tree ~= nil and tree.SetHide ~= nil then tree:SetHide(true); end
         end
     end);
 

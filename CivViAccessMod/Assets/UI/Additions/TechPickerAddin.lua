@@ -815,12 +815,26 @@ function TechPicker.close()
         end
     end);
 
-    -- Unhide engine TechTree (sighted UI). If a sighted partner is
-    -- on turn next, the engine UI takes over normally.
+    -- PROPERLY CLOSE the engine TechTree — do NOT just un-hide it. The engine
+    -- TechTree (/InGame/TechTree) is a FULL-SCREEN MODAL: re-showing it (the old
+    -- SetHide(false)) left it raised and capturing Enter + Escape, trapping the
+    -- blind primary user with no keyboard dismiss — scanner keys still fell
+    -- through to WorldInput so the cursor worked, but end-turn and the pause
+    -- menu did nothing (root-caused via screenshot 2026-06-15). Fire the same
+    -- close event the LaunchBar uses so the tree dequeues and releases input,
+    -- then belt-and-suspenders hide the control. (A sighted partner can
+    -- re-raise it from the launch bar; trapping the primary is the worse
+    -- failure. Contrast ProductionPanel — a benign side panel that's safe to
+    -- un-hide, which is why production never trapped.)
+    pcall(function()
+        if LuaEvents ~= nil and LuaEvents.LaunchBar_CloseTechTree ~= nil then
+            LuaEvents.LaunchBar_CloseTechTree();
+        end
+    end);
     pcall(function()
         if ContextPtr ~= nil and ContextPtr.LookUpControl ~= nil then
             local tree = ContextPtr:LookUpControl("/InGame/TechTree");
-            if tree ~= nil and tree.SetHide ~= nil then tree:SetHide(false); end
+            if tree ~= nil and tree.SetHide ~= nil then tree:SetHide(true); end
         end
     end);
 
