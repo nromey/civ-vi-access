@@ -203,10 +203,36 @@ function FeatureName(plot)
     return Locale.Lookup(featureRow.Name);
 end
 
+-- True if a resource INDEX is visible to the local player — i.e. its revealing
+-- tech is researched (or it has no prereq, like bonus/luxury resources).
+-- STRATEGIC resources (oil, iron, coal, niter, aluminum, uranium...) are
+-- TECH-HIDDEN even on a revealed tile; plot:GetResourceType returns them
+-- regardless, so every speech path MUST gate on this or we leak e.g. oil at
+-- game start — a resource-level fog-of-war cheat (Noel 2026-06-15). Mirrors the
+-- engine's own check (PlotToolTip / WorldViewIconsManager):
+-- GetResources():IsResourceVisible(hash). Defaults to TRUE if the API is
+-- unavailable (no regression); only a DEFINITIVE false hides the resource.
+function ResourceVisibleToLocalPlayer(resourceIdx)
+    if resourceIdx == nil or resourceIdx == -1 then return false; end
+    local row = GameInfo.Resources[resourceIdx];
+    if row == nil or row.Hash == nil then return true; end
+    if Game == nil or Game.GetLocalPlayer == nil or Players == nil then return true; end
+    local lp = Game.GetLocalPlayer();
+    if lp == nil or lp < 0 then return true; end
+    local pPlayer = Players[lp];
+    if pPlayer == nil or pPlayer.GetResources == nil then return true; end
+    local pr = pPlayer:GetResources();
+    if pr == nil or pr.IsResourceVisible == nil then return true; end
+    local ok, vis = pcall(function() return pr:IsResourceVisible(row.Hash); end);
+    if ok and vis == false then return false; end
+    return true;
+end
+
 function ResourceName(plot)
     if plot == nil then return ""; end
     local resourceIdx = plot:GetResourceType();
     if resourceIdx == -1 then return ""; end
+    if not ResourceVisibleToLocalPlayer(resourceIdx) then return ""; end
     local resourceRow = GameInfo.Resources[resourceIdx];
     if resourceRow == nil then return ""; end
     return Locale.Lookup(resourceRow.Name);

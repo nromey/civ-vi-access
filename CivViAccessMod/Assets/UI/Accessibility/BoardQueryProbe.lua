@@ -157,8 +157,13 @@ local function fillBlocks(rx, ry, radius, predicate)
                         local si = sectorIndex(rx, ry, px, py);
                         if si ~= nil then b.sectors[si] = (b.sectors[si] or 0) + 1; end
                         if pl.IsRiver and pl:IsRiver() then b.hasRiver = true; end
+                        -- Gate on resource visibility so the board query doesn't
+                        -- leak tech-hidden strategics (oil before Refining, etc.) —
+                        -- Noel 2026-06-15. Helper is global from ScreenReaderPlotUtils
+                        -- (same VM); nil-guard defaults to showing (no regression).
                         local rt = pl:GetResourceType();
-                        if rt ~= nil and rt ~= -1 and GameInfo.Resources[rt] ~= nil then
+                        if rt ~= nil and rt ~= -1 and GameInfo.Resources[rt] ~= nil
+                           and (ResourceVisibleToLocalPlayer == nil or ResourceVisibleToLocalPlayer(rt)) then
                             b.resources[L(GameInfo.Resources[rt].Name)] = true;
                         end
                         for dir = 0, (DirectionTypes.NUM_DIRECTION_TYPES or 6) - 1 do
