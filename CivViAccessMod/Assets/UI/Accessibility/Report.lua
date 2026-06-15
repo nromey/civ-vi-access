@@ -74,6 +74,36 @@ function Report.show(title, body)
     emit(MARKER .. "[end]");
 end
 
+-- "Turn X of Y" (or just "Turn X" when the game has no hard turn limit),
+-- matching the on-screen turn counter exactly (mirrors TopPanel.lua's
+-- RefreshTurnsRemaining). GetGameEndTurn is EXCLUSIVE — the turn AFTER the last
+-- playable one — and the displayed counter normalizes by the start turn when the
+-- ruleset advertises CAPABILITY_DISPLAY_NORMALIZED_TURN (so a later-era start
+-- still reads "Turn 1"). Pass a raw GetCurrentGameTurn value (the empire report
+-- passes the current turn; the end-of-turn report passes the turn that ended);
+-- omit the arg to use the current turn. Game speed sets the cap (Standard 500,
+-- Quick 330, Online 250, Epic 750, Marathon 1500); the player picked it at setup.
+function Report.turnPhrase(rawTurn)
+    local turn = rawTurn;
+    if turn == nil then
+        turn = (Game ~= nil and Game.GetCurrentGameTurn ~= nil) and Game.GetCurrentGameTurn() or 0;
+    end
+    local endTurn = (Game ~= nil and Game.GetGameEndTurn ~= nil) and Game.GetGameEndTurn() or 0;
+    local normalized = GameCapabilities ~= nil and GameCapabilities.HasCapability ~= nil
+                       and GameCapabilities.HasCapability("CAPABILITY_DISPLAY_NORMALIZED_TURN");
+    local startTurn = (GameConfiguration ~= nil and GameConfiguration.GetStartTurn ~= nil)
+                      and GameConfiguration.GetStartTurn() or 0;
+    if normalized then
+        turn = (turn - startTurn) + 1;
+        if endTurn > 0 then endTurn = endTurn - startTurn; end
+    end
+    if endTurn > 0 then
+        local maxT = normalized and endTurn or (endTurn - 1);
+        return "Turn " .. tostring(turn) .. " of " .. tostring(maxT);
+    end
+    return "Turn " .. tostring(turn);
+end
+
 -- Smoke test: a sample report exercising headings, a list, a table, and
 -- an external link, so we can confirm the full Lua -> log -> launcher ->
 -- WebView2 pipe and that browse-mode navigation works.

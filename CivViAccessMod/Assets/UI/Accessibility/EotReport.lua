@@ -357,7 +357,8 @@ function EotReport.show()
         return;
     end
     Speech.emit("Opening end of turn report", "meta");
-    Report.show("End of Turn " .. tostring(_lastDelta.turn), _lastDelta.html);
+    -- "End of Turn 33 of 500" — same progress context as the empire report.
+    Report.show("End of " .. Report.turnPhrase(_lastDelta.turn), _lastDelta.html);
 end
 
 -- ---------------------------------------------------------------------------

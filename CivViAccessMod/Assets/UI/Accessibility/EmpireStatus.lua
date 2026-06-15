@@ -592,8 +592,9 @@ function EmpireStatus.show()
 
     Speech.emit("Building empire status report", "meta");
 
-    local turn = (Game and Game.GetCurrentGameTurn) and Game.GetCurrentGameTurn() or 0;
-    local title = "Empire Status — Turn " .. tostring(turn);
+    -- Title carries the game-progress context ("Turn 33 of 500") so the player
+    -- knows how far in they are; Report.turnPhrase matches the on-screen counter.
+    local title = "Empire Status — " .. Report.turnPhrase();
 
     -- Pre-fetch yields so research/civic ETA can use them.
     local scienceYield, cultureYield = nil, nil;
