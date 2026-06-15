@@ -191,6 +191,17 @@ function UnitInfo.speakInfo()
             .. tostring(roundMp(maxMoves)) .. " moves";
     end
 
+    -- Build charges (Builders, Military Engineers). Spoken only when the unit
+    -- has any. Pairs with moves so the player can tell "out of moves this turn"
+    -- (can't build again until next turn) from "out of charges" (the unit is
+    -- consumed after spending its last one) — Noel 2026-06-14. Also the live
+    -- charge readout that confirms the "last charge" message.
+    local okBC, buildCharges = pcall(function() return pUnit:GetBuildCharges(); end);
+    if okBC and buildCharges ~= nil and buildCharges > 0 then
+        parts[#parts + 1] = tostring(buildCharges)
+            .. ((buildCharges == 1) and " build charge" or " build charges");
+    end
+
     -- Territory the unit STANDS in (Noel 2026-06-12): decides the heal rate
     -- and whether heal-until-full accepts — sighted players read it off the
     -- border colors. Neutral is spoken explicitly here (slash is on-demand,
