@@ -1769,6 +1769,20 @@ function OnLuaActivateNotification( pNotification:table )
 		-- resolution needed; fire the LuaEvent and let the picker
 		-- pull current tech state on its end.
 		if pNotification:GetType() == NotificationTypes.CHOOSE_TECH then
+			-- Guard a spurious re-activation: closing the engine TechTree on our
+			-- picker close (the 2026-06-15 modal-trap fix) can re-fire this
+			-- CHOOSE_TECH activation even though research is already set — which
+			-- reopened the picker and forced "pick tech twice". If a research is
+			-- already selected, this activation is redundant; ignore it. The
+			-- explicit open key (CIVVIACCESS_OpenTechPicker via HexCursorAddin)
+			-- does NOT route through here, so changing research mid-stream still
+			-- works.
+			local pPlayer = Players and Players[pNotification:GetPlayerID()] or nil;
+			local pTechs = (pPlayer ~= nil and pPlayer.GetTechs ~= nil) and pPlayer:GetTechs() or nil;
+			if pTechs ~= nil and pTechs.GetResearchingTech ~= nil then
+				local cur = pTechs:GetResearchingTech();
+				if cur ~= nil and cur >= 0 then return; end
+			end
 			if LuaEvents ~= nil and LuaEvents.CivViAccess_OpenTechPicker ~= nil then
 				LuaEvents.CivViAccess_OpenTechPicker();
 			else
@@ -1776,8 +1790,14 @@ function OnLuaActivateNotification( pNotification:table )
 			end
 			return;
 		end
-		-- CHOOSE_CIVIC → CivicPicker. Same shape as CHOOSE_TECH.
+		-- CHOOSE_CIVIC → CivicPicker. Same shape + same re-activation guard.
 		if pNotification:GetType() == NotificationTypes.CHOOSE_CIVIC then
+			local pPlayer = Players and Players[pNotification:GetPlayerID()] or nil;
+			local pCulture = (pPlayer ~= nil and pPlayer.GetCulture ~= nil) and pPlayer:GetCulture() or nil;
+			if pCulture ~= nil and pCulture.GetProgressingCivic ~= nil then
+				local cur = pCulture:GetProgressingCivic();
+				if cur ~= nil and cur >= 0 then return; end
+			end
 			if LuaEvents ~= nil and LuaEvents.CivViAccess_OpenCivicPicker ~= nil then
 				LuaEvents.CivViAccess_OpenCivicPicker();
 			else
