@@ -330,6 +330,12 @@ do
             prior = ctx:GetInputHandler();
         end
         ctx:SetInputHandler(function(uiMsg, wParam, lParam)
+            -- [DIAG 2026-06-23] dead-arrows bug on nerstation: prove whether the
+            -- MainMenu context receives keyboard at all. Logs only KeyDown(256)/
+            -- KeyUp(257) to avoid mouse-move spam. STRIP once resolved.
+            if uiMsg == 256 or uiMsg == 257 then
+                print("[CivViAccess][DIAG] MainMenu input: uiMsg=" .. tostring(uiMsg) .. " wParam=" .. tostring(wParam));
+            end
             if MainMenuAccess.OnInput(uiMsg, wParam, lParam) then
                 return true;
             end
@@ -338,6 +344,7 @@ do
             end
             return false;
         end);
+        print("[CivViAccess][DIAG] MainMenuAccess.Install: input handler attached");
     end
 
     function MainMenuAccess.WrapShow(origShowFn)
@@ -539,6 +546,16 @@ end
 function OnOptions()
 	UIManager:QueuePopup(Controls.Options, PopupPriority.Current);
 	Close();
+end
+
+-- ===========================================================================
+-- Open the Options screen and land on the graphics tab. Fired (cross-context)
+-- by the FrontEnd graphics-device notice's "Open graphics options" button.
+-- Prep the jump first (OptionsAccess stores it), then show the screen so its
+-- NotifyShow applies the pending jump.
+function OnCivViAccessOpenGraphicsOptions()
+	LuaEvents.CivViAccess_OptionsJumpToGraphics();
+	OnOptions();
 end
 
 -- ===========================================================================
@@ -1873,6 +1890,7 @@ function Initialize()
 	LuaEvents.CivRoyaleIntro_StartMatchMaking.Add(StartRoyaleMatchMaking);
 	LuaEvents.PiratesIntro_StartMatchMaking.Add(StartPiratesMatchMaking);
 	LuaEvents.StateTransition_SignalRaised.Add( OnStateTransition );
+	LuaEvents.CivViAccess_OpenGraphicsOptions.Add( OnCivViAccessOpenGraphicsOptions );
 
 	BuildAllMenus();
 	UpdateMotD();

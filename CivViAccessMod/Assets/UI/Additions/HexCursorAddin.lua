@@ -311,8 +311,32 @@ local function OnInterfaceModeChanged(oldMode, newMode)
     speak("Interface mode changed: " .. tostring(oldMode) .. " to " .. tostring(newMode));
 end
 
+-- Re-apply persisted Accessibility-tab settings at world load. The Options
+-- companion (OptionsAccess) writes these to the engine option store but only
+-- loads when the Options screen opens; this addin loads at world start, so it
+-- owns the boot-time apply. Verbosity.setOn / HexGeom.setDirectionMode both
+-- broadcast, so every Context syncs to the stored value. Stored as integers
+-- under "Misc" (the store the FrontEnd graphics flag uses). Keys mirror
+-- OptionsAccess.SETTING_* (kept in sync by hand — both are tiny + commented).
+local function applyPersistedAccessibilitySettings()
+    if Options == nil or Options.GetAppOption == nil then return; end
+    local v = Options.GetAppOption("Misc", "CivViAccess_Verbosity");
+    if type(v) == "number" and Verbosity ~= nil and Verbosity.setOn ~= nil then
+        Verbosity.setOn(v == 1);
+    end
+    local d = Options.GetAppOption("Misc", "CivViAccess_DirMode");
+    if type(d) == "number" and HexGeom ~= nil and HexGeom.setDirectionMode ~= nil then
+        local order = HexGeom.MODE_ORDER or { "hex", "compass", "clock", "degrees" };
+        if order[d] ~= nil then HexGeom.setDirectionMode(order[d]); end
+    end
+end
+
 local function OnLoadScreenClose()
     speak("Load screen closed");
+    local ok, err = pcall(applyPersistedAccessibilitySettings);
+    if not ok and Log ~= nil and Log.warn ~= nil then
+        Log.warn("applyPersistedAccessibilitySettings failed: " .. tostring(err));
+    end
 end
 
 local function OnShowLeaderScreen(leaderName, isLocalPlayer)

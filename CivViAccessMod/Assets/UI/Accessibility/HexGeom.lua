@@ -302,15 +302,39 @@ function HexGeom.getDirectionMode()
     return HexGeom._directionMode or "hex";
 end
 
--- Set the mode directly (the future settings entry calls this). Ignores an
--- unknown value. Returns the spoken mode name (or nil if unchanged/invalid).
-function HexGeom.setDirectionMode(mode)
-    if MODE_LOC[mode] == nil then return nil; end
+-- The ordered mode list as ids, for the settings tab + persistence (1-based
+-- index <-> mode id). Exposed so OptionsAccess and the boot-time apply can map
+-- a stored integer to a mode without duplicating the order.
+HexGeom.MODE_ORDER = MODE_ORDER;
+
+-- Set the local copy without broadcasting (used by the sync listener so a
+-- broadcast doesn't echo back into an infinite loop). Returns false on an
+-- unknown mode.
+local function applyDirectionLocal(mode)
+    if MODE_LOC[mode] == nil then return false; end
     HexGeom._directionMode = mode;
+    return true;
+end
+
+local function broadcastDirection(mode)
+    if LuaEvents ~= nil and LuaEvents.CivViAccess_DirectionModeChanged ~= nil then
+        LuaEvents.CivViAccess_DirectionModeChanged(mode);
+    end
+end
+
+-- Set the mode directly (the settings entry + boot-time apply call this).
+-- Ignores an unknown value. Broadcasts so every sandboxed Context's HexGeom
+-- copy stays in sync (same cross-Context pattern as Verbosity) — the cursor,
+-- scanner, surveyor and tooltips all follow one global mode. Returns the
+-- spoken mode name (or nil if unchanged/invalid).
+function HexGeom.setDirectionMode(mode)
+    if not applyDirectionLocal(mode) then return nil; end
+    broadcastDirection(mode);
     return Locale.Lookup(MODE_LOC[mode]);
 end
 
 -- Advance to the next mode and return its spoken name (for the toggle key).
+-- Broadcasts too, so the cycle key keeps every Context in sync.
 function HexGeom.cycleDirectionMode()
     local cur = HexGeom._directionMode or "hex";
     local idx = 1;
@@ -318,6 +342,18 @@ function HexGeom.cycleDirectionMode()
         if m == cur then idx = i; break; end
     end
     idx = (idx % #MODE_ORDER) + 1;
-    HexGeom._directionMode = MODE_ORDER[idx];
-    return Locale.Lookup(MODE_LOC[HexGeom._directionMode]);
+    local nextMode = MODE_ORDER[idx];
+    applyDirectionLocal(nextMode);
+    broadcastDirection(nextMode);
+    return Locale.Lookup(MODE_LOC[nextMode]);
+end
+
+-- Sync to mode changes fired from any other Context. applyDirectionLocal (not
+-- setDirectionMode) so the broadcast doesn't echo. Guarded so Civ VI's
+-- re-include of this file doesn't stack duplicate listeners.
+if LuaEvents ~= nil and not HexGeom._dirListenerInstalled then
+    HexGeom._dirListenerInstalled = true;
+    LuaEvents.CivViAccess_DirectionModeChanged.Add(function(mode)
+        applyDirectionLocal(mode);
+    end);
 end

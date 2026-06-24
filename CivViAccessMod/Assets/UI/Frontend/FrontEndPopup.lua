@@ -40,6 +40,7 @@ local m_announceTitle :string = "";
 local m_announceText  :string = "";
 local m_buttons       :table  = {};
 local m_focused       :number = 0;
+local m_pendingDriverNotice :boolean = false;  -- show driver notice after device notice when both apply
 
 local function playNavSound()
     if UI ~= nil and UI.PlaySound ~= nil then
@@ -224,6 +225,107 @@ end
 
 
 -- ===========================================================================
+-- ACCESSIBILITY: graphics-device / outdated-driver notices, routed here from
+-- the FrontEnd shell root (FrontEnd.lua). Base shows these as mouse-only
+-- PopupDialogs on the FrontEnd ROOT context, which never receives keyboard —
+-- a silent, un-exitable wall. This popup *Context* DOES grab keyboard, so
+-- hosting them here makes them navigable. They reuse the same button-nav
+-- machinery as the exit/error popups above. (showDriverNotice is defined first
+-- so showDeviceNotice can chain to it when both notices apply.)
+-- ===========================================================================
+local function showDriverNotice()
+    UIManager:QueuePopup( ContextPtr, PopupPriority.Current );
+
+    m_kPopupDialog:Close();
+    resetAnnounce();
+
+    local title = Locale.Lookup("LOC_CIVVIACCESS_GRAPHICS_DRIVER_NOTICE_TITLE");
+    local body  = Locale.Lookup("LOC_FRONTEND_POPUP_OUTDATED_DRIVER");
+    local quiet = Locale.Lookup("LOC_FRONTEND_POPUP_OUTDATED_DRIVER_QUIET");
+    local loud  = Locale.Lookup("LOC_FRONTEND_POPUP_OUTDATED_DRIVER_LOUD");
+
+    local function onQuiet()
+        UIManager:DequeuePopup( ContextPtr );
+        Options.SetAppOption("Misc", "AcceptedOutdatedDriver", 1);
+        Events.UserAcceptsOutdatedDriver();
+    end
+    local function onLoud()
+        UIManager:DequeuePopup( ContextPtr );
+    end
+
+    m_kPopupDialog:AddTitle(title);
+    m_kPopupDialog:AddText(body);
+    m_kPopupDialog:AddButton(quiet, onQuiet, PopupDialog.COMMAND_CANCEL);
+    m_kPopupDialog:AddButton(loud,  onLoud,  PopupDialog.COMMAND_CONFIRM);
+
+    m_announceTitle = title;
+    m_announceText  = body;
+    pushButton(quiet, onQuiet, PopupDialog.COMMAND_CANCEL);
+    pushButton(loud,  onLoud,  PopupDialog.COMMAND_CONFIRM);
+
+    m_kPopupDialog:Open();
+    flushAnnounce();
+end
+
+local function showDeviceNotice()
+    UIManager:QueuePopup( ContextPtr, PopupPriority.Current );
+
+    m_kPopupDialog:Close();
+    resetAnnounce();
+
+    local title = Locale.Lookup("LOC_CIVVIACCESS_GRAPHICS_NOTICE_TITLE");
+    local body  = Locale.Lookup("LOC_CIVVIACCESS_GRAPHICS_NOTICE_BODY");
+    local cont  = Locale.Lookup("LOC_CIVVIACCESS_GRAPHICS_NOTICE_CONTINUE");
+    local opts  = Locale.Lookup("LOC_CIVVIACCESS_GRAPHICS_NOTICE_OPEN_OPTIONS");
+
+    local function accept()
+        Options.SetAppOption("Misc", "AcceptedUnknownDevice", 1);
+        Events.UserAcceptsUnknownDevice();
+    end
+    local function onContinue()
+        UIManager:DequeuePopup( ContextPtr );
+        accept();
+        if m_pendingDriverNotice then
+            m_pendingDriverNotice = false;
+            showDriverNotice();
+        end
+    end
+    local function onOpenOptions()
+        UIManager:DequeuePopup( ContextPtr );
+        accept();
+        m_pendingDriverNotice = false;  -- opening Options supersedes the driver notice this launch
+        LuaEvents.CivViAccess_OpenGraphicsOptions();
+    end
+
+    -- Continue is the safe default: it's the CANCEL command (Esc fires it) and
+    -- the first/focused button (Enter fires it). "Open graphics options" is
+    -- opt-in: arrow to it, then Enter.
+    m_kPopupDialog:AddTitle(title);
+    m_kPopupDialog:AddText(body);
+    m_kPopupDialog:AddButton(cont, onContinue,    PopupDialog.COMMAND_CANCEL);
+    m_kPopupDialog:AddButton(opts, onOpenOptions, PopupDialog.COMMAND_CONFIRM);
+
+    m_announceTitle = title;
+    m_announceText  = body;
+    pushButton(cont, onContinue,    PopupDialog.COMMAND_CANCEL);
+    pushButton(opts, onOpenOptions, PopupDialog.COMMAND_CONFIRM);
+
+    m_kPopupDialog:Open();
+    flushAnnounce();
+end
+
+-- Routed from FrontEnd.lua's OnInit. Device notice first (chains to the driver
+-- notice on accept if both apply), or the driver notice alone.
+function OnCivViAccessShowGraphicsNotices(needDevice, needDriver)
+    if needDevice then
+        m_pendingDriverNotice = (needDriver == true);
+        showDeviceNotice();
+    elseif needDriver then
+        showDriverNotice();
+    end
+end
+
+-- ===========================================================================
 function OnDisableMods()
     OnPopupClose();
     LuaEvents.MainMenu_ShowAdditionalContent();
@@ -302,5 +404,6 @@ function Initialize()
     LuaEvents.MultiplayerPopup.Add( OnFrontEndPopup );
     LuaEvents.MainMenu_LaunchError.Add( OnLaunchError );
     LuaEvents.MainMenu_UserRequestClose.Add( OnUserRequestClose );
+    LuaEvents.CivViAccess_ShowGraphicsNotices.Add( OnCivViAccessShowGraphicsNotices );
 end
 Initialize();

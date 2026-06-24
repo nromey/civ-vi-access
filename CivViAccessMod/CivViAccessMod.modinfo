@@ -55,6 +55,7 @@
       <File priority="10001">Assets/UI/Accessibility/ContextHelp.lua</File>
       <File priority="10001">Assets/UI/Panels/StatusMessagePanel.lua</File>
       <File priority="10001">Assets/UI/Panels/NotificationPanel.lua</File>
+      <File priority="10001">Assets/UI/Frontend/FrontEnd.lua</File>
       <File priority="10001">Assets/UI/Frontend/MainMenu.lua</File>
       <File priority="10001">Assets/UI/Frontend/FrontEndPopup.lua</File>
       <File priority="10001">Assets/UI/Frontend/IntroScreen.lua</File>
@@ -445,6 +446,7 @@
     <File>Assets/UI/Accessibility/ContextHelp.lua</File>
     <File>Assets/UI/Accessibility/TutorialAccess.lua</File>
     <File>Assets/UI/Options.lua</File>
+    <File>Assets/UI/Frontend/FrontEnd.lua</File>
     <File>Assets/UI/Frontend/MainMenu.lua</File>
     <File>Assets/UI/Frontend/FrontEndPopup.lua</File>
     <File>Assets/UI/Frontend/IntroScreen.lua</File>

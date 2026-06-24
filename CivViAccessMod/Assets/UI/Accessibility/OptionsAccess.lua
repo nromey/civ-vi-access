@@ -21,14 +21,21 @@
 -- site where it registers with the engine. We stash by controlName and
 -- invoke after SetValue() ourselves.
 --
--- Key bindings (only fire while Options is active and unhidden):
---   Up / Down          previous / next item within the current tab
---   Home / End         first / last item within the current tab
---   Left / Right       slider: step value down / up (or pulldown prev/next)
---   Shift+Left/Right   slider: big step
---   Enter / Space      activate / toggle focused item
---   Tab / Shift+Tab    next / previous tab; re-announce first item in new tab
---   Escape             fall through to engine (which calls OnCancel)
+-- Key bindings (only fire while Options is active and unhidden). Standard
+-- Windows tab-dialog model now that we wrap the Options input handler:
+--   Tab / Shift+Tab            next / previous setting within the current tab
+--   Ctrl+Tab / Ctrl+Shift+Tab  next / previous tab page
+--   Up / Down                  next / previous setting (reliable alias for Tab)
+--   PageUp / PageDown          previous / next tab page (reliable alias that
+--                              survives the engine's Shift-modifier ghosting on
+--                              this context)
+--   Home / End                 first / last setting within the current tab
+--   Left / Right               slider step / pulldown prev-next (NOT tab nav —
+--                              that would collide with value adjust);
+--                              Ctrl+Left/Right = big step
+--   Enter / Space              activate / toggle focused setting
+--   F1                         speak keyboard help
+--   Escape                     fall through to engine (which calls OnCancel)
 --
 -- MVP scope (2026-05-13): Audio tab fully populated; other six tabs are
 -- stubs that expose only the Reset / Confirm / Close buttons. The screen
@@ -37,6 +44,11 @@
 
 include("ScreenReader");
 include("ContextHelp");
+-- The Accessibility tab drives these mod modules directly (read current value
+-- to announce, write on change). Both are dependency-light pure modules that
+-- load safely in any Context (front-end Options and in-game Options alike).
+include("Verbosity");
+include("HexGeom");
 
 OptionsAccess = {};
 
@@ -85,6 +97,8 @@ local STEP_BIG   :number = 0.20;   -- Shift+Left/Right = 20%
 local m_tabs              :table   = {};    -- mirror of Options.lua m_tabs
 local m_tabItems          :table   = {};    -- items[tabIdx] = { item, ... }
 local m_tabIndex          :number  = 1;
+local m_accessTabIdx                 = nil;  -- index of the virtual Accessibility tab (= #m_tabs + 1)
+local m_pendingJumpPanel             = nil;  -- deep-link: jump to this panel name on next show
 local m_itemIndex         :table   = {};    -- per-tab cursor; itemIndex[tabIdx]
 local m_sliderCallbacks   :table   = {};    -- by controlName -> fn(value)
 local m_checkboxCallbacks :table   = {};    -- by controlName -> fn(boolean)
@@ -183,6 +197,9 @@ end
 
 local function isItemUsable(item)
     if item == nil then return false; end
+    -- Mod-owned items (the Accessibility tab's choices) have no base control;
+    -- they're always usable as long as they declare a handler kind.
+    if item.controlName == nil then return item.kind ~= nil; end
     local c = getControl(item.controlName);
     if c == nil then return false; end
     if isControlHidden(c) then return false; end
@@ -461,12 +478,128 @@ local function activateEditbox(item)
     speak(announceEditbox(item) .. ". " .. Locale.Lookup("LOC_CIVVIACCESS_EDITBOX_MOUSE_HINT"), false);
 end
 
+-- ===========================================================================
+--  Accessibility settings (mod-owned "choice" items)
+-- ===========================================================================
+-- Unlike every other tab, the Accessibility tab has NO base Civ VI controls.
+-- Each item is a "choice": an ordered value list plus get/set closures that
+-- read/write a mod module (Verbosity, HexGeom) and persist through the engine
+-- user-option store. Persistence uses Options.SetAppOption("Misc", ...) — the
+-- same store the FrontEnd graphics-device flag round-trips through (proven to
+-- survive a relaunch; no explicit SaveOptions needed). Values are stored as
+-- integers (the option store is integer-typed). The boot-time re-apply lives
+-- in HexCursorAddin (it loads at world start; this companion is lazy).
+local SETTING_SECTION = "Misc";
+
+OptionsAccess.SETTING_VERBOSITY = "CivViAccess_Verbosity";
+OptionsAccess.SETTING_DIRMODE   = "CivViAccess_DirMode";
+
+local function getStoredInt(key)
+    if Options == nil or Options.GetAppOption == nil then return nil; end
+    local ok, v = pcall(Options.GetAppOption, SETTING_SECTION, key);
+    if ok and type(v) == "number" then return v; end
+    return nil;
+end
+
+local function setStoredInt(key, value)
+    if Options == nil or Options.SetAppOption == nil then return; end
+    pcall(Options.SetAppOption, SETTING_SECTION, key, value);
+end
+
+-- Verbosity: terse (0, default) / chatty (1). Verbosity.setOn broadcasts to
+-- every Context; we also persist the integer.
+local function verbosityGet()
+    local stored = getStoredInt(OptionsAccess.SETTING_VERBOSITY);
+    local on;
+    if stored ~= nil then on = (stored == 1);
+    elseif Verbosity ~= nil and Verbosity.isOn ~= nil then on = Verbosity.isOn();
+    else on = false; end
+    return on and "chatty" or "terse";
+end
+local function verbositySet(id)
+    local on = (id == "chatty");
+    if Verbosity ~= nil and Verbosity.setOn ~= nil then Verbosity.setOn(on); end
+    setStoredInt(OptionsAccess.SETTING_VERBOSITY, on and 1 or 0);
+end
+
+-- Direction vocabulary: hex / compass / clock / degrees. Stored as the 1-based
+-- index into HexGeom.MODE_ORDER; HexGeom.setDirectionMode broadcasts to the
+-- cursor / scanner Contexts.
+local function dirOrder()
+    return (HexGeom ~= nil and HexGeom.MODE_ORDER) or { "hex", "compass", "clock", "degrees" };
+end
+local function dirGet()
+    local order = dirOrder();
+    local stored = getStoredInt(OptionsAccess.SETTING_DIRMODE);
+    if stored ~= nil and order[stored] ~= nil then return order[stored]; end
+    if HexGeom ~= nil and HexGeom.getDirectionMode ~= nil then return HexGeom.getDirectionMode(); end
+    return order[1];
+end
+local function dirSet(id)
+    if HexGeom ~= nil and HexGeom.setDirectionMode ~= nil then HexGeom.setDirectionMode(id); end
+    local order = dirOrder();
+    for i, m in ipairs(order) do
+        if m == id then setStoredInt(OptionsAccess.SETTING_DIRMODE, i); break; end
+    end
+end
+
+local ACCESS_ITEMS = {
+    { kind = "choice", labelKey = "LOC_CIVVIACCESS_SETTING_VERBOSITY",
+      get = verbosityGet, set = verbositySet,
+      values = {
+          { id = "terse",  labelKey = "LOC_CIVVIACCESS_VERBOSITY_TERSE"  },
+          { id = "chatty", labelKey = "LOC_CIVVIACCESS_VERBOSITY_CHATTY" },
+      } },
+    { kind = "choice", labelKey = "LOC_CIVVIACCESS_SETTING_DIRECTION",
+      get = dirGet, set = dirSet,
+      values = {
+          { id = "hex",     labelKey = "LOC_CIVVIACCESS_DIRVALUE_HEX"     },
+          { id = "compass", labelKey = "LOC_CIVVIACCESS_DIRVALUE_COMPASS" },
+          { id = "clock",   labelKey = "LOC_CIVVIACCESS_DIRVALUE_CLOCK"   },
+          { id = "degrees", labelKey = "LOC_CIVVIACCESS_DIRVALUE_DEGREES" },
+      } },
+};
+
+local function choiceValueEntry(item)
+    local id = item.get and item.get() or nil;
+    for _, v in ipairs(item.values or {}) do
+        if v.id == id then return v; end
+    end
+    return (item.values or {})[1];
+end
+
+local function announceChoice(item)
+    local v = choiceValueEntry(item);
+    local valTxt = (v ~= nil) and loc(v.labelKey) or "";
+    return Locale.Lookup("LOC_CIVVIACCESS_ITEM_VALUE", speakableLabel(item), valTxt);
+end
+
+local function adjustChoice(item, dir, big)
+    local vals = item.values or {};
+    if #vals == 0 then speak(announceChoice(item), false); return; end
+    local cur = choiceValueEntry(item);
+    local idx = 1;
+    for i, v in ipairs(vals) do if v == cur then idx = i; break; end end
+    idx = idx + ((dir ~= nil and dir < 0) and -1 or 1);
+    if idx < 1 then idx = #vals; end
+    if idx > #vals then idx = 1; end
+    local nv = vals[idx];
+    if item.set then item.set(nv.id); end
+    speak(announceChoice(item), false);
+end
+
+-- Enter / Space advances to the next value (a flip for a 2-value toggle).
+local function activateChoice(item)
+    adjustChoice(item, 1, false);
+end
+
 local ITEM_HANDLERS = {
     slider   = { announce = announceSlider,   activate = activateSlider,   adjust = adjustSlider   },
     checkbox = { announce = announceCheckbox, activate = activateCheckbox                          },
     button   = { announce = announceButton,   activate = activateButton                            },
     pulldown = { announce = announcePulldown, activate = activatePulldown, adjust = adjustPulldown },
     editbox  = { announce = announceEditbox,  activate = activateEditbox                           },
+    choice   = { announce = announceChoice,   activate = activateChoice,   adjust = adjustChoice   },
 };
 
 -- ===========================================================================
@@ -620,9 +753,29 @@ local function buildTabItems()
         m_tabItems[i] = items;
         m_itemIndex[i] = m_itemIndex[i] or 0;
     end
+
+    -- Virtual Accessibility tab: mod-owned settings, no base panel. It lives
+    -- one past the real tabs and is reached by the same Ctrl+Tab / PageUp-Down
+    -- cycle; switchToTab special-cases it (hides the base panels itself).
+    m_accessTabIdx = #m_tabs + 1;
+    local accessItems = {};
+    for _, item in ipairs(ACCESS_ITEMS) do accessItems[#accessItems + 1] = item; end
+    -- Confirm commits any staged base-tab changes; Close exits. No Reset (it
+    -- resets base options, not ours — our settings persist the moment they change).
+    accessItems[#accessItems + 1] = { kind = "button", controlName = "ConfirmButton",
+        labelKey = "LOC_GENERIC_CONFIRM_BUTTON",
+        activate = function() if OnConfirm ~= nil then OnConfirm() end end };
+    accessItems[#accessItems + 1] = { kind = "button", controlName = "WindowCloseButton",
+        labelKey = "LOC_MULTIPLAYER_BACK",
+        activate = function() if OnCancel ~= nil then OnCancel() end end };
+    m_tabItems[m_accessTabIdx] = accessItems;
+    m_itemIndex[m_accessTabIdx] = m_itemIndex[m_accessTabIdx] or 0;
 end
 
 local function tabTitle(idx)
+    if idx == m_accessTabIdx then
+        return loc("LOC_CIVVIACCESS_ACCESS_TAB");
+    end
     local tab = m_tabs[idx];
     if tab == nil then return ""; end
     return loc(tab[3]);
@@ -720,13 +873,33 @@ end
 -- ===========================================================================
 --  Cross-tab navigation
 -- ===========================================================================
+-- The virtual Accessibility tab has no base panel, so do what base
+-- OnSelectTab would: hide every base panel + deselect its button, set the
+-- window title, and hide Reset (it resets base options, not ours).
+local function showAccessTabVisual()
+    for _, tab in ipairs(m_tabs) do
+        if tab[2] ~= nil and tab[2].SetHide ~= nil then tab[2]:SetHide(true); end
+        if tab[1] ~= nil and tab[1].SetSelected ~= nil then tab[1]:SetSelected(false); end
+    end
+    if Controls ~= nil and Controls.WindowTitle ~= nil then
+        Controls.WindowTitle:SetText(Locale.ToUpper(Locale.Lookup("LOC_CIVVIACCESS_ACCESS_TAB")));
+    end
+    if Controls ~= nil and Controls.ResetButton ~= nil then
+        Controls.ResetButton:SetHide(true);
+    end
+end
+
 local function switchToTab(idx)
-    if idx < 1 or idx > #m_tabs then return; end
+    local maxIdx = m_accessTabIdx or #m_tabs;
+    if idx < 1 or idx > maxIdx then return; end
     if idx == m_tabIndex then return; end
     m_tabIndex = idx;
-    -- Use the screen's own tab-switching logic so panel visibility, reset
-    -- button hide flag, window title, and selection highlight all update.
-    if OnSelectTab ~= nil then
+    -- Base tabs: use the screen's own tab-switching logic so panel visibility,
+    -- reset-button hide flag, window title and selection highlight all update.
+    -- The virtual tab has no base panel — handle its visuals ourselves.
+    if idx == m_accessTabIdx then
+        showAccessTabVisual();
+    elseif OnSelectTab ~= nil then
         OnSelectTab(idx);
     end
     -- Reset focus to first usable item in new tab.
@@ -744,7 +917,8 @@ local function switchToTab(idx)
 end
 
 local function nextTab(step)
-    local n = #m_tabs;
+    -- Total tab count includes the virtual Accessibility tab (= m_accessTabIdx).
+    local n = m_accessTabIdx or #m_tabs;
     if n == 0 then return; end
     local target = m_tabIndex + step;
     if target < 1 then target = n; end
@@ -792,6 +966,11 @@ end
 -- Off now that Shift+Tab path is replaced with PageUp/PageDown (no modifier
 -- dependency, no log noise to chase).
 local DEBUG_INPUT :boolean = false;
+
+-- Temporary: log the message forms each Tab-family chord delivers, so we can
+-- confirm Ctrl+Tab / Ctrl+Shift+Tab arrive as expected before retiring the
+-- PageUp/PageDown + Up/Down fallbacks. STRIP after the live nav-key test.
+local TAB_DIAG :boolean = true;
 
 function OptionsAccess.OnInput(pInputStruct)
     if pInputStruct == nil or pInputStruct.GetMessageType == nil then
@@ -842,15 +1021,38 @@ function OptionsAccess.OnInput(pInputStruct)
 
     local isTab = (wParam == VK_TAB) or (wParam == VK_TAB_NAV);
     if isTab then
-        -- Tab is forward-only. Shift+Tab is unreliable in Civ VI's input
-        -- pipeline (modifier state ghosts in ways our handler can't
-        -- distinguish from real user holds), so PageUp is the backward path.
-        if uiMsg ~= 2 then return true; end
-        nextTab(1);
+        -- Standard tab-dialog model:
+        --   Ctrl(+Shift)+Tab -> switch tab page
+        --   (Shift+)Tab       -> next / previous setting within the page
+        -- Civ VI double-delivers a single Tab press: a KeyUp form (key=VK_TAB,
+        -- 101 in its mapping) AND a msg=2 navigation form (key=9). Shift+Tab
+        -- only arrives as the msg=2 form (the engine eats the KeyUp form for
+        -- its own backward-focus traversal). So we split the two behaviors
+        -- across the two forms to collapse the duplicate without timing:
+        --   tab switch  acts on the KeyUp form, swallows the msg=2 twin;
+        --   item move   acts on the msg=2 form, swallows the KeyUp twin.
+        -- Struct modifiers read false on msg=2, so use the KeyDown/KeyUp
+        -- tracked Ctrl/Shift state.
+        local ctrl  = ctrlDownFrom(pInputStruct);
+        local shift = shiftDownFrom(pInputStruct);
+        if TAB_DIAG then
+            print(string.format("OPT_TAB msg=%s key=%s ctrl=%s shift=%s",
+                tostring(uiMsg), tostring(wParam), tostring(ctrl), tostring(shift)));
+        end
+        if ctrl then
+            if uiMsg == 2 then return true; end   -- swallow the msg=2 twin
+            nextTab(shift and -1 or 1);
+            return true;
+        end
+        if uiMsg ~= 2 then return true; end        -- swallow the KeyUp twin
+        moveBy(shift and -1 or 1);
         return true;
     end
 
-    -- PageUp / PageDown — the reliable tab nav keys. No modifier dependency.
+    -- PageUp / PageDown — reliable tab-page nav aliases (no modifier
+    -- dependency). Kept alongside Ctrl+Tab as the guaranteed-direction
+    -- fallback while the Ctrl+Shift+Tab backward path is verified live
+    -- (the Shift-ghosting history on this context).
     if wParam == VK_PRIOR then
         nextTab(-1);
         return true;
@@ -904,6 +1106,40 @@ function OptionsAccess.OnInput(pInputStruct)
 end
 
 -- ===========================================================================
+--  Deep-link: jump to a tab by panel name (e.g. from the FrontEnd graphics-
+--  device notice's "Open graphics options" button). The request can arrive
+--  before the screen is shown, so it's stored and applied on NotifyShow.
+-- ===========================================================================
+local function tabIndexForPanel(panelName)
+    for i, tab in ipairs(m_tabs) do
+        if panelNameForTab(tab) == panelName then return i; end
+    end
+    return 0;
+end
+
+local function applyPendingJump()
+    if m_pendingJumpPanel == nil then return; end
+    local panel = m_pendingJumpPanel;
+    m_pendingJumpPanel = nil;
+    local idx = tabIndexForPanel(panel);
+    if idx < 1 then return; end
+    if idx == m_tabIndex then
+        announceTabHeader();
+    else
+        switchToTab(idx);
+    end
+end
+
+-- Public entry: request the screen land on a given panel. Applies immediately
+-- if already open, otherwise on the next show.
+function OptionsAccess.RequestJumpToPanel(panelName)
+    m_pendingJumpPanel = panelName;
+    if m_screenOpen then
+        applyPendingJump();
+    end
+end
+
+-- ===========================================================================
 --  Notifications from the Options.lua fork
 -- ===========================================================================
 local m_helpAnnouncedThisSession :boolean = false;
@@ -923,7 +1159,7 @@ function OptionsAccess.NotifyShow()
         buildTabItems();
     end
     -- Sync our tab index with the screen's actual selection (defaults to 1).
-    if m_tabIndex < 1 or m_tabIndex > #m_tabs then m_tabIndex = 1; end
+    if m_tabIndex < 1 or m_tabIndex > (m_accessTabIdx or #m_tabs) then m_tabIndex = 1; end
     local items = currentItems();
     local first = m_itemIndex[m_tabIndex] or 0;
     if first < 1 then
@@ -943,6 +1179,9 @@ function OptionsAccess.NotifyShow()
         m_helpAnnouncedThisSession = true;
         speak(Locale.Lookup("LOC_CIVVIACCESS_OPTIONS_NAV_HINT"), true);
     end
+    -- Deep-link from the FrontEnd graphics-device notice: land on the
+    -- requested tab (e.g. GraphicsOptions) now that tabs are built.
+    applyPendingJump();
 end
 
 function OptionsAccess.NotifyHide()
@@ -999,3 +1238,13 @@ function OptionsAccess.WrapHide(origHideFn)
         OptionsAccess.NotifyHide();
     end
 end
+
+-- ===========================================================================
+--  Cross-context deep-link. The FrontEnd graphics-device notice's "Open
+--  graphics options" button has MainMenu show the Options screen and fire
+--  this event; we land on the GraphicsOptions tab (applied on NotifyShow if
+--  the screen isn't open yet).
+-- ===========================================================================
+LuaEvents.CivViAccess_OptionsJumpToGraphics.Add(function()
+    OptionsAccess.RequestJumpToPanel("GraphicsOptions");
+end);

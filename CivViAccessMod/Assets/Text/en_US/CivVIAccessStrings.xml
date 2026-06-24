@@ -129,6 +129,25 @@
             <Text>Quitting Civilization VI.</Text>
         </Row>
 
+        <!-- Graphics-device notices (FrontEnd.lua). Shown when Civ VI can't
+             classify the GPU (e.g. Intel Arc / cards newer than the 2016
+             device database). DRAFT wording — Noel owns the SR-UX call. -->
+        <Row Tag="LOC_CIVVIACCESS_GRAPHICS_NOTICE_TITLE">
+            <Text>Graphics device not recognized</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_GRAPHICS_NOTICE_BODY">
+            <Text>Civilization VI could not measure this graphics card, so it applied safe default settings. They run fine. Choose Continue to go to the main menu, or open graphics options to adjust them.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_GRAPHICS_NOTICE_CONTINUE">
+            <Text>Continue</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_GRAPHICS_NOTICE_OPEN_OPTIONS">
+            <Text>Open graphics options</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_GRAPHICS_DRIVER_NOTICE_TITLE">
+            <Text>Graphics driver is out of date</Text>
+        </Row>
+
         <!-- Options screen. EDITBOX_MOUSE_HINT is a standalone sentence the
              Lua appends after the current editbox announcement. -->
         <Row Tag="LOC_CIVVIACCESS_TAB_HEADER">
@@ -138,10 +157,42 @@
             <Text>{1_Title} tab, not yet accessible. Reset, Confirm, or Close available.</Text>
         </Row>
         <Row Tag="LOC_CIVVIACCESS_OPTIONS_NAV_HINT">
-            <Text>Use Page Up and Page Down to change tabs. Press F1 for full keyboard help.</Text>
+            <Text>Tab moves through settings; Control Tab changes tabs. Page Up and Page Down also change tabs. Press F1 for full keyboard help.</Text>
         </Row>
         <Row Tag="LOC_CIVVIACCESS_EDITBOX_MOUSE_HINT">
             <Text>Mouse click to edit.</Text>
+        </Row>
+
+        <!-- Accessibility tab: a mod-owned settings group (a virtual tab in the
+             Options screen, no base panel). Value labels are short on purpose
+             ("hex", not "Direction mode: hex") since the setting label already
+             names the control. -->
+        <Row Tag="LOC_CIVVIACCESS_ACCESS_TAB">
+            <Text>Accessibility</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_SETTING_VERBOSITY">
+            <Text>Verbosity</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_VERBOSITY_TERSE">
+            <Text>terse</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_VERBOSITY_CHATTY">
+            <Text>chatty</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_SETTING_DIRECTION">
+            <Text>Direction vocabulary</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_DIRVALUE_HEX">
+            <Text>hex</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_DIRVALUE_COMPASS">
+            <Text>compass</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_DIRVALUE_CLOCK">
+            <Text>clock</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_DIRVALUE_DEGREES">
+            <Text>degrees</Text>
         </Row>
 
         <!-- Tutorial accessibility — wraps the engine's tutorial popup,

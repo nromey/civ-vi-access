@@ -234,6 +234,68 @@ in this order:
   cousin. Prereq lesson (the Granary surprise): NO deeper queueing UX until
   the audibility layer is solid — a queue you can't hear is a trap.
 
+## Squads — our own named unit groups (Noel 2026-06-23 — roadmap candidate, GATED)
+
+Named, reversible groups of arbitrary units you can cycle, command, and move
+together. Neither vanilla Civ V nor Civ VI ships freeform named groups — pure
+accessibility value-add for late-game unit management. **Key feasibility win:**
+Civ V Access needed a C++ ENGINE FORK DLL only because they piggybacked on Vox
+Populi's existing squad structs; since WE define the concept, it's **100% Lua, no
+DLL, no fork** — a squad is just `name → {unitIDs}` + a mod-side focus cursor.
+
+**GATE: build the primitives first — squads is an orchestration layer over them,
+not new capability.** move-squad = **P2 routes** pathfinder per member + "who can't
+reach"; batch fortify/sleep = mass-action ([[project_mass_action_design_pending]])
+scoped to a group; membership readout = scanner / unit-state. Don't start until
+P2 (movement/routes) is solid; pairs with the mass-action work.
+
+MVP: name a group, move it, batch-fortify it, report stragglers. Long tail
+(defer): cross-turn persistence (prune dead/merged unit IDs — corps/army merges
+change IDs) + move semantics (mixed speeds, wake modes, escort). Crib the UX from
+Civ V Access `CivVAccess_SquadMapMode.lua` / `CivVAccess_SquadStrings_en_US.lua`.
+NOT the same as vanilla corps/armies (permanent merge) or escort formation — those
+are destructive engine commands we should expose separately. Full detail + UX
+keymap: memory `project_squads_feature`.
+
+## Multiplayer accessibility + account login (future — MP parity north star)
+
+[[project_multiplayer_parity_goal]]. Hotseat with Julian (#13 sighted mode,
+[[project_sighted_mode_per_turn]]) is the near-term path and needs NO login of any
+kind. Online MP adds screens we've never wrapped, plus a gating question. All
+findings code-verified 2026-06-23 against the base install.
+
+- **Two separate account/login screens (NOT the same flow):**
+  - **My2K login** — `Base/Assets/UI/FiraxisLive/My2K.lua` + `My2K.xml`. An
+    email+password form, reached only from the main-menu `My2KLogin` button (which is
+    `Disabled="1"` by default — *this is why Noel never had a way to enter it*). NOT
+    triggered by entering MP. OPTIONAL but worth doing: **logging in unlocks extra
+    in-game content/perks** (Noel 2026-06-23). Has a one-time TOS/legal sub-flow
+    (scrollable docs + Agree/Disagree). Depends on the text-entry primitive below.
+  - **CrossPlayLogin** — `Base/Assets/UI/FrontEnd/Multiplayer/CrossPlayLogin.lua`.
+    The cross-platform lobby-service login (`Network.IsUserLoggedIntoCrossPlayLobbyService`
+    / `AttemptConnectionToCrossPlayLobbyService`), reached when starting a
+    `CROSSPLAY_INTERNET` lobby. Different mechanism from My2K (no email/password form;
+    a connection attempt + error dialog). Lobby types: LAN / Steam Internet /
+    PLAYBYCLOUD / CROSSPLAY_INTERNET (`LobbyTypes.lua`).
+  - **Cross-play platform reality (web-verified 2026-06-23):** PC-family ONLY —
+    Steam/Epic/Mac (+iOS); there is **NO PC↔console cross-play** (PS/Xbox/Switch).
+    Since our mod is PC-only, a blind player can cross-play only with PC/Mac partners
+    — NOT Julian-on-Switch. For the blind+sighted (Julian) case the reliable paths are
+    **Julian-on-PC** (Steam/Epic internet MP) or **hotseat on one machine** (#13). Civ V
+    Access shipped an MP-screens accessibility pass (staging room / lobby /
+    waiting-for-players) week of 2026-06-16 — reference when we wrap Civ VI MP screens.
+- **★ Text-entry primitive (prereq, reusable far beyond login):** first time we'd
+  read/echo a Civ VI `EditBox`. Everything built so far is buttons + lists. Unlocks My2K
+  AND city/unit naming, search fields, MP chat. Handle the obscured password field
+  deliberately (announce "protected"; do NOT speak the characters). Hook the existing
+  `RegisterStringChangedCallback` to echo. Noel owns the SR-UX call on echo behavior.
+- **MP screens still to wrap:** lobby-type picker, StagingRoom, kick/disconnect dialogs.
+- **OPEN QUESTION — is our mod MP-legal?** modinfo declares `AffectsSavedGames=1` and
+  registers `AddGameplayScripts`; cross-play/cloud MP may reject non-matching mods or
+  desync. Audit MP-safety (all listeners read-only, no state writes — strip
+  `DiploDebugMeet`'s `SetHasMet`) before assuming the mod runs in online MP.
+  Hotseat/LAN are the safe fallbacks.
+
 ## Unphased infra (ride alongside / after P1–P3 — not blocking play)
 
 - **#13 Sighted mode** — input passthrough + per-player designation in game options
@@ -264,12 +326,19 @@ in this order:
   bridge DLLs we don't use. The embed glob is in `CivViAccess.csproj`
   (`..\camm\third_party\tolk\dist\x64\*.dll`), so the quick win is our-side. Three
   gates: (1) the Prism->Tolk fallback is the real tradeoff — dropping Tolk removes
-  the safety net (no-speech is the worst failure); deliberate call. (2) VERIFY what
-  prism.dll loads at runtime before dropping the whole glob — it likely still needs
-  `nvdaControllerClient.dll` (standard NVDA API); drop `Tolk.dll` + JAWS/SAPI/Dolphin
-  bridges, keep what Prism uses. (3) The clean version = CAMM backend bundling is
-  adopter-selectable (declare `Backends = Prism` once, drives embed + runtime
-  selection) — that's camm-side, so submodule-publish-before-tag applies. Also
+  the safety net (no-speech is the worst failure); deliberate call. (2) VERIFIED
+  2026-06-23 (Prism `source/backends/nvda.cpp`): the NVDA backend needs NO sidecar
+  DLL — it does NOT load `nvdaControllerClient.dll`. It binds NVDA's controller RPC
+  server directly over in-box `rpcrt4` (local `ncalrpc` endpoint
+  `NvdaCtlr.<session>.<desktop>`) using MIDL stubs generated from
+  `idl/nvdaController.idl` at build time, calling `nvdaController_speakText` etc. So
+  for the NVDA path we drop `Tolk.dll` + the JAWS/SAPI/Dolphin bridges and ship
+  nothing extra. (SAPI/OneCore are in-box too; confirm any other backend before
+  assuming zero deps.) (3) The clean version, and THE REAL FIX (Noel 2026-06-23):
+  make backend bundling **CAMM-side and adopter-selectable** — declare
+  `Backends = Prism` once and CAMM drives both the embed (ship ONLY what that
+  backend needs) and runtime selection. Camm-side, so submodule-publish-before-tag
+  applies. Also
   retires the macOS "Tolk replacement" blocker (`project_cross_platform`).
 
 ---
