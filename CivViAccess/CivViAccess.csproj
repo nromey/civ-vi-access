@@ -119,39 +119,26 @@
   -->
 
   <!--
-    Tolk DLLs are embedded as resources (logical name `tolk/<filename>`)
-    so the launcher exe is genuinely standalone — drop the .exe anywhere
-    and Camm.TolkBootstrap extracts the sidecars next to it on first
-    run. This unlocks the "download a single file, double-click to
-    install" UX. Native AOT compiles them in as binary blobs.
+    Screen-reader comm path: Prism ONLY. We deliberately do NOT embed the Tolk
+    native sidecars (Tolk.dll + nvdaControllerClient64.dll + SAAPI64.dll) anymore
+    — Prism is the active backend and its NVDA path needs no sidecar DLL (it binds
+    NVDA's controller over in-box rpcrt4; SAPI/OneCore are in-box too), so
+    prism.dll is the only file the speech path requires.
 
-    The DLL source lives in CAMM at camm/third_party/tolk/dist/x64/
-    (so all CAMM consumers share one vendored copy). CAMM's library
-    deliberately does NOT embed these resources — the consuming exe
-    must, so TolkBootstrap reading from Assembly.GetEntryAssembly()
-    finds them.
+    TRADEOFF (deliberate, Noel 2026-06-24): dropping the Tolk natives removes the
+    Prism -> Tolk fallback. ScreenReaderFactory still *compiles* the Tolk path
+    (Tolk.cs is source-compiled into Camm.dll), but with no Tolk.dll to extract it
+    can't speak — so if Prism ever fails to init, the result is a SILENT no-speech
+    rather than a fallback. Before this ships in a release, add a loud
+    "no speech backend available" diagnostic to ScreenReaderFactory (a camm-side
+    change → submodule-publish-before-tag applies). The cleaner long-term form is a
+    CAMM-side <CammBackends> switch that drives the embed declaratively.
 
-    All DLLs in this directory are x64 — folder name enforces it
-    and the launcher's <PlatformTarget>x64</PlatformTarget> would
-    refuse to load a 32-bit DLL anyway.
-  -->
-  <ItemGroup>
-    <EmbeddedResource Include="..\camm\third_party\tolk\dist\x64\*.dll">
-      <LogicalName>tolk/%(Filename)%(Extension)</LogicalName>
-    </EmbeddedResource>
-  </ItemGroup>
-
-  <!--
-    Prism native speech backend. CivViAccess bundles BOTH backends — the
-    Tolk sidecars above and Prism here — and CammModManifest.ScreenReaderBackend
-    selects which is active at launch (currently Prism, with automatic
-    Prism -> Tolk fallback; flip at launch with the CAMM_SCREEN_READER_BACKEND
-    env var, no rebuild). Prism is BUILT FROM SOURCE from the pinned
-    camm/third_party/prism submodule during this build and embedded as
-    `prism/prism.dll` — see camm/build/Camm.Prism.targets. Requires a C++
-    toolchain (Visual Studio with the C++ workload; CI loads MSVC). The
-    first clean build runs the ~2-minute Prism build; after that it's
-    incremental (rebuilds only when the submodule pin changes).
+    Prism is BUILT FROM SOURCE from the pinned camm/third_party/prism submodule
+    during this build and embedded as `prism/prism.dll` — see
+    camm/build/Camm.Prism.targets. Requires a C++ toolchain (Visual Studio with the
+    C++ workload; CI loads MSVC). The first clean build runs the ~2-minute Prism
+    build; after that it's incremental (rebuilds only when the submodule pin changes).
   -->
   <PropertyGroup>
     <CammPrismMode>BuildFromSource</CammPrismMode>
