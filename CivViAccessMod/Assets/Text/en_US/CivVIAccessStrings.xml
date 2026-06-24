@@ -194,6 +194,18 @@
         <Row Tag="LOC_CIVVIACCESS_DIRVALUE_DEGREES">
             <Text>degrees</Text>
         </Row>
+        <Row Tag="LOC_CIVVIACCESS_SETTING_SIGHTED">
+            <Text>Sighted mode</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_SIGHTED_BLIND">
+            <Text>blind</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_SIGHTED_SIGHTED">
+            <Text>sighted</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_PLAYER_SIGHTED">
+            <Text>Sighted player</Text>
+        </Row>
 
         <!-- Tutorial accessibility — wraps the engine's tutorial popup,
              goal, and world-pointer events for spoken announcement. The

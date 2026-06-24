@@ -329,6 +329,28 @@ local function applyPersistedAccessibilitySettings()
         local order = HexGeom.MODE_ORDER or { "hex", "compass", "clock", "degrees" };
         if order[d] ~= nil then HexGeom.setDirectionMode(order[d]); end
     end
+    -- Sighted mode lives in a separate VM (the WorldInput wrap); it only learns
+    -- the persisted value via this broadcast at world load.
+    local s = Options.GetAppOption("Misc", "CivViAccess_SightedMode");
+    if type(s) == "number" and LuaEvents ~= nil and LuaEvents.CivViAccess_SetSighted ~= nil then
+        LuaEvents.CivViAccess_SetSighted(s == 1);
+    end
+    -- Per-player override for the LOCAL player (set at game creation, stored on
+    -- the PlayerConfiguration). If present it wins over the global toggle above.
+    -- (Hotseat per-turn switching is later content.) PlayerConfigurations
+    -- round-tripping a custom key into the running game is the one thing to
+    -- confirm live — if pv is nil here, the global setting simply stands.
+    if PlayerConfigurations ~= nil and Game ~= nil and Game.GetLocalPlayer ~= nil
+       and LuaEvents ~= nil and LuaEvents.CivViAccess_SetSighted ~= nil then
+        local lp = Game.GetLocalPlayer();
+        if lp ~= nil and lp >= 0 and PlayerConfigurations[lp] ~= nil
+           and PlayerConfigurations[lp].GetValue ~= nil then
+            local okp, pv = pcall(function() return PlayerConfigurations[lp]:GetValue("CIVVIACCESS_SIGHTED"); end);
+            if okp and type(pv) == "number" then
+                LuaEvents.CivViAccess_SetSighted(pv == 1);
+            end
+        end
+    end
 end
 
 local function OnLoadScreenClose()

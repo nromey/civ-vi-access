@@ -200,6 +200,13 @@ local function isItemUsable(item)
     -- Mod-owned items (the Accessibility tab's choices) have no base control;
     -- they're always usable as long as they declare a handler kind.
     if item.controlName == nil then return item.kind ~= nil; end
+    -- Gated items (the Graphics Advanced sub-panel) are only usable while
+    -- their gate container is visible — the controls live inside a collapsed
+    -- container and their own IsHidden() does NOT reflect the parent's state.
+    if item.gateControl ~= nil then
+        local g = getControl(item.gateControl);
+        if g == nil or isControlHidden(g) then return false; end
+    end
     local c = getControl(item.controlName);
     if c == nil then return false; end
     if isControlHidden(c) then return false; end
@@ -363,6 +370,12 @@ end
 local function announceButton(item)
     local c = getControl(item.controlName);
     local label = speakableLabel(item);
+    -- dynamicLabel: read the control's live text (e.g. the Advanced-graphics
+    -- toggle whose caption flips Show<->Hide) instead of the static labelKey.
+    if item.dynamicLabel and c ~= nil and c.GetText ~= nil then
+        local ok, txt = pcall(function() return c:GetText(); end);
+        if ok and txt ~= nil and txt ~= "" then label = stripIconTags(tostring(txt)); end
+    end
     if c ~= nil and isControlDisabled(c) then
         return Locale.Lookup("LOC_CIVVIACCESS_ITEM_UNAVAILABLE", label);
     end
@@ -493,6 +506,7 @@ local SETTING_SECTION = "Misc";
 
 OptionsAccess.SETTING_VERBOSITY = "CivViAccess_Verbosity";
 OptionsAccess.SETTING_DIRMODE   = "CivViAccess_DirMode";
+OptionsAccess.SETTING_SIGHTED   = "CivViAccess_SightedMode";
 
 local function getStoredInt(key)
     if Options == nil or Options.GetAppOption == nil then return nil; end
@@ -543,6 +557,25 @@ local function dirSet(id)
     end
 end
 
+-- Sighted mode: blind (0, default) / sighted (1). "Sighted" passes the whole
+-- keyboard through to the engine — the capture-all WorldInput wrap already
+-- listens on CivViAccess_SetSighted and short-circuits to passthrough. Firing
+-- the event here updates the (separate-VM) wrap live; the int is also persisted
+-- and re-applied at world load (HexCursorAddin). No speech gating yet — this
+-- only flips input ownership (see project_sighted_mode_per_turn).
+local function sightedGet()
+    local stored = getStoredInt(OptionsAccess.SETTING_SIGHTED);
+    local on = (stored ~= nil) and (stored == 1) or false;
+    return on and "sighted" or "blind";
+end
+local function sightedSet(id)
+    local on = (id == "sighted");
+    if LuaEvents ~= nil and LuaEvents.CivViAccess_SetSighted ~= nil then
+        LuaEvents.CivViAccess_SetSighted(on);
+    end
+    setStoredInt(OptionsAccess.SETTING_SIGHTED, on and 1 or 0);
+end
+
 local ACCESS_ITEMS = {
     { kind = "choice", labelKey = "LOC_CIVVIACCESS_SETTING_VERBOSITY",
       get = verbosityGet, set = verbositySet,
@@ -557,6 +590,12 @@ local ACCESS_ITEMS = {
           { id = "compass", labelKey = "LOC_CIVVIACCESS_DIRVALUE_COMPASS" },
           { id = "clock",   labelKey = "LOC_CIVVIACCESS_DIRVALUE_CLOCK"   },
           { id = "degrees", labelKey = "LOC_CIVVIACCESS_DIRVALUE_DEGREES" },
+      } },
+    { kind = "choice", labelKey = "LOC_CIVVIACCESS_SETTING_SIGHTED",
+      get = sightedGet, set = sightedSet,
+      values = {
+          { id = "blind",   labelKey = "LOC_CIVVIACCESS_SIGHTED_BLIND"   },
+          { id = "sighted", labelKey = "LOC_CIVVIACCESS_SIGHTED_SIGHTED" },
       } },
 };
 
@@ -665,11 +704,33 @@ local GRAPHICS_ITEMS = {
     { kind = "slider",   controlName = "PerformanceSlider",        labelKey = "LOC_OPTIONS_VIDEO_PERFORMANCE_TEXT", valueLabelControlName = "PerformanceValue" },
     { kind = "slider",   controlName = "MemorySlider",             labelKey = "LOC_OPTIONS_VIDEO_MEMORY_TEXT",      valueLabelControlName = "MemoryValue"      },
     { kind = "button",   controlName = "AdvancedGraphicsOptions",  labelKey = "LOC_OPTIONS_SHOW_ADVANCED_GRAPHICS",
+      dynamicLabel = true,
       activate = function() if OnToggleAdvancedOptions ~= nil then OnToggleAdvancedOptions(); end end },
-    -- The Advanced subsection (shadows / lighting / terrain / water / etc.)
-    -- is deliberately not enumerated yet — it's a per-session-state toggle
-    -- and its controls only become visible after AdvancedGraphicsOptions is
-    -- clicked. Follow-up to extend.
+    -- Advanced sub-panel. These live inside AdvancedOptionsContainer, which is
+    -- collapsed until the toggle above is activated; gateControl hides them from
+    -- nav until then. Control names + label keys are from base Options.xml.
+    -- (Reflections is commented out in base XML; omitted.)
+    { kind = "checkbox", controlName = "VSyncEnabledCheckbox",               labelKey = "LOC_OPTIONS_VIDEO_VSYNC_ENABLED_TEXT",                  gateControl = "AdvancedOptionsContainer" },
+    { kind = "pulldown", controlName = "TickIntervalPullDown",              labelKey = "LOC_OPTIONS_PERFORMANCE_TICK_INTERVAL_TEXT",            gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "AssetTextureResolutionCheckbox",    labelKey = "LOC_OPTIONS_VIDEO_HIGH_RESOLUTION_ASSET_TEXTURES_TEXT", gateControl = "AdvancedOptionsContainer" },
+    { kind = "pulldown", controlName = "VFXDetailLevelPullDown",            labelKey = "LOC_OPTIONS_VIDEO_VFX_DETAIL_LEVEL_TEXT",               gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "LightingBloomEnabledCheckbox",      labelKey = "LOC_OPTIONS_LIGHTING_BLOOM_ENABLED_TEXT",               gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "LightingDynamicLightingEnabledCheckbox", labelKey = "LOC_OPTIONS_LIGHTING_DYNAMIC_LIGHTING_ENABLED_TEXT", gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "ShadowsEnabledCheckbox",            labelKey = "LOC_OPTIONS_SHADOWS_ENABLED_TEXT",                      gateControl = "AdvancedOptionsContainer" },
+    { kind = "pulldown", controlName = "ShadowsResolutionPullDown",         labelKey = "LOC_OPTIONS_SHADOWS_RESOLUTION_TEXT",                   gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "CloudShadowsEnabledCheckbox",       labelKey = "LOC_OPTIONS_CLOUD_SHADOWS_ENABLED_TEXT",                gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "SSOverlayEnabledCheckbox",          labelKey = "LOC_OPTIONS_SSOVERLAY_ENABLED_TEXT",                    gateControl = "AdvancedOptionsContainer" },
+    { kind = "pulldown", controlName = "TerrainQualityPullDown",            labelKey = "LOC_OPTIONS_TERRAIN_QUALITY_TEXT",                      gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "TerrainSynthesisCheckbox",          labelKey = "LOC_OPTIONS_TERRAIN_HIGH_RESOLUTION_TEXT",              gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "TerrainTextureResolutionCheckbox",  labelKey = "LOC_OPTIONS_TERRAIN_HIGH_RESOLUTION_TEXTURES_TEXT",     gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "TerrainShaderCheckbox",             labelKey = "LOC_OPTIONS_TERRAIN_HIGH_QUALITY_SHADER_TEXT",          gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "TerrainAOEnabledCheckbox",          labelKey = "LOC_OPTIONS_LIGHTING_AO_ENABLED_TEXT",                  gateControl = "AdvancedOptionsContainer" },
+    { kind = "pulldown", controlName = "TerrainAOResolutionPullDown",       labelKey = "LOC_OPTIONS_LIGHTING_AO_RENDER_RESOLUTION_TEXT",        gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "TerrainClutterCheckbox",            labelKey = "LOC_OPTIONS_TERRAIN_HIGH_DETAIL_CLUTTER_TEXT",          gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "WaterResolutionCheckbox",           labelKey = "LOC_OPTIONS_WATER_HIGH_RESOLUTION_TEXT",                gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "WaterShaderCheckbox",               labelKey = "LOC_OPTIONS_WATER_HIGH_QUALITY_SHADER_TEXT",            gateControl = "AdvancedOptionsContainer" },
+    { kind = "pulldown", controlName = "LeaderQualityPullDown",             labelKey = "LOC_OPTIONS_LEADER_QUALITY_TEXT",                       gateControl = "AdvancedOptionsContainer" },
+    { kind = "checkbox", controlName = "MotionBlurEnabledCheckbox",         labelKey = "LOC_OPTIONS_LEADER_MOTIONBLUR_TEXT",                    gateControl = "AdvancedOptionsContainer" },
 };
 
 local LANGUAGE_ITEMS = {

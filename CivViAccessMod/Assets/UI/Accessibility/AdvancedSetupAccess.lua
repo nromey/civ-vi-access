@@ -312,6 +312,29 @@ local function playerSlotItems(playerID)
         for _, parameter in pairs(playerParams.Parameters) do
             items[#items + 1] = parameterItem(parameter, playerParams)
         end
+        -- Mod-owned per-player accessibility flag: is THIS player sighted?
+        -- (Default unchecked = blind.) Not an engine parameter — a custom
+        -- VirtualCheckbox persisted on the PlayerConfiguration so it survives
+        -- into the running game, where the local player's value is read at
+        -- world load (HexCursorAddin) and broadcast to the input wrap. Nothing
+        -- else consumes it yet; hotseat per-turn switching is later content.
+        -- See project_sighted_mode_per_turn.
+        items[#items + 1] = BaseMenuItems.VirtualCheckbox({
+            labelFn = function() return Locale.Lookup("LOC_CIVVIACCESS_PLAYER_SIGHTED") end,
+            getValue = function()
+                if PlayerConfigurations == nil or PlayerConfigurations[playerID] == nil then return false end
+                local pc = PlayerConfigurations[playerID]
+                if pc.GetValue == nil then return false end
+                local ok, v = pcall(function() return pc:GetValue("CIVVIACCESS_SIGHTED") end)
+                return ok and v == 1
+            end,
+            setValue = function(on)
+                if PlayerConfigurations == nil or PlayerConfigurations[playerID] == nil then return end
+                local pc = PlayerConfigurations[playerID]
+                if pc.SetValue == nil then return end
+                pcall(function() pc:SetValue("CIVVIACCESS_SIGHTED", on and 1 or 0) end)
+            end,
+        })
         -- Remove button when legal: the engine sets RemoveButton:SetHide
         -- based on min-player constraints; our wrapper reads that hide
         -- state via the matched ui_instance. We can't easily reach the
