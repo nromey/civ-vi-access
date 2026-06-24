@@ -329,6 +329,11 @@ local function applyPersistedAccessibilitySettings()
         local order = HexGeom.MODE_ORDER or { "hex", "compass", "clock", "degrees" };
         if order[d] ~= nil then HexGeom.setDirectionMode(order[d]); end
     end
+    local cm = Options.GetAppOption("Misc", "CivViAccess_CoordMode");
+    if type(cm) == "number" and HexGeom ~= nil and HexGeom.setCoordMode ~= nil then
+        local order = HexGeom.COORD_MODES or { "absolute", "relative" };
+        if order[cm] ~= nil then HexGeom.setCoordMode(order[cm]); end
+    end
     -- Sighted mode lives in a separate VM (the WorldInput wrap); it only learns
     -- the persisted value via this broadcast at world load.
     local s = Options.GetAppOption("Misc", "CivViAccess_SightedMode");

@@ -509,6 +509,7 @@ local SETTING_SECTION = "Misc";
 
 OptionsAccess.SETTING_VERBOSITY = "CivViAccess_Verbosity";
 OptionsAccess.SETTING_DIRMODE   = "CivViAccess_DirMode";
+OptionsAccess.SETTING_COORDMODE = "CivViAccess_CoordMode";
 OptionsAccess.SETTING_SIGHTED   = "CivViAccess_SightedMode";
 
 local function getStoredInt(key)
@@ -560,6 +561,27 @@ local function dirSet(id)
     end
 end
 
+-- Coordinate vocabulary: absolute (1, default) / relative. Mirrors the
+-- direction setting: stored as the 1-based index into HexGeom.COORD_MODES;
+-- HexGeom.setCoordMode broadcasts to the cursor Contexts.
+local function coordOrder()
+    return (HexGeom ~= nil and HexGeom.COORD_MODES) or { "absolute", "relative" };
+end
+local function coordGet()
+    local order = coordOrder();
+    local stored = getStoredInt(OptionsAccess.SETTING_COORDMODE);
+    if stored ~= nil and order[stored] ~= nil then return order[stored]; end
+    if HexGeom ~= nil and HexGeom.getCoordMode ~= nil then return HexGeom.getCoordMode(); end
+    return order[1];
+end
+local function coordSet(id)
+    if HexGeom ~= nil and HexGeom.setCoordMode ~= nil then HexGeom.setCoordMode(id); end
+    local order = coordOrder();
+    for i, m in ipairs(order) do
+        if m == id then setStoredInt(OptionsAccess.SETTING_COORDMODE, i); break; end
+    end
+end
+
 -- Sighted mode: blind (0, default) / sighted (1). "Sighted" passes the whole
 -- keyboard through to the engine — the capture-all WorldInput wrap already
 -- listens on CivViAccess_SetSighted and short-circuits to passthrough. Firing
@@ -593,6 +615,12 @@ local ACCESS_ITEMS = {
           { id = "compass", labelKey = "LOC_CIVVIACCESS_DIRVALUE_COMPASS" },
           { id = "clock",   labelKey = "LOC_CIVVIACCESS_DIRVALUE_CLOCK"   },
           { id = "degrees", labelKey = "LOC_CIVVIACCESS_DIRVALUE_DEGREES" },
+      } },
+    { kind = "choice", labelKey = "LOC_CIVVIACCESS_SETTING_COORD",
+      get = coordGet, set = coordSet,
+      values = {
+          { id = "absolute", labelKey = "LOC_CIVVIACCESS_COORDVALUE_ABSOLUTE" },
+          { id = "relative", labelKey = "LOC_CIVVIACCESS_COORDVALUE_RELATIVE" },
       } },
     { kind = "choice", labelKey = "LOC_CIVVIACCESS_SETTING_SIGHTED",
       get = sightedGet, set = sightedSet,

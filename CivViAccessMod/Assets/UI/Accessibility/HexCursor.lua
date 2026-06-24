@@ -555,7 +555,7 @@ function HexCursor.jumpAndAnnounce(x, y)
     if plot == nil then return; end
     setCursor(plot);
     AnnouncePlot(plot);
-    Speech.emit(HexGeom.absoluteCoords(x, y), "status");
+    Speech.emit(HexGeom.coordString(x, y), "status");
 end
 
 -- Scanner BACKSPACE: return the cursor to the cell saved before the last jump.
@@ -569,9 +569,16 @@ function HexCursor.returnAndAnnounce(x, y)
     local plot = Map.GetPlot(x, y);
     if plot == nil then return; end
     setCursor(plot);
-    local coords = HexGeom.absoluteCoords(x, y);
+    -- Coordinate mode: numbers tail in absolute mode, nil in relative (the
+    -- bearing carries position). No-capital case always falls back to numbers.
     local rel = HexGeom.relativeToCapital(x, y);
-    local where = (rel == nil) and coords or (rel .. ". " .. coords);
+    local tail = HexGeom.coordTail(x, y);
+    local where;
+    if rel ~= nil then
+        where = (tail ~= nil) and (rel .. ". " .. tail) or rel;
+    else
+        where = tail or HexGeom.absoluteCoords(x, y);
+    end
     Speech.emit(Locale.Lookup("LOC_CIVVIACCESS_SCANNER_RETURNING", where), "status");
 end
 
@@ -613,10 +620,16 @@ function HexCursor.speakWhereAmI()
     -- speak the numbers too — Alt+S as the only coords key was too easy to
     -- forget. Coords go last so the bearing (the thing you usually want)
     -- leads.
-    local coords = HexGeom.absoluteCoords(_x, _y);
+    -- Coordinate mode: append the raw numbers only in absolute mode; relative
+    -- mode speaks the bearing alone. No capital yet -> always give numbers.
     local rel = HexGeom.relativeToCapital(_x, _y);
-    local base = (rel == nil) and (coords .. ". No capital yet.")
-                 or (rel .. ". " .. coords);
+    local tail = HexGeom.coordTail(_x, _y);
+    local base;
+    if rel ~= nil then
+        base = (tail ~= nil) and (rel .. ". " .. tail) or rel;
+    else
+        base = (tail or HexGeom.absoluteCoords(_x, _y)) .. ". No capital yet.";
+    end
     local sel = selectedUnitPhrase();
     if sel ~= nil then base = base .. ". " .. sel; end
     Speech.emit(base, "status");
@@ -671,9 +684,11 @@ function HexCursor.speakSurvey()
     end
     local sel = selectedUnitPhrase();
     if sel ~= nil then parts[#parts + 1] = sel; end
-    -- Coords last (Noel 2026-06-02): the survey now always ends with the
-    -- absolute X, Y so any where-am-I key carries the numbers.
-    parts[#parts + 1] = HexGeom.absoluteCoords(_x, _y);
+    -- Coords last (Noel 2026-06-02): in absolute mode the survey ends with the
+    -- raw X, Y. In relative mode the leading capital bearing (parts[1]) already
+    -- carries position, so the numbers tail is dropped.
+    local tail = HexGeom.coordTail(_x, _y);
+    if tail ~= nil then parts[#parts + 1] = tail; end
     Speech.emit(table.concat(parts, ". "), "status");
 end
 

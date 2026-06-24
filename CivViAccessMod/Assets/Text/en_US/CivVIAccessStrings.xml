@@ -194,6 +194,15 @@
         <Row Tag="LOC_CIVVIACCESS_DIRVALUE_DEGREES">
             <Text>degrees</Text>
         </Row>
+        <Row Tag="LOC_CIVVIACCESS_SETTING_COORD">
+            <Text>Coordinate readout</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_COORDVALUE_ABSOLUTE">
+            <Text>absolute</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_COORDVALUE_RELATIVE">
+            <Text>relative</Text>
+        </Row>
         <Row Tag="LOC_CIVVIACCESS_SETTING_SIGHTED">
             <Text>Sighted mode</Text>
         </Row>

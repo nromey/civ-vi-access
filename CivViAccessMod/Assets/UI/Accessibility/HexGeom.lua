@@ -357,3 +357,56 @@ if LuaEvents ~= nil and not HexGeom._dirListenerInstalled then
         applyDirectionLocal(mode);
     end);
 end
+
+-- ===========================================================================
+-- Coordinate vocabulary: absolute (default) / relative.
+--   absolute -> the raw "X 47, Y 23" grid coords (what the where-am-I has
+--               always appended after the capital bearing).
+--   relative -> capital-relative bearing only (relativeToCapital, itself
+--               direction-vocab aware); the raw numbers are dropped.
+-- Same cross-Context broadcast as the direction mode. The dedicated absolute
+-- key (speakWhereAmIAbs) ignores this and always speaks numbers.
+-- ===========================================================================
+HexGeom._coordMode = HexGeom._coordMode or "absolute";
+local COORD_MODES = { "absolute", "relative" };
+HexGeom.COORD_MODES = COORD_MODES;
+
+function HexGeom.getCoordMode()
+    return HexGeom._coordMode or "absolute";
+end
+
+local function applyCoordLocal(mode)
+    if mode ~= "absolute" and mode ~= "relative" then return false; end
+    HexGeom._coordMode = mode;
+    return true;
+end
+
+function HexGeom.setCoordMode(mode)
+    if not applyCoordLocal(mode) then return nil; end
+    if LuaEvents ~= nil and LuaEvents.CivViAccess_CoordModeChanged ~= nil then
+        LuaEvents.CivViAccess_CoordModeChanged(mode);
+    end
+    return mode;
+end
+
+if LuaEvents ~= nil and not HexGeom._coordListenerInstalled then
+    HexGeom._coordListenerInstalled = true;
+    LuaEvents.CivViAccess_CoordModeChanged.Add(function(mode) applyCoordLocal(mode); end);
+end
+
+-- The raw-numbers tail for where-am-I composition: the absolute coords in
+-- absolute mode, or nil in relative mode (the bearing already conveys position).
+function HexGeom.coordTail(x, y)
+    if HexGeom._coordMode == "relative" then return nil; end
+    return HexGeom.absoluteCoords(x, y);
+end
+
+-- Standalone position locator (a jump/where readout not already paired with a
+-- bearing): absolute coords, or the capital-relative bearing in relative mode
+-- (falling back to coords when there's no capital yet).
+function HexGeom.coordString(x, y)
+    if HexGeom._coordMode == "relative" then
+        return HexGeom.relativeToCapital(x, y) or HexGeom.absoluteCoords(x, y);
+    end
+    return HexGeom.absoluteCoords(x, y);
+end
