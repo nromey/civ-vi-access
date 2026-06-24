@@ -207,6 +207,31 @@
             <Text>Sighted player</Text>
         </Row>
 
+        <!-- KeyBindings tab (the in-game hotkey manager). One item per engine
+             action; Left/Right switches the gesture slot, Enter records, Delete
+             clears. The slot/gesture come from the engine. -->
+        <Row Tag="LOC_CIVVIACCESS_KEYBIND_PRIMARY">
+            <Text>primary</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_KEYBIND_ALTERNATE">
+            <Text>alternate</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_KEYBIND_UNBOUND">
+            <Text>unbound</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_KEYBIND_ANNOUNCE">
+            <Text>{1_Action}, {2_Slot}, {3_Gesture}</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_KEYBIND_RECORDING">
+            <Text>Rebinding {1_Action} {2_Slot}. Press a key combination, or Escape to cancel.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_KEYBIND_BOUND">
+            <Text>{1_Action} {2_Slot} bound to {3_Gesture}.</Text>
+        </Row>
+        <Row Tag="LOC_CIVVIACCESS_KEYBIND_CLEARED">
+            <Text>{1_Action} {2_Slot} cleared.</Text>
+        </Row>
+
         <!-- Tutorial accessibility — wraps the engine's tutorial popup,
              goal, and world-pointer events for spoken announcement. The
              body of each advisor message and goal text comes from Civ VI

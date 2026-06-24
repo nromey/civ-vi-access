@@ -87,6 +87,7 @@ local VK_CONTROL :number = vk("VK_CONTROL",0x11);
 local VK_PRIOR   :number = vk("VK_PRIOR",  0x21); -- PageUp
 local VK_NEXT    :number = vk("VK_NEXT",   0x22); -- PageDown
 local VK_F1      :number = vk("VK_F1",     0x70);
+local VK_DELETE  :number = vk("VK_DELETE", 0x2E);
 
 local STEP_SMALL :number = 0.05;   -- Left / Right = 5%
 local STEP_BIG   :number = 0.20;   -- Shift+Left/Right = 20%
@@ -98,6 +99,8 @@ local m_tabs              :table   = {};    -- mirror of Options.lua m_tabs
 local m_tabItems          :table   = {};    -- items[tabIdx] = { item, ... }
 local m_tabIndex          :number  = 1;
 local m_accessTabIdx                 = nil;  -- index of the virtual Accessibility tab (= #m_tabs + 1)
+local m_recordingItem                = nil;  -- keybind item currently capturing a new gesture
+local m_keybindResultHooked          = false; -- guard: subscribe to InputGestureRecorded once
 local m_pendingJumpPanel             = nil;  -- deep-link: jump to this panel name on next show
 local m_itemIndex         :table   = {};    -- per-tab cursor; itemIndex[tabIdx]
 local m_sliderCallbacks   :table   = {};    -- by controlName -> fn(value)
@@ -632,6 +635,105 @@ local function activateChoice(item)
     adjustChoice(item, 1, false);
 end
 
+-- ===========================================================================
+--  KeyBindings tab (the in-game hotkey manager)
+-- ===========================================================================
+-- The base KeyBindings tab is a dynamic list built from the engine's action
+-- table plus a modal gesture-capture popup. We REUSE the base machinery
+-- (StartActiveKeyBinding / BindRecordedGesture / RefreshKeyBinding / ClearGesture
+-- are globals after InitializeKeyBinding) and layer keyboard nav + speech on
+-- top. One item per action; Left/Right switches the focused gesture slot
+-- (primary / alternate), Enter records a new gesture for it, Delete clears it.
+-- While the engine's capture popup is open, OnInput passes ALL keys through (so
+-- the recorder and the base Escape-cancel receive them).
+local function keybindSlotLabel(slot)
+    return Locale.Lookup((slot == 1) and "LOC_CIVVIACCESS_KEYBIND_ALTERNATE"
+                                      or  "LOC_CIVVIACCESS_KEYBIND_PRIMARY");
+end
+
+local function keybindGesture(item)
+    if Input == nil or Input.GetGestureDisplayString == nil then return nil; end
+    local ok, g = pcall(Input.GetGestureDisplayString, item.actionId, item.slot or 0);
+    if ok and g ~= nil and g ~= false and g ~= "" then return stripIconTags(tostring(g)); end
+    return nil;
+end
+
+local function announceKeybind(item)
+    local g = keybindGesture(item) or Locale.Lookup("LOC_CIVVIACCESS_KEYBIND_UNBOUND");
+    return Locale.Lookup("LOC_CIVVIACCESS_KEYBIND_ANNOUNCE",
+        item.actionName or "", keybindSlotLabel(item.slot or 0), g);
+end
+
+local function adjustKeybind(item, dir, big)
+    -- Left/Right switches the focused gesture slot (primary <-> alternate).
+    item.slot = (item.slot == 1) and 0 or 1;
+    speak(announceKeybind(item), false);
+end
+
+local function activateKeybind(item)
+    -- Begin recording a new gesture for the focused slot; the bound result
+    -- comes back via Events.InputGestureRecorded (onKeybindResult announces it).
+    if StartActiveKeyBinding == nil then return; end
+    m_recordingItem = item;
+    speak(Locale.Lookup("LOC_CIVVIACCESS_KEYBIND_RECORDING",
+        item.actionName or "", keybindSlotLabel(item.slot or 0)), false);
+    StartActiveKeyBinding(item.actionId, item.slot or 0);
+end
+
+local function clearKeybind(item)
+    if Input == nil or Input.ClearGesture == nil then return; end
+    pcall(Input.ClearGesture, item.actionId, item.slot or 0);
+    if RefreshKeyBinding ~= nil then pcall(RefreshKeyBinding); end
+    speak(Locale.Lookup("LOC_CIVVIACCESS_KEYBIND_CLEARED",
+        item.actionName or "", keybindSlotLabel(item.slot or 0)), false);
+end
+
+-- Build the action list the same way base RefreshKeyBinding does (enumerate +
+-- filter + sort by category then name). One item per action.
+local function buildKeyBindingItems()
+    local items = {};
+    if Input == nil or Input.GetActionCount == nil or Input.GetActionId == nil then
+        return items;
+    end
+    local actions = {};
+    local count = Input.GetActionCount();
+    for i = 0, count - 1 do
+        local actionId = Input.GetActionId(i);
+        if actionId ~= nil and (Input.ShouldShowActionKeybinding == nil
+                                or Input.ShouldShowActionKeybinding(actionId)) then
+            local name = (Input.GetActionName ~= nil)
+                and stripIconTags(Locale.Lookup(Input.GetActionName(actionId)) or "")
+                or tostring(actionId);
+            local cat = (Input.GetActionCategory ~= nil)
+                and (Locale.Lookup(Input.GetActionCategory(actionId)) or "") or "";
+            actions[#actions + 1] = { id = actionId, name = name, cat = cat };
+        end
+    end
+    table.sort(actions, function(a, b)
+        local c = Locale.Compare(a.cat, b.cat);
+        if c == 0 then return Locale.Compare(a.name, b.name) == -1; end
+        return c == -1;
+    end);
+    for _, a in ipairs(actions) do
+        items[#items + 1] = { kind = "keybind", actionId = a.id, actionName = a.name,
+                              category = a.cat, slot = 0 };
+    end
+    return items;
+end
+
+-- Announce the result of a rebind. Subscribed AFTER the base handler (in
+-- Install, which runs after InitializeKeyBinding) so the gesture is already
+-- bound when we re-read it. Set fresh by activateKeybind each time; a cancel
+-- (no gesture) just leaves the stale value for the next real bind to overwrite.
+local function onKeybindResult(gesture)
+    if m_recordingItem == nil then return; end
+    local item = m_recordingItem;
+    m_recordingItem = nil;
+    speak(Locale.Lookup("LOC_CIVVIACCESS_KEYBIND_BOUND",
+        item.actionName or "", keybindSlotLabel(item.slot or 0),
+        keybindGesture(item) or Locale.Lookup("LOC_CIVVIACCESS_KEYBIND_UNBOUND")), false);
+end
+
 local ITEM_HANDLERS = {
     slider   = { announce = announceSlider,   activate = activateSlider,   adjust = adjustSlider   },
     checkbox = { announce = announceCheckbox, activate = activateCheckbox                          },
@@ -639,6 +741,7 @@ local ITEM_HANDLERS = {
     pulldown = { announce = announcePulldown, activate = activatePulldown, adjust = adjustPulldown },
     editbox  = { announce = announceEditbox,  activate = activateEditbox                           },
     choice   = { announce = announceChoice,   activate = activateChoice,   adjust = adjustChoice   },
+    keybind  = { announce = announceKeybind,  activate = activateKeybind,  adjust = adjustKeybind  },
 };
 
 -- ===========================================================================
@@ -766,10 +869,8 @@ local APPLICATION_ITEMS = {
     { kind = "checkbox", controlName = "WarnAboutModsCheckbox", labelKey = "LOC_OPTIONS_APP_WARN_MOD_COMPATIBILITY" },
 };
 
--- KeyBindings tab is dynamic (rebind buttons + modal popup). Not yet
--- accessible — empty content array means only the bottom row is reachable.
-local KEYBINDINGS_ITEMS = {};
-
+-- KeyBindings is dynamic — a function (not a static list) so it's rebuilt from
+-- the live engine action table each time tabs are built. See buildKeyBindingItems.
 local TAB_CONTENT_BY_PANEL = {
     GameOptions        = GAME_ITEMS,
     GraphicsOptions    = GRAPHICS_ITEMS,
@@ -777,7 +878,7 @@ local TAB_CONTENT_BY_PANEL = {
     LanguageOptions    = LANGUAGE_ITEMS,
     InterfaceOptions   = INTERFACE_ITEMS,
     ApplicationOptions = APPLICATION_ITEMS,
-    KeyBindings        = KEYBINDINGS_ITEMS,
+    KeyBindings        = buildKeyBindingItems,
 };
 
 -- ===========================================================================
@@ -804,6 +905,9 @@ local function buildTabItems()
     for i, tab in ipairs(m_tabs) do
         local name = panelNameForTab(tab);
         local content = (name ~= nil and TAB_CONTENT_BY_PANEL[name]) or {};
+        -- Dynamic tabs (KeyBindings) provide a builder function rather than a
+        -- static list; call it to get the live items.
+        if type(content) == "function" then content = content() or {}; end
         local items = {};
         for _, item in ipairs(content) do
             items[#items + 1] = item;
@@ -1040,6 +1144,15 @@ function OptionsAccess.OnInput(pInputStruct)
     local uiMsg  = pInputStruct:GetMessageType();
     local wParam = pInputStruct:GetKey();
 
+    -- While the engine's key-binding capture popup is open, pass ALL keys
+    -- through so the gesture recorder captures the combo and the base
+    -- Escape-cancel (Options.lua InputHandler) fires. We resume on close.
+    if Controls ~= nil and Controls.KeyBindingPopup ~= nil
+       and Controls.KeyBindingPopup.IsHidden ~= nil
+       and not Controls.KeyBindingPopup:IsHidden() then
+        return false;
+    end
+
     if DEBUG_INPUT then
         local sh = (pInputStruct.IsShiftDown ~= nil) and tostring(pInputStruct:IsShiftDown()) or "no-method";
         local ct = (pInputStruct.IsControlDown ~= nil) and tostring(pInputStruct:IsControlDown()) or "no-method";
@@ -1161,6 +1274,17 @@ function OptionsAccess.OnInput(pInputStruct)
         activateCurrent();
         return true;
     end
+    -- Delete clears the focused gesture slot on a KeyBindings item; ignored
+    -- (fall through) elsewhere.
+    if wParam == VK_DELETE then
+        local items = currentItems();
+        local item = items[m_itemIndex[m_tabIndex] or 0];
+        if item ~= nil and item.kind == "keybind" then
+            clearKeybind(item);
+            return true;
+        end
+        return false;
+    end
     -- Escape: fall through. The fork wraps the engine's InputHandler so Esc
     -- reaches OnCancel via the original handler.
     return false;
@@ -1269,6 +1393,13 @@ end
 function OptionsAccess.Install(ctx, tabs)
     m_tabs = tabs or {};
     buildTabItems();
+    -- Subscribe to the rebind-result event AFTER the base handler (Install runs
+    -- after InitializeKeyBinding), so the gesture is already bound when we
+    -- re-read it. Guarded so re-Install doesn't stack listeners.
+    if not m_keybindResultHooked and Events ~= nil and Events.InputGestureRecorded ~= nil then
+        m_keybindResultHooked = true;
+        Events.InputGestureRecorded.Add(onKeybindResult);
+    end
 end
 
 function OptionsAccess.WrapInput(origInputFn)
