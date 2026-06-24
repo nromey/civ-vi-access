@@ -299,7 +299,12 @@ findings code-verified 2026-06-23 against the base install.
 ## Unphased infra (ride alongside / after P1–P3 — not blocking play)
 
 - **#13 Sighted mode** — input passthrough + per-player designation in game options
-  (hotseat with Julian/Dulian). Different use case than solo play.
+  (hotseat with Julian/Dulian). Different use case than solo play. **UI + persistence
+  SHIPPED 2026-06-24** (global toggle in the Accessibility Options tab + per-player
+  VirtualCheckbox in AdvancedSetup, both wired to the existing WorldInputAccessWrap
+  `_sighted`/`CivViAccess_SetSighted` keystone). REMAINING: speech gating (sighted should
+  also mute — Civ VI lacks the central mute Civ V Access had), per-turn auto-flip for
+  hotseat, and verifying `PlayerConfigurations` custom-key survival into the running game.
 - **#14 Key migration** — MOSTLY DONE (verified 2026-06-11/12): the hex cluster
   (bare + Shift Q/E/A/D/Z/C) + Ctrl+D vocab ride the capture-all wrap via
   `NavKeys.lua`. Remaining: the Alt+Q/A/Z/C engine letter-actions (silent
