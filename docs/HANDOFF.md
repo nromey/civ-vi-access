@@ -23,8 +23,11 @@ we did a full menu pass. Commits this session, all on `main`, none tagged:
    `Tab`/`Shift+Tab` = move setting; `Up`/`Down` + `PageUp`/`PageDown` kept as reliable
    aliases. `TAB_DIAG=true` logs `OPT_TAB` to confirm the Ctrl chords arrive (strip after).
 2. **Accessibility tab** (virtual tab, `choice` item kind, `SetAppOption` persistence,
-   `HexGeom` direction-mode now broadcasts cross-context, boot-apply in HexCursorAddin):
-   residents **Verbosity** (terse/chatty) + **Direction vocabulary** (hex/compass/clock/degrees).
+   `HexGeom` direction + coord modes broadcast cross-context, boot-apply in HexCursorAddin):
+   four residents — **Verbosity** (terse/chatty), **Direction vocabulary**
+   (hex/compass/clock/degrees), **Coordinate readout** (absolute/relative — default absolute
+   is byte-identical to today; relative = capital bearing, drops the raw numbers), and
+   **Sighted mode** (blind/sighted).
 3. **Graphics Advanced sub-panel**: all 21 advanced controls enumerated into `GRAPHICS_ITEMS`
    with a `gateControl` that hides them until the Advanced toggle is expanded; the toggle
    button uses `dynamicLabel` to announce its live Show/Hide caption. Control names + LOC
@@ -43,19 +46,25 @@ we did a full menu pass. Commits this session, all on `main`, none tagged:
      `PlayerConfigurations` (`CIVVIACCESS_SIGHTED`). At world load the LOCAL player's value
      overrides the global and is broadcast to the wrap. **No speech gating yet — only flips
      input ownership.** Hotseat per-turn switching + speech gating are later content.
-6. **Prism-only ship**: dropped the Tolk native embed from `CivViAccess.csproj`
-   (`Tolk.dll` + `nvdaControllerClient64.dll` + `SAAPI64.dll`); `prism.dll` is the only
-   speech file. **Launcher builds clean (verified, 0/0).** Tradeoff documented inline.
+6. **Speech ship**: tried Prism-only (dropped the Tolk embed) then **reverted — Tolk
+   stays as the Prism→Tolk fallback** (Noel's call 2026-06-24: a few hundred KB is worth
+   avoiding silent total no-speech if Prism ever fails to init). Net csproj change = none.
+   Remaining nice-to-have: a loud "no speech backend" diagnostic in camm `ScreenReaderFactory`
+   for the both-fail case.
 
 ### ►► MORNING TEST SCRIPT (one pass covers everything)
 1. `dotnet run --project C:\dev\civ-vi-access\CivViAccess`. (Speech still works → confirms
    the Prism-only drop didn't break the comm path.)
 2. **Open Options.** `Ctrl+Tab`/`Ctrl+Shift+Tab` move between tabs; `Tab`/`Shift+Tab` move
    between settings. (`PageUp`/`PageDown` + `Up`/`Down` still work.)
-3. **Accessibility tab** (last tab): hear "Accessibility", "Verbosity, terse". `Tab` →
-   "Direction vocabulary, hex" → "Sighted mode, blind". Change each (`Left/Right`/`Enter`).
-   Close/reopen → persists. Set Direction = compass; quit + relaunch + start a game →
-   in-game where-am-I speaks compass bearings (boot-apply).
+3. **Accessibility tab** (last tab): hear "Accessibility", "Verbosity, terse". `Tab`
+   through the four settings: Verbosity, Direction vocabulary, Coordinate readout, Sighted
+   mode. Change each (`Left/Right`/`Enter`). Close/reopen → persists. Set Direction =
+   compass; quit + relaunch + start a game → in-game where-am-I speaks compass bearings
+   (boot-apply). **Coordinate readout**: default "absolute" should sound exactly like now
+   ("…of capital. X 47, Y 23"); switch to "relative" → where-am-I (S / Shift+S) drops the
+   raw numbers and speaks the capital bearing only. Tell me if you want the relative wording
+   different — that's a one-line change.
 4. **Graphics tab** → arrow to "Show advanced graphics", `Enter` → it expands; arrow down
    into VSync / shadows / terrain / water / leader quality etc. (≈21 controls). Toggle a few.
 5. **KeyBindings tab**: arrow the action list; each reads "Action, primary, <gesture>".
@@ -76,17 +85,14 @@ we did a full menu pass. Commits this session, all on `main`, none tagged:
   setup→running game? If `pv` is nil in-game, fall back to a mod-side table seeded at start.
 
 ## ►► NEXT (Noel's plan 2026-06-24, remaining)
-1. **Playtest** the above; reword any LOC.
-2. **Coordinate mode** (3rd Accessibility resident) — NEEDS Noel's UX call: relative readout
-   = direction-decomposed ("5 east, 3 southeast of capital") or grid offset ("+5, −3")?
-   Then add a `HexGeom` coord-mode flag + broadcast + thread through where-am-I
-   (HexCursor 558/572/603/616/676, ScreenReaderPlotUtils 144).
-3. **Prism recompile + version bump** (the camm step): bump the pinned
+1. **Playtest** the above; reword any LOC (incl. the relative-coordinate wording — hear it,
+   tell me to adjust).
+2. **Prism recompile + version bump** (the camm step): bump the pinned
    `camm/third_party/prism` submodule to last week's upstream, rebuild, **then** version
    bump as one batch. ⚠️ submodule-publish-before-tag. ⚠️ reconcile with the pending 0.8.0
-   gate (builder last-charge fix + `CHARGE_DEBUG` strip). ⚠️ **add the loud "no speech
-   backend" diagnostic to camm `ScreenReaderFactory` before a release ships the Tolk drop.**
-4. Then → playability / playthrough.
+   gate (builder last-charge fix + `CHARGE_DEBUG` strip). Optional: add the loud "no speech
+   backend" diagnostic to camm `ScreenReaderFactory` (now low priority — Tolk fallback kept).
+3. Then → playability / playthrough.
 
 ### Menu gaps still open (from this session's audit — for the next menu pass)
 - **Save-game filename entry** (S–M): mouse-only; needs the SR text-entry primitive (also
